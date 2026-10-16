@@ -7,16 +7,11 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <!-- Dynamic Header Placeholder -->
     <header id="header-placeholder"></header>
-
-    <!-- Main Content (Registration Form) -->
     <main>
         <div class="form-container">
             <h2>Create an Account</h2>
             <p>Join our patient portal for easy healthcare access.</p>
-            
             <form id="registerForm">
                 <div class="form-group">
                     <label for="firstname">First Name</label>
@@ -48,18 +43,19 @@
                         <input type="checkbox" required> I agree to the Terms of Service.
                     </label>
                 </div>
-                <button type="submit" class="btn-submit">Create Account</button>
+                <button type="submit" class="btn-submit" id="registerBtn">Create Account</button>
+                <div id="registerError" class="error-message" style="text-align:center; margin-top:10px;"></div>
             </form>
-
             <div class="form-footer">
                 Already have an account? <a href="login.html">Sign in</a>
             </div>
         </div>
     </main>
-
-    <!-- Dynamic Footer Placeholder -->
     <footer id="footer-placeholder"></footer>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
