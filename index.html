@@ -7,24 +7,26 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <!-- Dynamic Header Placeholder -->
     <header id="header-placeholder"></header>
-
-    <!-- Main Content -->
     <main>
-        <div style="text-align: center; max-width: 800px;">
-            <h1 style="color: #1e3a8a; font-size: 36px; margin-bottom: 20px;">Compassionate Healthcare for Our Community</h1>
-            <p style="font-size: 18px; color: #555; line-height: 1.6;">
-                Welcome to DEEN Hospital. We are dedicated to providing world-class medical care with a personal touch. 
-                Explore our departments or log in to your patient portal.
-            </p>
+        <div class="home-content">
+            <div class="emergency-banner">
+                🚨 Emergency? Call 112 or our 24/7 hotline: <br>
+                <span>+1 (555) 123-4567</span>
+            </div>
+            <h1>Compassionate Healthcare for Our Community</h1>
+            <p>Welcome to DEEN Hospital. Explore our departments or log in to your patient portal.</p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:10px;">
+                <a href="pages/appointments.html" class="btn btn-primary" style="padding:12px 24px;">Book Appointment</a>
+                <a href="pages/emergency.html" class="btn btn-outline" style="padding:12px 24px; border-color:#1e3a8a; color:#1e3a8a;">Emergency Info</a>
+            </div>
         </div>
     </main>
-
-    <!-- Dynamic Footer Placeholder -->
     <footer id="footer-placeholder"></footer>
-
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="firebase-config.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
