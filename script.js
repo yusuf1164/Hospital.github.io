@@ -1,3 +1,31 @@
+
+
+
+// ==========================================
+// FIREBASE CONFIGURATION & INITIALIZATION
+// ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAeoi7_GAJ1bJkHdnKGaLPRrnH3RirI1H4",
+  authDomain: "deen-hospital.firebaseapp.com",
+  projectId: "deen-hospital",
+  storageBucket: "deen-hospital.firebasestorage.app",
+  messagingSenderId: "96445469484",
+  appId: "1:96445469484:web:2efb94ababdc39c79a1289"
+};
+
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// ==========================================
+
+
+
+
+
+
+
+
 document.addEventListener('DOMContentLoaded', () => {
     
     // 1. Load the Header dynamically
