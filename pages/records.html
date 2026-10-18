@@ -26,9 +26,10 @@
             <!-- Search Patient -->
             <div class="form-card" style="margin-bottom: 30px;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label>Select Patient</label>
-                    <select id="patientSelect" required>
-                        <option value="">Loading patients...</option>
+                    <label>Search Patient (Name, ID, or Phone)</label>
+                    <input type="text" id="searchPatientInput" placeholder="Type to search..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; margin-bottom: 10px;">
+                    <select id="patientSelect" required size="4" style="width: 100%; padding: 10px; border-radius: 5px; display: none;">
+                        <!-- Options will be injected by JS -->
                     </select>
                 </div>
             </div>
@@ -67,30 +68,49 @@
 
     <footer id="footer-placeholder"></footer>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
-    <!-- Records Logic -->
     <script>
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
             const patientSelect = document.getElementById('patientSelect');
+            const searchInput = document.getElementById('searchPatientInput');
             const historyContainer = document.getElementById('historyContainer');
+            let allPatients = [];
 
-            // 1. Load Patients into Dropdown
+            // 1. Load Patients into Memory
             db.collection('patients').orderBy('firstName').get().then((snapshot) => {
-                patientSelect.innerHTML = '<option value="">Select a patient...</option>';
-                snapshot.forEach(doc => {
-                    const p = doc.data();
-                    patientSelect.innerHTML += `<option value="${doc.id}">${p.firstName} ${p.lastName}</option>`;
-                });
+                snapshot.forEach(doc => allPatients.push({ id: doc.id, ...doc.data() }));
             });
 
-            // 2. Fetch all records when a patient is selected
+            // 2. Live Search Logic
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                if (term.length < 2) {
+                    patientSelect.style.display = 'none';
+                    return;
+                }
+
+                const filtered = allPatients.filter(p => {
+                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                    const pid = String(p.patientId).toLowerCase();
+                    const phone = String(p.phone).toLowerCase();
+                    return name.includes(term) || pid.includes(term) || phone.includes(term);
+                });
+
+                patientSelect.innerHTML = '<option value="">Select matching patient...</option>';
+                filtered.forEach(p => {
+                    patientSelect.innerHTML += `<option value="${p.id}">${p.patientId} - ${p.firstName} ${p.lastName} (${p.phone})</option>`;
+                });
+                
+                patientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+            });
+
+            // 3. Fetch all records when a patient is selected
             patientSelect.addEventListener('change', (e) => {
                 const pid = e.target.value;
                 if (!pid) {
@@ -100,11 +120,9 @@
 
                 historyContainer.style.display = 'block';
 
-                // Set loading states
                 const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
                 sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
 
-                // Fetch everything at the same time using Promise.all for speed
                 Promise.all([
                     db.collection('vitals').where('patientId', '==', pid).get(),
                     db.collection('consultations').where('patientId', '==', pid).get(),
@@ -113,10 +131,8 @@
                     db.collection('bills').where('patientId', '==', pid).get()
                 ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
                     
-                    // Helper to format dates
                     const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
 
-                    // --- Render Vitals ---
                     let vitalsHTML = '';
                     if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
                     vitalsSnap.forEach(doc => {
@@ -125,7 +141,6 @@
                     });
                     document.getElementById('vitalsList').innerHTML = vitalsHTML;
 
-                    // --- Render Consultations ---
                     let consultHTML = '';
                     if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
                     consultSnap.forEach(doc => {
@@ -133,14 +148,13 @@
                         consultHTML += `
                             <div class="record-item">
                                 <span class="record-date">${formatDate(d.createdAt)}</span>
-                                <strong>Doctor:</strong> ${d.doctorName}<br>
+                                <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
                                 <strong>Symptoms:</strong> ${d.symptoms}<br>
                                 <strong>Diagnosis:</strong> ${d.diagnosis}
                             </div>`;
                     });
                     document.getElementById('consultationsList').innerHTML = consultHTML;
 
-                    // --- Render Labs ---
                     let labsHTML = '';
                     if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
                     labsSnap.forEach(doc => {
@@ -150,7 +164,6 @@
                     });
                     document.getElementById('labsList').innerHTML = labsHTML;
 
-                    // --- Render Radiology ---
                     let radHTML = '';
                     if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
                     radSnap.forEach(doc => {
@@ -160,7 +173,6 @@
                     });
                     document.getElementById('radiologyList').innerHTML = radHTML;
 
-                    // --- Render Billing ---
                     let billsHTML = '';
                     if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
                     billsSnap.forEach(doc => {
