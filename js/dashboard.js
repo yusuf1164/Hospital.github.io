@@ -30,8 +30,12 @@ function renderModules(userRoles) {
             { title: '📜 Activity Logs', desc: 'View all staff actions', link: 'pages/activity-log.html' },
             { title: '👔 Admin / HR', desc: 'Manage staff roles & access', link: 'pages/admin.html' },
             { title: '🧑‍💼 Reception', desc: 'Patient registration', link: 'pages/reception.html' },
+            { title: '🌡️ Nursing', desc: 'Vitals & care', link: 'pages/nursing.html' },
             { title: '🩺 OPD (Doctors)', desc: 'Consultations', link: 'pages/opd.html' },
-            { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' }
+            { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' },
+            { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' },
+            { title: '💳 Billing', desc: 'Payments & Invoices', link: 'pages/billing.html' },
+            { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' }
         ]
     };
 
@@ -42,6 +46,7 @@ function renderModules(userRoles) {
 
     if (finalModules.length === 0) finalModules = allModules.patient;
 
+    // Remove duplicates
     const uniqueModules = Array.from(new Set(finalModules.map(m => m.title)))
         .map(title => finalModules.find(m => m.title === title));
 
