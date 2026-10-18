@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Management - DEEN Hospital</title>
+    <title>Admin - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
     <style>
         .search-box { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; }
@@ -19,24 +19,55 @@
     <main>
         <div class="table-container">
             <div class="page-header">
-                <h1>👔 User Management (Admin Only)</h1>
-                <p>Search for staff, assign departments, and manage access.</p>
+                <h1>👔 Admin / HR Panel</h1>
+                <p>Manage staff access and hospital services.</p>
             </div>
 
+            <!-- User Management Section -->
             <div class="form-card">
-                <h3>1. Find User</h3>
-                <input type="text" id="searchUser" class="search-box" placeholder="Type Name or Staff ID (e.g. 1001)...">
+                <h3>1. User Access Management</h3>
+                <input type="text" id="searchUser" class="search-box" placeholder="Type Name or Staff ID...">
                 <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
                     <option value="">Select a user...</option>
                 </select>
+                
+                <div id="rolesSection" style="display: none; margin-top: 20px;">
+                    <div class="role-grid" id="roleCheckboxes"></div>
+                    <button id="saveRolesBtn" class="btn-submit" style="margin-top: 20px; max-width: 250px;">Save User Access</button>
+                    <div id="msgBox" style="margin-top: 15px; font-weight: bold;"></div>
+                </div>
             </div>
 
-            <div class="form-card" id="rolesSection" style="display: none;">
-                <h3>2. Assign Departments</h3>
-                <div class="role-grid" id="roleCheckboxes"></div>
-                <button id="saveRolesBtn" class="btn-submit" style="margin-top: 20px; max-width: 250px;">Save User Access</button>
-                <div id="msgBox" style="margin-top: 15px; font-weight: bold;"></div>
+            <!-- Service Management Section -->
+            <div class="form-card" style="border-left: 4px solid #2563eb;">
+                <h3>2. Manage Lab Tests & Radiology Scans</h3>
+                <form id="serviceForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
+                    <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
+                        <label>Service Name</label>
+                        <input type="text" id="serviceName" required placeholder="e.g. Malaria Test">
+                    </div>
+                    <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                        <label>Department</label>
+                        <select id="serviceType" required>
+                            <option value="labTests">Laboratory</option>
+                            <option value="radiologyScans">Radiology</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn-submit" style="width: auto; padding: 10px 20px;">Add Service</button>
+                </form>
+
+                <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <h4 style="color:#1e3a8a; margin-bottom: 10px;">Lab Tests</h4>
+                        <ul id="labTestsList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <h4 style="color:#1e3a8a; margin-bottom: 10px;">Radiology Scans</h4>
+                        <ul id="radiologyScansList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
+                    </div>
+                </div>
             </div>
+
         </div>
     </main>
 
@@ -54,15 +85,14 @@
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
+            // --- USER MANAGEMENT LOGIC ---
             const searchInput = document.getElementById('searchUser');
             const userSelect = document.getElementById('userSelect');
             const rolesSection = document.getElementById('rolesSection');
             const roleCheckboxes = document.getElementById('roleCheckboxes');
 
             db.collection('users').get().then((snapshot) => {
-                snapshot.forEach(doc => {
-                    allUsers.push({ id: doc.id, ...doc.data() });
-                });
+                snapshot.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
                 populateDropdown(allUsers);
             });
 
@@ -77,7 +107,6 @@
                 const term = e.target.value.toLowerCase();
                 const filtered = allUsers.filter(u => {
                     const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
-                    // Force staffId to be a string so numbers don't break the search
                     const staffId = String(u.staffId || '').toLowerCase();
                     return fullName.includes(term) || staffId.includes(term);
                 });
@@ -94,16 +123,11 @@
 
             userSelect.addEventListener('change', (e) => {
                 const selectedId = e.target.value;
-                if (!selectedId) {
-                    rolesSection.style.display = 'none';
-                    return;
-                }
-
+                if (!selectedId) { rolesSection.style.display = 'none'; return; }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
                 
                 const selectedUser = allUsers.find(u => u.id === selectedId);
-                
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
 
                 if (selectedUser && selectedUser.roles) {
@@ -120,18 +144,13 @@
 
                 const newRoles = [];
                 departments.forEach(dept => {
-                    if (document.getElementById(`chk_${dept}`).checked) {
-                        newRoles.push(dept);
-                    }
+                    if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
                 });
 
-                db.collection('users').doc(selectedId).update({
-                    roles: newRoles
-                }).then(() => {
+                db.collection('users').doc(selectedId).update({ roles: newRoles }).then(() => {
                     const msg = document.getElementById('msgBox');
                     msg.style.color = 'green';
                     msg.textContent = 'Access updated successfully!';
-                    
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].roles = newRoles;
                 }).catch(err => {
@@ -140,6 +159,43 @@
                     msg.textContent = 'Error: ' + err.message;
                 });
             });
+
+            // --- SERVICE MANAGEMENT LOGIC ---
+            const serviceForm = document.getElementById('serviceForm');
+            const labList = document.getElementById('labTestsList');
+            const radList = document.getElementById('radiologyScansList');
+
+            // Real-time listener for services
+            db.collection('labTests').onSnapshot(snap => {
+                labList.innerHTML = snap.empty ? '<li>No tests added.</li>' : '';
+                snap.forEach(doc => {
+                    labList.innerHTML += `<li style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;">${doc.data().name} <button onclick="deleteService('labTests', '${doc.id}')" style="color:red; border:none; background:none; cursor:pointer;">✖</button></li>`;
+                });
+            });
+
+            db.collection('radiologyScans').onSnapshot(snap => {
+                radList.innerHTML = snap.empty ? '<li>No scans added.</li>' : '';
+                snap.forEach(doc => {
+                    radList.innerHTML += `<li style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee;">${doc.data().name} <button onclick="deleteService('radiologyScans', '${doc.id}')" style="color:red; border:none; background:none; cursor:pointer;">✖</button></li>`;
+                });
+            });
+
+            serviceForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('serviceName').value;
+                const type = document.getElementById('serviceType').value;
+
+                db.collection(type).add({ name: name }).then(() => {
+                    alert('Service added successfully!');
+                    serviceForm.reset();
+                }).catch(err => alert("Error: " + err.message));
+            });
+
+            window.deleteService = function(collection, id) {
+                if(confirm("Delete this service?")) {
+                    db.collection(collection).doc(id).delete();
+                }
+            };
         });
     </script>
 </body>
