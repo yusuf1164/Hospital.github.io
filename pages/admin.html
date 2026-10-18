@@ -16,6 +16,17 @@
         .delete-btn { background: none; border: none; cursor: pointer; padding: 5px; display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s; }
         .delete-btn svg { fill: #dc2626; width: 18px; height: 18px; }
         .delete-btn:hover { transform: scale(1.15); }
+
+        /* Vertical Line Divider */
+        .service-list-col { flex: 1; min-width: 250px; }
+        
+        /* Only show the vertical line on screens wider than 600px */
+        @media (min-width: 600px) {
+            .service-list-col:last-child {
+                border-left: 2px solid #e5e7eb;
+                padding-left: 20px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -62,11 +73,14 @@
                 </form>
 
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 200px;">
+                    <!-- Lab Tests Column -->
+                    <div class="service-list-col">
                         <h4 style="color:#1e3a8a; margin-bottom: 10px;">Lab Tests</h4>
                         <ul id="labTestsList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
                     </div>
-                    <div style="flex: 1; min-width: 200px;">
+                    
+                    <!-- Radiology Scans Column -->
+                    <div class="service-list-col">
                         <h4 style="color:#1e3a8a; margin-bottom: 10px;">Radiology Scans</h4>
                         <ul id="radiologyScansList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
                     </div>
