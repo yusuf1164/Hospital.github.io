@@ -3,39 +3,140 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Laboratory - DEEN Hospital</title>
+    <title>Nursing / Vitals - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
     <header id="header-placeholder"></header>
+
     <main>
         <div class="table-container">
             <div class="page-header">
-                <h1>🧪 Laboratory</h1>
-                <p>Blood tests, urine tests, and diagnostic reports.</p>
+                <h1>🌡️ Nursing Department</h1>
+                <p>Record patient vitals before they see the doctor.</p>
             </div>
-            <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="alert('Feature coming: New lab request')">+ New Lab Request</button>
+
+            <!-- Vitals Form -->
+            <div class="form-card">
+                <h3>Record Patient Vitals</h3>
+                <form id="nursingForm">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Select Patient</label>
+                            <!-- This dropdown will be populated by JavaScript -->
+                            <select id="patientSelect" required>
+                                <option value="">Loading patients...</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Blood Pressure (mmHg)</label><input type="text" id="bp" required placeholder="e.g. 120/80"></div>
+                        <div class="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" id="temp" required placeholder="e.g. 37.2"></div>
+                        <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" id="weight" required placeholder="e.g. 70.5"></div>
+                        <div class="form-group"><label>Pulse (bpm)</label><input type="number" id="pulse" required placeholder="e.g. 72"></div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Save Vitals</button>
+                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
+                </form>
             </div>
+
+            <!-- Vitals List -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Vitals</h3>
             <table>
                 <thead>
-                    <tr><th>Patient</th><th>Test Type</th><th>Requested By</th><th>Status</th><th>Result</th><th>Action</th></tr>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>BP</th>
+                        <th>Temp (°C)</th>
+                        <th>Weight (kg)</th>
+                        <th>Pulse</th>
+                        <th>Date</th>
+                    </tr>
                 </thead>
-                <tbody id="labTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading lab requests...</td></tr>
+                <tbody id="vitalsTableBody">
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading vitals...</td></tr>
                 </tbody>
             </table>
         </div>
     </main>
+
     <footer id="footer-placeholder"></footer>
+
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../firebase-config.js"></script>
     <script src="../script.js"></script>
-    <script src="../js/departments.js"></script>
+
+    <!-- Nursing Logic -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => loadDepartmentData('laboratory'));
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const patientSelect = document.getElementById('patientSelect');
+
+            // 1. Load Patients into the Dropdown
+            db.collection('patients').orderBy('firstName').get().then((snapshot) => {
+                patientSelect.innerHTML = '<option value="">Select a patient...</option>';
+                snapshot.forEach(doc => {
+                    const p = doc.data();
+                    patientSelect.innerHTML += `<option value="${doc.id}" data-name="${p.firstName} ${p.lastName}">${p.firstName} ${p.lastName} (ID: ${doc.id.slice(0,4)})</option>`;
+                });
+            });
+
+            // 2. Load Recent Vitals into Table
+            db.collection('vitals').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
+                const tbody = document.getElementById('vitalsTableBody');
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${d.patientName}</td>
+                            <td>${d.bp}</td>
+                            <td>${d.temp}</td>
+                            <td>${d.weight}</td>
+                            <td>${d.pulse}</td>
+                            <td>${date}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            // 3. Handle Form Submission
+            const form = document.getElementById('nursingForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                const errorDiv = document.getElementById('formError');
+                btn.textContent = 'Saving...'; btn.disabled = true;
+
+                // Get the selected patient's ID and Name
+                const patientId = patientSelect.value;
+                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+
+                db.collection('vitals').add({
+                    patientId: patientId,
+                    patientName: patientName,
+                    bp: document.getElementById('bp').value,
+                    temp: document.getElementById('temp').value,
+                    weight: document.getElementById('weight').value,
+                    pulse: document.getElementById('pulse').value,
+                    recordedBy: user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                })
+                .then(() => {
+                    alert('Vitals Saved Successfully!');
+                    form.reset(); btn.textContent = 'Save Vitals'; btn.disabled = false; errorDiv.style.display = 'none';
+                })
+                .catch((error) => {
+                    errorDiv.style.display = 'block'; errorDiv.textContent = "Error: " + error.message; btn.textContent = 'Save Vitals'; btn.disabled = false;
+                });
+            });
+        });
     </script>
 </body>
 </html>
