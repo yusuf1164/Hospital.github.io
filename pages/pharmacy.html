@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pharmacy - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>💊 Pharmacy</h1>
+                <p>Dispense medications based on doctor consultations.</p>
+            </div>
+
+            <!-- Pharmacy Queue Table -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Prescription Queue</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Diagnosis</th>
+                        <th>Prescription</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="pharmacyTableBody">
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading prescriptions...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <!-- Pharmacy Logic -->
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const tbody = document.getElementById('pharmacyTableBody');
+
+            // 1. Load Consultations that are Pending Pharmacy
+            // We use onSnapshot so the table updates instantly if a doctor adds a new prescription
+            db.collection('consultations').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+                tbody.innerHTML = '';
+                let hasPending = false;
+
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    
+                    // Only show prescriptions that haven't been dispensed yet
+                    if (d.status === 'Pending Pharmacy') {
+                        hasPending = true;
+                        const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                        
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><strong>${d.patientName}</strong></td>
+                                <td>${d.diagnosis}</td>
+                                <td style="color: #2563eb; font-weight: bold;">${d.prescription}</td>
+                                <td>${date}</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="dispenseDrug('${doc.id}')">Dispense</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                if (!hasPending) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
+                }
+            });
+
+            // 2. Function to Mark as Dispensed
+            window.dispenseDrug = function(consultationId) {
+                if(confirm("Have you dispensed these drugs to the patient?")) {
+                    db.collection('consultations').doc(consultationId).update({
+                        status: 'Dispensed'
+                    })
+                    .then(() => {
+                        alert('Prescription marked as Dispensed!');
+                        // The onSnapshot listener will automatically remove it from the table
+                    })
+                    .catch((error) => {
+                        alert("Error updating status: " + error.message);
+                    });
+                }
+            };
+        });
+    </script>
+</body>
+</html>
