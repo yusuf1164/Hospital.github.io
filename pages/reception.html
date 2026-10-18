@@ -108,8 +108,6 @@
                     registeredBy: user.uid,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 })
-                .then(() => {
-                    alert('Patient Registered Successfully!');
                     .then(() => {
                      logActivity(auth.currentUser, "Registered Patient", `Patient: ${firstName} ${lastName}`); // <-- ADD THIS
                     alert('Patient Registered Successfully!');
