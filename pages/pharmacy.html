@@ -45,59 +45,48 @@
     <script src="../script.js"></script>
 
     <!-- Pharmacy Logic -->
-    <script>
-        auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+    <script>auth.onAuthStateChanged((user) => {
+    if (!user) { window.location.href = '../login.html'; return; }
 
-            const tbody = document.getElementById('pharmacyTableBody');
+    const tbody = document.getElementById('pharmacyTableBody');
 
-            // 1. Load Consultations that are Pending Pharmacy
-            // We use onSnapshot so the table updates instantly if a doctor adds a new prescription
-            db.collection('consultations').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
-                tbody.innerHTML = '';
-                let hasPending = false;
+    // Read from 'prescriptions' collection now
+    db.collection('prescriptions').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+        tbody.innerHTML = '';
+        let hasPending = false;
 
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    
-                    // Only show prescriptions that haven't been dispensed yet
-                    if (d.status === 'Pending Pharmacy') {
-                        hasPending = true;
-                        const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
-                        
-                        tbody.innerHTML += `
-                            <tr>
-                                <td><strong>${d.patientName}</strong></td>
-                                <td>${d.diagnosis}</td>
-                                <td style="color: #2563eb; font-weight: bold;">${d.prescription}</td>
-                                <td>${date}</td>
-                                <td><span class="status-badge status-pending">Pending</span></td>
-                                <td>
-                                    <button class="btn btn-primary" onclick="dispenseDrug('${doc.id}')">Dispense</button>
-                                </td>
-                            </tr>
-                        `;
-                    }
-                });
+        snapshot.forEach(doc => {
+            const d = doc.data();
+            
+            if (d.status === 'Pending') {
+                hasPending = true;
+                const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td><strong>${d.patientName}</strong></td>
+                        <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
+                        <td>${date}</td>
+                        <td><span class="status-badge status-pending">Pending</span></td>
+                        <td>
+                            <button class="btn btn-primary" onclick="dispenseDrug('${doc.id}')">Dispense</button>
+                        </td>
+                    </tr>
+                `;
+            }
+        });
 
-                if (!hasPending) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
-                }
-            });
+        if (!hasPending) {
+            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
+        }
+    });
 
-            // 2. Function to Mark as Dispensed
-            window.dispenseDrug = function(consultationId) {
-                if(confirm("Have you dispensed these drugs to the patient?")) {
-                    db.collection('consultations').doc(consultationId).update({
-                        status: 'Dispensed'
-                    })
-                    .then(() => {
-                        alert('Prescription marked as Dispensed!');
-                        // The onSnapshot listener will automatically remove it from the table
-                    })
-                    .catch((error) => {
-                        alert("Error updating status: " + error.message);
-                    });
+    window.dispenseDrug = function(id) {
+        if(confirm("Have you dispensed these drugs?")) {
+            db.collection('prescriptions').doc(id).update({
+                status: 'Dispensed'
+            }).then(() => alert('Dispensed successfully!'))
+              .catch((error) => alert("Error: " + error.message));
                 }
             };
         });
