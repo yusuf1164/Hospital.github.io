@@ -3,6 +3,12 @@
 body { display: flex; flex-direction: column; min-height: 100vh; background-color: #f3f4f6; color: #333; }
 a { text-decoration: none; color: inherit; }
 
+/* Dynamically injected header links */
+#dynamic-dept-links { display: flex; gap: 18px; align-items: center; }
+
+@media (max-width: 900px) {
+    #dynamic-dept-links { flex-direction: column; width: 100%; gap: 15px; text-align: center; margin-top: 10px; }
+}
 /* HEADER */
 .header-main { background-color: #1e3a8a; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
 .logo { font-size: 22px; font-weight: bold; }
