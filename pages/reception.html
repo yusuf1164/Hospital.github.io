@@ -41,12 +41,12 @@
                 </form>
             </div>
 
-            <!-- Patient List -->
+            <!-- Patient List Preview (Recent 5) -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Registrations</h3>
             <table>
-                <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>Date</th></tr></thead>
+                <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Phone</th></tr></thead>
                 <tbody id="receptionTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr>
+                    <tr><td colspan="4" style="text-align:center; color:#888;">Loading patients...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -54,46 +54,38 @@
 
     <footer id="footer-placeholder"></footer>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
-    <!-- Reception Logic -->
     <script>
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
-            // 1. Load Patients into Table
-            db.collection('patients').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
+            // Load Recent Patients
+            db.collection('patients').orderBy('createdAt', 'desc').limit(5).onSnapshot((snapshot) => {
                 const tbody = document.getElementById('receptionTableBody');
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
                     return;
                 }
                 
                 tbody.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
-                    
                     tbody.innerHTML += `
                         <tr>
-                            <td>${doc.id.slice(0, 8)}...</td>
+                            <td><strong style="color:#2563eb;">${d.patientId || 'N/A'}</strong></td>
                             <td>${d.firstName} ${d.lastName}</td>
                             <td>${d.age}</td>
-                            <td>${d.gender}</td>
                             <td>${d.phone}</td>
-                            <td>${date}</td>
                         </tr>
                     `;
                 });
-            }, (error) => {
-                console.error("Firestore error:", error);
             });
 
-            // 2. Handle Form Submission
+            // Handle Form Submission
             const form = document.getElementById('receptionForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -109,26 +101,44 @@
                 const phone = document.getElementById('phone').value;
                 const address = document.getElementById('address').value;
 
-                db.collection('patients').add({
-                    firstName: firstName,
-                    lastName: lastName,
-                    age: age,
-                    gender: gender,
-                    phone: phone,
-                    address: address,
-                    registeredBy: user.uid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                })
-                .then(() => {
-                    // Log the activity for the Admin
-                    logActivity(auth.currentUser, "Registered Patient", `Name: ${firstName} ${lastName}, Phone: ${phone}`);
+                let generatedPatientId = ""; // Variable to hold the new ID
+
+                // 1. Generate Sequential Patient ID (P0001)
+                const counterRef = db.collection('settings').doc('counters');
+                db.runTransaction((transaction) => {
+                    return transaction.get(counterRef).then((doc) => {
+                        let nextId = 1; // Start at P0001
+                        if (doc.exists && doc.data().lastPatientId) {
+                            nextId = doc.data().lastPatientId + 1;
+                        }
+                        transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
+                        
+                        // Format as P0001, P0002, etc.
+                        generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
+                    });
+                }).then(() => {
+                    // 2. Save the Patient Data
+                    return db.collection('patients').add({
+                        patientId: generatedPatientId,
+                        firstName: firstName,
+                        lastName: lastName,
+                        age: age,
+                        gender: gender,
+                        phone: phone,
+                        address: address,
+                        registeredBy: user.uid,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }).then(() => {
+                    logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`);
                     
-                    alert('Patient Registered Successfully!');
+                    // 3. Show Success Modal with the ID
+                    alert(`✅ Patient Registered Successfully!\n\nPatient Name: ${firstName} ${lastName}\nPatient ID: ${generatedPatientId}\n\nPlease write this ID on the patient's card.`);
+                    
                     form.reset(); 
                     btn.textContent = 'Register Patient'; 
                     btn.disabled = false; 
-                })
-                .catch((error) => {
+                }).catch((error) => {
                     console.error("Error adding document: ", error);
                     errorDiv.style.display = 'block'; 
                     errorDiv.textContent = "Error: " + error.message; 
