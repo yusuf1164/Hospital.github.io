@@ -102,93 +102,98 @@
                 });
             });
 
-            // 3. Handle Form Submission
-            const form = document.getElementById('opdForm');
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const btn = document.getElementById('submitBtn');
-                const errorDiv = document.getElementById('formError');
-                
-                btn.textContent = 'Saving...'; 
-                btn.disabled = true;
-                errorDiv.style.display = 'none';
+            // Handle Submission
+const form = document.getElementById('opdForm');
+form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    btn.textContent = 'Saving...'; btn.disabled = true;
 
-                const patientId = patientSelect.value;
-                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
-                const symptoms = document.getElementById('symptoms').value;
-                const diagnosis = document.getElementById('diagnosis').value;
-                const doctorId = user.uid;
+    const patientId = patientSelect.value;
+    const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+    const symptoms = document.getElementById('symptoms').value;
+    const diagnosis = document.getElementById('diagnosis').value;
+    const doctorId = user.uid;
 
-                const sendToPharmacy = document.getElementById('chkPharmacy').checked;
-                const sendToLab = document.getElementById('chkLab').checked;
-                const sendToRadiology = document.getElementById('chkRadiology').checked;
+    const sendToPharmacy = document.getElementById('chkPharmacy').checked;
+    const sendToLab = document.getElementById('chkLab').checked;
+    const sendToRadiology = document.getElementById('chkRadiology').checked;
 
-                // First, get the doctor's profile info so we can send it to the other departments
-                db.collection('users').doc(doctorId).get().then(doctorDoc => {
-                    const docData = doctorDoc.data() || {};
-                    const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
-                    const doctorStaffId = docData.staffId || 'N/A';
+    // 1. Fetch the Doctor's info first
+    db.collection('users').doc(doctorId).get().then(doctorDoc => {
+        const docData = doctorDoc.data() || {};
+        const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
+        const doctorStaffId = docData.staffId || 'N/A';
 
-                    // Create an array of promises for the database writes
-                    let promises = [];
-
-                    // A. Save the main consultation record
-                    promises.push(db.collection('consultations').add({
-                        patientId, patientName, symptoms, diagnosis, 
-                        doctorId, doctorName, doctorStaffId,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    }));
-
-                    // B. Send to Pharmacy (if checked)
-                    if (sendToPharmacy) {
-                        promises.push(db.collection('prescriptions').add({
-                            patientId, patientName,
-                            medication: document.getElementById('prescription').value,
-                            doctorId, doctorName, doctorStaffId,
-                            status: 'Pending',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }));
-                    }
-
-                    // C. Send to Laboratory (if checked)
-                    if (sendToLab) {
-                        promises.push(db.collection('labResults').add({
-                            patientId, patientName,
-                            testType: document.getElementById('labTest').value,
-                            doctorId, doctorName, doctorStaffId,
-                            status: 'Pending', result: '',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }));
-                    }
-
-                    // D. Send to Radiology (if checked)
-                    if (sendToRadiology) {
-                        promises.push(db.collection('radiology').add({
-                            patientId, patientName,
-                            scanType: document.getElementById('radiologyScan').value,
-                            doctorId, doctorName, doctorStaffId,
-                            status: 'Pending', result: '',
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        }));
-                    }
-
-                    // Run all database writes at the same time
-                    return Promise.all(promises);
-
-                }).then(() => {
-                    alert('Consultation saved and requests routed!');
-                    form.reset(); 
-                    toggleFields(); // Hide the extra fields again
-                    btn.textContent = 'Save & Send Requests'; 
-                    btn.disabled = false;
-                }).catch((error) => {
-                    errorDiv.style.display = 'block';
-                    errorDiv.textContent = "Error: " + error.message;
-                    btn.textContent = 'Save & Send Requests'; 
-                    btn.disabled = false;
-                });
-            });
+        // 2. Save the main consultation record
+        return db.collection('consultations').add({
+            patientId, patientName, symptoms, diagnosis, 
+            doctorId, doctorName, doctorStaffId,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+    }).then(() => {
+        
+        // 3. Send to the selected departments
+        let promises = [];
+        
+        // We need to re-declare these since we are in a new .then() block
+        const sendToPharmacy = document.getElementById('chkPharmacy').checked;
+        const sendToLab = document.getElementById('chkLab').checked;
+        const sendToRadiology = document.getElementById('chkRadiology').checked;
+        
+        // We need the doctor details again, so let's fetch them once more or store them globally
+        return db.collection('users').doc(doctorId).get().then(doctorDoc => {
+            const docData = doctorDoc.data() || {};
+            const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
+            const doctorStaffId = docData.staffId || 'N/A';
+
+            let promises = [];
+
+            if (sendToPharmacy) {
+                promises.push(db.collection('prescriptions').add({
+                    patientId, patientName,
+                    medication: document.getElementById('prescription').value,
+                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
+                    status: 'Pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }));
+            }
+
+            if (sendToLab) {
+                promises.push(db.collection('labResults').add({
+                    patientId, patientName,
+                    testType: document.getElementById('labTest').value,
+                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
+                    status: 'Pending', result: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }));
+            }
+
+            if (sendToRadiology) {
+                promises.push(db.collection('radiology').add({
+                    patientId, patientName,
+                    scanType: document.getElementById('radiologyScan').value,
+                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
+                    status: 'Pending', result: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }));
+            }
+
+            return Promise.all(promises);
+        });
+
+    }).then(() => {
+        alert('Consultation saved and requests routed!');
+        form.reset(); 
+        toggleFields(); 
+        btn.textContent = 'Save & Send Requests'; btn.disabled = false;
+    }).catch((error) => {
+        document.getElementById('formError').style.display = 'block';
+        document.getElementById('formError').textContent = "Error: " + error.message;
+        btn.textContent = 'Save & Send Requests'; btn.disabled = false;
+    });
+});
     </script>
 </body>
 </html>
