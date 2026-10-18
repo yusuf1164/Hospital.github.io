@@ -1,6 +1,7 @@
 
 
-
+// Add this to the VERY TOP of script.js
+alert("script.js is running!");
 // ==========================================
 // FIREBASE CONFIGURATION & INITIALIZATION
 // ==========================================
