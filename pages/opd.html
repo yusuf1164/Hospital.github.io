@@ -16,7 +16,6 @@
                 <p>Doctor consultation, diagnosis, and routing to departments.</p>
             </div>
 
-            <!-- Form Card -->
             <div class="form-card">
                 <h3>New Consultation</h3>
                 <form id="opdForm">
@@ -51,18 +50,24 @@
                         </label>
                     </div>
 
-                    <!-- Hidden fields -->
+                    <!-- Hidden fields that appear based on checkboxes -->
                     <div id="pharmacyFields" style="display:none;" class="form-group">
                         <label>Prescription (Medications)</label>
                         <textarea id="prescription" rows="2" placeholder="e.g. Artemether-Lumefantrine..."></textarea>
                     </div>
+
                     <div id="labFields" style="display:none;" class="form-group">
                         <label>Lab Test Required</label>
-                        <input type="text" id="labTest" placeholder="e.g. Full Blood Count">
+                        <select id="labTest" required>
+                            <option value="">Loading tests...</option>
+                        </select>
                     </div>
+
                     <div id="radiologyFields" style="display:none;" class="form-group">
                         <label>Radiology Scan Required</label>
-                        <input type="text" id="radiologyScan" placeholder="e.g. Chest X-Ray">
+                        <select id="radiologyScan" required>
+                            <option value="">Loading scans...</option>
+                        </select>
                     </div>
 
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 250px;">Save & Send Requests</button>
@@ -110,7 +115,7 @@
             const patientSelect = document.getElementById('patientSelect');
             const historyBody = document.getElementById('opdHistoryBody');
 
-            // 1. Load Patients into Dropdown
+            // 1. Load Patients
             db.collection('patients').orderBy('firstName').get().then((snapshot) => {
                 patientSelect.innerHTML = '<option value="">Select a patient...</option>';
                 snapshot.forEach(doc => {
@@ -119,7 +124,20 @@
                 });
             });
 
-            // 2. Load Consultation History
+            // 2. Fetch Dynamic Services for Dropdowns
+            db.collection('labTests').get().then(snap => {
+                const labSelect = document.getElementById('labTest');
+                labSelect.innerHTML = '<option value="">Select test...</option>';
+                snap.forEach(doc => labSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+            });
+
+            db.collection('radiologyScans').get().then(snap => {
+                const radSelect = document.getElementById('radiologyScan');
+                radSelect.innerHTML = '<option value="">Select scan...</option>';
+                snap.forEach(doc => radSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+            });
+
+            // 3. Load Consultation History
             db.collection('consultations').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
@@ -131,7 +149,6 @@
                     const d = doc.data();
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString() : 'Just now';
                     
-                    // Build the routing string based on what was saved in the database
                     let routedTo = [];
                     if (d.requests && d.requests.pharmacy) {
                         routedTo.push(`<span class="status-badge status-pending" style="margin-right:5px;">💊 Pharmacy: ${d.requests.pharmacy}</span>`);
@@ -142,7 +159,6 @@
                     if (d.requests && d.requests.radiology) {
                         routedTo.push(`<span class="status-badge status-complete" style="margin-right:5px;">🩻 Radiology: ${d.requests.radiology}</span>`);
                     }
-
                     if (routedTo.length === 0) routedTo.push("None");
 
                     historyBody.innerHTML += `
@@ -157,16 +173,14 @@
                 });
             });
 
-            // 3. Handle Form Submission
+            // 4. Handle Form Submission
             const form = document.getElementById('opdForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('submitBtn');
                 const errorDiv = document.getElementById('formError');
                 
-                btn.textContent = 'Saving...'; 
-                btn.disabled = true;
-                errorDiv.style.display = 'none';
+                btn.textContent = 'Saving...'; btn.disabled = true; errorDiv.style.display = 'none';
 
                 const patientId = patientSelect.value;
                 const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
@@ -174,7 +188,6 @@
                 const diagnosis = document.getElementById('diagnosis').value;
                 const doctorId = user.uid;
 
-                // Gather data for requests
                 const reqPharmacy = document.getElementById('chkPharmacy').checked;
                 const reqLab = document.getElementById('chkLab').checked;
                 const reqRadiology = document.getElementById('chkRadiology').checked;
@@ -190,11 +203,9 @@
 
                     let promises = [];
 
-                    // Save Consultation Record (Including the request details for history)
                     promises.push(db.collection('consultations').add({
                         patientId, patientName, symptoms, diagnosis, 
                         doctorId, doctorName, doctorStaffId,
-                        // Save routing info right here for the history table
                         requests: {
                             pharmacy: reqPharmacy ? pharmVal : null,
                             lab: reqLab ? labVal : null,
@@ -203,7 +214,6 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     }));
 
-                    // Send to Pharmacy
                     if (reqPharmacy) {
                         promises.push(db.collection('prescriptions').add({
                             patientId, patientName, medication: pharmVal,
@@ -212,8 +222,6 @@
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }));
                     }
-
-                    // Send to Lab
                     if (reqLab) {
                         promises.push(db.collection('labResults').add({
                             patientId, patientName, testType: labVal,
@@ -222,8 +230,6 @@
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         }));
                     }
-
-                    // Send to Radiology
                     if (reqRadiology) {
                         promises.push(db.collection('radiology').add({
                             patientId, patientName, scanType: radVal,
@@ -238,13 +244,11 @@
                     alert('Consultation saved and requests routed!');
                     form.reset(); 
                     toggleFields(); 
-                    btn.textContent = 'Save & Send Requests'; 
-                    btn.disabled = false;
+                    btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 }).catch((error) => {
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = "Error: " + error.message;
-                    btn.textContent = 'Save & Send Requests'; 
-                    btn.disabled = false;
+                    btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 });
             });
         });
