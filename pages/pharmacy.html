@@ -22,9 +22,9 @@
                 <thead>
                     <tr>
                         <th>Patient Name</th>
-                        <th>Requested By (Dr)</th>
                         <th>Diagnosis</th>
                         <th>Prescription</th>
+                        <th>Requested By (Dr)</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -66,12 +66,10 @@
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${d.patientName}</strong></td>
-                        
+                        <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
                         <td>${d.doctorName || 'Unknown Doctor'} <br>
                             <small style="color:#666;">ID: ${d.doctorStaffId || 'N/A'}</small>
                         </td>
-                        
-                        <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
                         <td>${date}</td>
                         <td><span class="status-badge status-pending">Pending</span></td>
                         <td>
