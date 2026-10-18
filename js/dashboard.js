@@ -22,10 +22,11 @@ function renderModules(userRoles) {
         doctor: [ { title: '🩺 OPD (Consultations)', desc: 'See patients & prescribe', link: 'pages/opd.html' } ],
         nurse: [ { title: '🌡️ Vitals Entry', desc: 'Record vitals', link: 'pages/nursing.html' } ],
         reception: [ { title: '🧑‍💼 Register Patient', desc: 'New patient intake', link: 'pages/reception.html' } ],
-        pharmacy: [ { title: '💊 Prescriptions Queue', desc: 'Dispense drugs', link: 'pages/pharmacy.html' } ],
-        lab: [ { title: '🧪 Lab Requests', desc: 'Pending tests', link: 'pages/laboratory.html' } ],
-        billing: [ { title: '💳 Invoices', desc: 'Manage bills', link: 'pages/billing.html' } ],
-        records: [ { title: '🗂️ Patient Files', desc: 'Access records', link: 'pages/records.html' } ],
+        pharmacy: [ { title: '💊 Pharmacy', desc: 'Dispense drugs', link: 'pages/pharmacy.html' } ],
+        lab: [ { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' } ],
+        radiology: [ { title: '🩻 Radiology', desc: 'X-rays & scans', link: 'pages/radiology.html' } ], // <-- ADDED
+        billing: [ { title: '💳 Billing', desc: 'Manage bills', link: 'pages/billing.html' } ],
+        records: [ { title: '🗂️ Records', desc: 'Access records', link: 'pages/records.html' } ],
         admin: [ 
             { title: '📜 Activity Logs', desc: 'View all staff actions', link: 'pages/activity-log.html' },
             { title: '👔 Admin / HR', desc: 'Manage staff roles & access', link: 'pages/admin.html' },
@@ -33,6 +34,7 @@ function renderModules(userRoles) {
             { title: '🌡️ Nursing', desc: 'Vitals & care', link: 'pages/nursing.html' },
             { title: '🩺 OPD (Doctors)', desc: 'Consultations', link: 'pages/opd.html' },
             { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' },
+            { title: '🩻 Radiology', desc: 'X-rays & scans', link: 'pages/radiology.html' }, // <-- ADDED
             { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' },
             { title: '💳 Billing', desc: 'Payments & Invoices', link: 'pages/billing.html' },
             { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' }
@@ -46,9 +48,9 @@ function renderModules(userRoles) {
 
     if (finalModules.length === 0) finalModules = allModules.patient;
 
-    // Remove duplicates
-    const uniqueModules = Array.from(new Set(finalModules.map(m => m.title)))
-        .map(title => finalModules.find(m => m.title === title));
+    // DEDUPLICATION FIX: We now check the 'link' so we don't get duplicate cards for the same page
+    const uniqueModules = Array.from(new Set(finalModules.map(m => m.link)))
+        .map(link => finalModules.find(m => m.link === link));
 
     container.innerHTML = uniqueModules.map(m => `
         <a href="${m.link}" class="dash-card" style="text-decoration:none; color:inherit; display:block;">
