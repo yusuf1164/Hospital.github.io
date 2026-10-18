@@ -71,7 +71,8 @@ main { flex: 1; padding: 30px 20px; display: flex; justify-content: center; alig
 /* ==========================================
    TABLES
 ========================================== */
-.table-container { width: 100%; overflow-x: auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; }
+.table-container { width: 100%; overflow-x: auto; background: #fff;
+                 border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; }
 th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
 th { background-color: #f9fafb; color: #1e3a8a; font-weight: 600; }
@@ -85,7 +86,24 @@ tr:hover { background-color: #f9fafb; }
 .page-header p { color: #666; font-size: 15px; }
 
 /* ==========================================
-   FOOTER
+
+
+
+
+/* Reception Form Card */
+.form-card { background: #f9fafb;  border: 1px solid #e5e7eb; padding: 20px; 
+            border-radius: 8px; margin-bottom: 30px;
+}
+.form-card h3 {
+    color: #1e3a8a; margin-bottom: 15px; font-size: 18px;
+}
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+/*========================================
+        FOOTER
 ========================================== */
 footer { background-color: #111827; color: #9ca3af; padding: 40px 20px 20px; }
 .footer-content { display: flex; flex-wrap: wrap; justify-content: space-between; max-width: 1200px; margin: 0 auto; gap: 30px; }
