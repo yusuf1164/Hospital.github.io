@@ -82,6 +82,7 @@ function initMobileMenu() {
 // ==========================================
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
+    const dynamicLinks = document.getElementById('dynamic-dept-links');
     if (!authButtons) return;
     
     const inPagesFolder = window.location.pathname.includes('/pages/');
@@ -89,10 +90,34 @@ function updateAuthUI() {
 
     auth.onAuthStateChanged((user) => {
         if (user) {
+            // User is logged in
             authButtons.innerHTML = `
                 <a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a>
                 <a href="#" id="logoutLink" class="btn btn-primary">Logout</a>
             `;
+            
+            // Fetch their roles to build the custom menu
+            db.collection('users').doc(user.uid).get().then(doc => {
+                const data = doc.data() || {};
+                let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
+                
+                // Everyone sees Emergency
+                let linksHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
+
+                // Add links based on roles
+                if (userRoles.includes('admin') || userRoles.includes('doctor')) {
+                    linksHTML += `<a href="${prefix}pages/opd.html">OPD</a>`;
+                }
+                if (userRoles.includes('admin') || userRoles.includes('lab')) {
+                    linksHTML += `<a href="${prefix}pages/laboratory.html">Lab</a>`;
+                }
+                if (userRoles.includes('admin') || userRoles.includes('pharmacy')) {
+                    linksHTML += `<a href="${prefix}pages/pharmacy.html">Pharmacy</a>`;
+                }
+                
+                if(dynamicLinks) dynamicLinks.innerHTML = linksHTML;
+            });
+
             const logoutLink = document.getElementById('logoutLink');
             if (logoutLink) {
                 logoutLink.addEventListener('click', (e) => {
@@ -101,10 +126,12 @@ function updateAuthUI() {
                 });
             }
         } else {
+            // User is logged out
             authButtons.innerHTML = `
                 <a href="${prefix}login.html" class="btn btn-outline">Login</a>
                 <a href="${prefix}register.html" class="btn btn-primary">Register</a>
             `;
+            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
         }
     });
 }
