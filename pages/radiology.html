@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radiology - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>🩻 Radiology / Imaging</h1>
+                <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
+            </div>
+
+            <!-- Radiology Queue Table -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Pending Scan Requests</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Patient Name</th>
+                        <th>Scan Type</th>
+                        <th>Requested By (Doctor)</th>
+                        <th>Status</th>
+                        <th>Result / Action</th>
+                    </tr>
+                </thead>
+                <tbody id="radiologyTableBody">
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading scan requests...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <!-- Radiology Logic -->
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const tbody = document.getElementById('radiologyTableBody');
+
+            // 1. Load Radiology Requests in Real-Time
+            db.collection('radiology').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    
+                    const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
+                    
+                    // If pending, show input box. If completed, show the result.
+                    let actionHtml = '';
+                    if (d.status === 'Pending') {
+                        actionHtml = `
+                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                                <input type="text" id="result_${doc.id}" placeholder="Enter scan findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:150px;">
+                                <button class="btn btn-primary" onclick="saveScanResult('${doc.id}')">Save</button>
+                            </div>
+                        `;
+                    } else {
+                        actionHtml = `<strong>${d.result}</strong>`;
+                    }
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><small>${date}</small></td>
+                            <td><strong>${d.patientName}</strong></td>
+                            <td>${d.scanType}</td>
+                            <td>${d.doctorName || 'Unknown'} <br><small>ID: ${d.doctorStaffId || 'N/A'}</small></td>
+                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                            <td>${actionHtml}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            // 2. Function to Save Scan Results
+            window.saveScanResult = function(docId) {
+                const resultInput = document.getElementById(`result_${docId}`).value;
+                if (!resultInput) {
+                    alert("Please enter the scan findings before saving.");
+                    return;
+                }
+
+                db.collection('radiology').doc(docId).update({
+                    result: resultInput,
+                    status: 'Completed'
+                }).then(() => {
+                    // Log the activity for the Admin
+                    logActivity(auth.currentUser, "Completed Scan", `Scan ID: ${docId}, Result: ${resultInput}`);
+                    
+                    alert('Scan result saved and marked as Completed!');
+                }).catch(err => {
+                    alert("Error saving result: " + err.message);
+                });
+            };
+        });
+    </script>
+</body>
+</html>
