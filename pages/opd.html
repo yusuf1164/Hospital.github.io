@@ -89,27 +89,37 @@
             });
 
             // 2. Load Recent Consultations
-            db.collection('consultations').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
-                const tbody = document.getElementById('opdTableBody');
-                if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
-                    return;
-                }
-                tbody.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${d.patientName}</td>
-                            <td>${d.symptoms}</td>
-                            <td><strong>${d.diagnosis}</strong></td>
-                            <td>${d.prescription}</td>
-                            <td><span class="status-badge status-pending">Pending Pharmacy</span></td>
-                        </tr>
-                    `;
-                });
-            });
+            // 2. Load Recent Consultations
+db.collection('consultations').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
+    const tbody = document.getElementById('opdTableBody');
+    if (snapshot.empty) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = '';
+    snapshot.forEach(doc => {
+        const d = doc.data();
+        
+        // Dynamically set the badge based on the actual status
+        let badgeClass = 'status-pending';
+        let badgeText = d.status || 'Pending Pharmacy';
+        
+        if (d.status === 'Dispensed') {
+            badgeClass = 'status-complete';
+            badgeText = 'Dispensed';
+        }
 
+        tbody.innerHTML += `
+            <tr>
+                <td>${d.patientName}</td>
+                <td>${d.symptoms}</td>
+                <td><strong>${d.diagnosis}</strong></td>
+                <td>${d.prescription}</td>
+                <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+            </tr>
+        `;
+    });
+});
             // 3. Handle Form Submission
             const form = document.getElementById('opdForm');
             form.addEventListener('submit', (e) => {
