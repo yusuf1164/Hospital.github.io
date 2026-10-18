@@ -45,7 +45,6 @@
 
             const tbody = document.getElementById('logTableBody');
 
-            // Fetch the most recent 100 logs
             db.collection('auditLogs').orderBy('timestamp', 'desc').limit(100).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No activity recorded yet.</td></tr>`;
@@ -57,7 +56,6 @@
                     const d = doc.data();
                     const date = d.timestamp ? d.timestamp.toDate().toLocaleString() : 'Just now';
                     
-                    // Add colors based on action type
                     let badgeColor = 'status-active';
                     if (d.action.includes('Registered')) badgeColor = 'status-complete';
                     if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
