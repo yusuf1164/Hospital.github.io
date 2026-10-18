@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Activity Log - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>📜 System Activity Log</h1>
+                <p>Monitor all staff actions across the hospital.</p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Staff Email</th>
+                        <th>Action</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="logTableBody">
+                    <tr><td colspan="4" style="text-align:center; color:#888;">Loading logs...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const tbody = document.getElementById('logTableBody');
+
+            // Fetch the most recent 100 logs
+            db.collection('auditLogs').orderBy('timestamp', 'desc').limit(100).onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No activity recorded yet.</td></tr>`;
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString() : 'Just now';
+                    
+                    // Add colors based on action type
+                    let badgeColor = 'status-active';
+                    if (d.action.includes('Registered')) badgeColor = 'status-complete';
+                    if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><small>${date}</small></td>
+                            <td><strong>${d.userEmail}</strong></td>
+                            <td><span class="status-badge ${badgeColor}">${d.action}</span></td>
+                            <td>${d.details}</td>
+                        </tr>
+                    `;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
