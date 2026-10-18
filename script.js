@@ -1,10 +1,8 @@
 
 
-// Add this to the VERY TOP of script.js
+// Add this to the very top to confirm the script runs
 alert("script.js is running!");
-// ==========================================
-// FIREBASE CONFIGURATION & INITIALIZATION
-// ==========================================
+
 const firebaseConfig = {
   apiKey: "AIzaSyAeoi7_GAJ1bJkHdnKGaLPRrnH3RirI1H4",
   authDomain: "deen-hospital.firebaseapp.com",
@@ -14,9 +12,26 @@ const firebaseConfig = {
   appId: "1:96445469484:web:2efb94ababdc39c79a1289"
 };
 
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
+// Try to connect to Firebase
+try {
+    // Check if the firebase SDK actually loaded
+    if (typeof firebase === 'undefined') {
+        throw new Error("Firebase SDK not loaded! Check your HTML script tags.");
+    }
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+    
+    // If you see this alert, Firebase connected successfully!
+    alert("Firebase connected successfully!");
+
+} catch (error) {
+    // If you see this alert, we found the problem!
+    alert("ERROR: " + error.message);
+}
+
+
 
 // ==========================================
 
