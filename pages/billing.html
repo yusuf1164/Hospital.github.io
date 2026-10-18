@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Billing - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>💳 Billing / Accounts</h1>
+                <p>Generate invoices and process patient payments.</p>
+            </div>
+
+            <!-- Billing Form -->
+            <div class="form-card">
+                <h3>Create New Invoice</h3>
+                <form id="billingForm">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Select Patient</label>
+                            <select id="patientSelect" required>
+                                <option value="">Loading patients...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Service Rendered</label>
+                            <input type="text" id="service" required placeholder="e.g. OPD Consultation, Pharmacy, Lab Test">
+                        </div>
+                        <div class="form-group">
+                            <label>Amount (₦)</label>
+                            <input type="number" id="amount" required placeholder="e.g. 5000">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Generate Bill</button>
+                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
+                </form>
+            </div>
+
+            <!-- Billing Queue Table -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Invoices</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Patient Name</th>
+                        <th>Service</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="billingTableBody">
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading invoices...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <!-- Billing Logic -->
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const patientSelect = document.getElementById('patientSelect');
+            const tbody = document.getElementById('billingTableBody');
+
+            // 1. Load Patients into Dropdown
+            db.collection('patients').orderBy('firstName').get().then((snapshot) => {
+                patientSelect.innerHTML = '<option value="">Select a patient...</option>';
+                snapshot.forEach(doc => {
+                    const p = doc.data();
+                    patientSelect.innerHTML += `<option value="${doc.id}" data-name="${p.firstName} ${p.lastName}">${p.firstName} ${p.lastName}</option>`;
+                });
+            });
+
+            // 2. Load Bills into Table in Real-Time
+            db.collection('bills').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No invoices generated yet.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    
+                    const badgeClass = d.status === 'Paid' ? 'status-complete' : 'status-pending';
+                    const actionHtml = d.status === 'Paid' 
+                        ? `<span style="color:#065f46; font-weight:bold;">Completed</span>` 
+                        : `<button class="btn btn-primary" onclick="payBill('${doc.id}', '${d.patientName}', '${d.amount}')">Mark as Paid</button>`;
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${date}</td>
+                            <td><strong>${d.patientName}</strong></td>
+                            <td>${d.service}</td>
+                            <td>₦${Number(d.amount).toLocaleString()}</td>
+                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                            <td>${actionHtml}</td>
+                        </tr>
+                    `;
+                });
+            });
+
+            // 3. Handle New Bill Submission
+            const form = document.getElementById('billingForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                btn.textContent = 'Generating...'; btn.disabled = true;
+
+                const patientId = patientSelect.value;
+                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+                const amount = document.getElementById('amount').value;
+                const service = document.getElementById('service').value;
+
+                db.collection('bills').add({
+                    patientId: patientId,
+                    patientName: patientName,
+                    service: service,
+                    amount: amount,
+                    status: 'Pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    // Log the activity for the Admin to see
+                    logActivity(auth.currentUser, "Generated Invoice", `Patient: ${patientName}, Service: ${service}, Amount: ₦${amount}`);
+                    
+                    alert('Invoice generated successfully!');
+                    form.reset(); btn.textContent = 'Generate Bill'; btn.disabled = false;
+                }).catch(err => {
+                    alert("Error: " + err.message);
+                    btn.textContent = 'Generate Bill'; btn.disabled = false;
+                });
+            });
+
+            // 4. Function to Mark Bill as Paid
+            window.payBill = function(billId, patientName, amount) {
+                if(confirm(`Confirm payment of ₦${amount} received from ${patientName}?`)) {
+                    db.collection('bills').doc(billId).update({
+                        status: 'Paid'
+                    }).then(() => {
+                        // Log the payment activity
+                        logActivity(auth.currentUser, "Processed Payment", `Patient: ${patientName}, Amount: ₦${amount}`);
+                        
+                        alert('Payment recorded successfully!');
+                    }).catch(err => {
+                        alert("Error updating payment: " + err.message);
+                    });
+                }
+            };
+        });
+    </script>
+</body>
+</html>
