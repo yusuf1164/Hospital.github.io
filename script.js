@@ -1,4 +1,6 @@
+// ==========================================
 // 1. FIREBASE CONFIGURATION
+// ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyAeoi7_GAJ1bJkHdnKGaLPRrnH3RirI1H4",
   authDomain: "deen-hospital.firebaseapp.com",
@@ -8,24 +10,27 @@ const firebaseConfig = {
   appId: "1:96445469484:web:2efb94ababdc39c79a1289"
 };
 
-// 2. INITIALIZE FIREBASE (Global variables)
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// 3. PAGE INITIALIZATION
+// ==========================================
+// 2. PAGE INITIALIZATION
+// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
     loadHeader();
     loadFooter();
     initForms();
 });
 
-// 4. LOAD HEADER & FOOTER
+// ==========================================
+// 3. LOAD HEADER & FOOTER
+// ==========================================
 function loadHeader() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const headerPath = inPagesFolder ? '../header.html' : 'header.html';
     
-    fetch(headerPath, { cache: "no-store" }) // Forces fresh load
+    fetch(headerPath, { cache: "no-store" })
         .then(res => res.text())
         .then(data => {
             const ph = document.getElementById('header-placeholder');
@@ -37,7 +42,7 @@ function loadHeader() {
                     ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"]').forEach(a => a.href = '../' + a.getAttribute('href'));
                 }
                 initMobileMenu();
-                updateAuthUI(); // THIS WILL NOW WORK PERFECTLY
+                updateAuthUI();
             }
         })
         .catch(err => console.error('Header load error:', err));
@@ -61,7 +66,9 @@ function loadFooter() {
         .catch(err => console.error('Footer load error:', err));
 }
 
-// 5. MOBILE MENU
+// ==========================================
+// 4. MOBILE MENU TOGGLE
+// ==========================================
 function initMobileMenu() {
     const menuToggle = document.getElementById('menu-toggle');
     const navLinks = document.getElementById('nav-links');
@@ -70,7 +77,9 @@ function initMobileMenu() {
     }
 }
 
-// 6. UPDATE AUTH UI (Injects Login/Register Buttons)
+// ==========================================
+// 5. DYNAMIC HEADER BUTTONS
+// ==========================================
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
     if (!authButtons) return;
@@ -80,7 +89,6 @@ function updateAuthUI() {
 
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // Logged in
             authButtons.innerHTML = `
                 <a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a>
                 <a href="#" id="logoutLink" class="btn btn-primary">Logout</a>
@@ -93,7 +101,6 @@ function updateAuthUI() {
                 });
             }
         } else {
-            // Logged out
             authButtons.innerHTML = `
                 <a href="${prefix}login.html" class="btn btn-outline">Login</a>
                 <a href="${prefix}register.html" class="btn btn-primary">Register</a>
@@ -102,8 +109,12 @@ function updateAuthUI() {
     });
 }
 
-// 7. FORMS (Login & Register)
+// ==========================================
+// 6. AUTHENTICATION FORMS (Login & Register)
+// ==========================================
 function initForms() {
+    
+    // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -112,28 +123,34 @@ function initForms() {
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('loginError');
             const btn = document.getElementById('loginBtn');
-            btn.textContent = 'Signing in...'; btn.disabled = true;
+            
+            btn.textContent = 'Signing in...'; 
+            btn.disabled = true;
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(() => window.location.href = 'dashboard.html')
                 .catch(err => {
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = err.message;
-                    btn.textContent = 'Sign In'; btn.disabled = false;
+                    btn.textContent = 'Sign In'; 
+                    btn.disabled = false;
                 });
         });
     }
 
+    // --- REGISTER FORM ---
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            
             const firstName = document.getElementById('firstname').value;
             const lastName = document.getElementById('lastname').value;
             const email = document.getElementById('email').value;
             const phone = document.getElementById('phone').value;
             const password = document.getElementById('password').value;
             const confirm = document.getElementById('confirmPassword').value;
+            
             const passwordError = document.getElementById('passwordError');
             const registerError = document.getElementById('registerError');
             const btn = document.getElementById('registerBtn');
@@ -143,24 +160,50 @@ function initForms() {
                 return;
             }
             passwordError.style.display = 'none';
-            btn.textContent = 'Creating Account...'; btn.disabled = true;
+            
+            btn.textContent = 'Creating Account...'; 
+            btn.disabled = true;
 
             auth.createUserWithEmailAndPassword(email, password)
                 .then((cred) => {
-                    return db.collection('users').doc(cred.user.uid).set({
-                        firstName, lastName, email, phone,
-                        role: 'patient', 
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    const counterRef = db.collection('settings').doc('counters');
+                    
+                    return db.runTransaction((transaction) => {
+                        return transaction.get(counterRef).then((doc) => {
+                            // Start at 1002 since you manually used 1001 for Admin
+                            let nextId = 1002; 
+                            
+                            if (doc.exists && doc.data().lastStaffId) {
+                                nextId = doc.data().lastStaffId + 1;
+                            }
+                            
+                            transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                            
+                            // Returns just the number as a string (e.g., "1002")
+                            return String(nextId); 
+                        });
+                    }).then((generatedStaffId) => {
+                        return db.collection('users').doc(cred.user.uid).set({
+                            firstName: firstName,
+                            lastName: lastName,
+                            email: email,
+                            phone: phone,
+                            staffId: generatedStaffId, 
+                            roles: ['patient'],
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
                     });
                 })
                 .then(() => {
-                    alert('Registration Successful!');
+                    alert('Registration Successful! Your Staff ID is: ' + document.getElementById('email').value); 
+                    // Note: Since we can't easily pass the ID to the alert here, you'll see it on the dashboard.
                     window.location.href = 'dashboard.html';
                 })
                 .catch(err => {
                     registerError.style.display = 'block';
                     registerError.textContent = err.message;
-                    btn.textContent = 'Create Account'; btn.disabled = false;
+                    btn.textContent = 'Create Account'; 
+                    btn.disabled = false;
                 });
         });
     }
