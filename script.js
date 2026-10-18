@@ -90,21 +90,17 @@ function updateAuthUI() {
 
     auth.onAuthStateChanged((user) => {
         if (user) {
-            // User is logged in
             authButtons.innerHTML = `
                 <a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a>
                 <a href="#" id="logoutLink" class="btn btn-primary">Logout</a>
             `;
             
-            // Fetch their roles to build the custom menu
             db.collection('users').doc(user.uid).get().then(doc => {
                 const data = doc.data() || {};
                 let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
                 
-                // Everyone sees Emergency
                 let linksHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
 
-                // Add links based on roles
                 if (userRoles.includes('admin') || userRoles.includes('doctor')) {
                     linksHTML += `<a href="${prefix}pages/opd.html">OPD</a>`;
                 }
@@ -126,7 +122,6 @@ function updateAuthUI() {
                 });
             }
         } else {
-            // User is logged out
             authButtons.innerHTML = `
                 <a href="${prefix}login.html" class="btn btn-outline">Login</a>
                 <a href="${prefix}register.html" class="btn btn-primary">Register</a>
@@ -137,10 +132,9 @@ function updateAuthUI() {
 }
 
 // ==========================================
-// 6. AUTHENTICATION FORMS (Login & Register)
+// 6. AUTHENTICATION FORMS
 // ==========================================
 function initForms() {
-    
     // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
@@ -197,16 +191,11 @@ function initForms() {
                     
                     return db.runTransaction((transaction) => {
                         return transaction.get(counterRef).then((doc) => {
-                            // Start at 1002 since you manually used 1001 for Admin
                             let nextId = 1002; 
-                            
                             if (doc.exists && doc.data().lastStaffId) {
                                 nextId = doc.data().lastStaffId + 1;
                             }
-                            
                             transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
-                            
-                            // Returns just the number as a string (e.g., "1002")
                             return String(nextId); 
                         });
                     }).then((generatedStaffId) => {
@@ -222,8 +211,7 @@ function initForms() {
                     });
                 })
                 .then(() => {
-                    alert('Registration Successful! Your Staff ID is: ' + document.getElementById('email').value); 
-                    // Note: Since we can't easily pass the ID to the alert here, you'll see it on the dashboard.
+                    alert('Registration Successful! Your Staff ID has been generated.');
                     window.location.href = 'dashboard.html';
                 })
                 .catch(err => {
@@ -235,6 +223,7 @@ function initForms() {
         });
     }
 }
+
 // ==========================================
 // 7. GLOBAL ACTIVITY LOGGER
 // ==========================================
