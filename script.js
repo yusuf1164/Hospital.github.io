@@ -235,3 +235,16 @@ function initForms() {
         });
     }
 }
+// ==========================================
+// 7. GLOBAL ACTIVITY LOGGER
+// ==========================================
+function logActivity(user, action, details) {
+    if (!user) return;
+    db.collection('auditLogs').add({
+        userId: user.uid,
+        userEmail: user.email,
+        action: action,
+        details: details,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    }).catch(err => console.error("Error logging activity:", err));
+}
