@@ -3,39 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OPD - DEEN Hospital</title>
+    <title>OPD / Doctor - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
 </head>
 <body>
     <header id="header-placeholder"></header>
+
     <main>
         <div class="table-container">
             <div class="page-header">
                 <h1>🩺 General Medicine / OPD</h1>
-                <p>Outpatient Department — patient queue and consultations.</p>
+                <p>Doctor consultation, diagnosis, and prescriptions.</p>
             </div>
-            <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
-                <button class="btn btn-primary" onclick="alert('Feature coming: Register new OPD visit')">+ New OPD Visit</button>
+
+            <!-- Consultation Form -->
+            <div class="form-card">
+                <h3>New Consultation</h3>
+                <form id="opdForm">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Select Patient</label>
+                            <select id="patientSelect" required>
+                                <option value="">Loading patients...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Presenting Symptoms</label>
+                            <textarea id="symptoms" rows="2" required placeholder="e.g. Fever, headache, body pain for 3 days..."></textarea>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Diagnosis</label>
+                            <input type="text" id="diagnosis" required placeholder="e.g. Malaria, Typhoid, Viral Infection">
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Prescription (Send to Pharmacy)</label>
+                            <textarea id="prescription" rows="2" required placeholder="e.g. Artemether-Lumefantrine 80/480mg, Paracetamol 500mg..."></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Save Consultation</button>
+                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
+                </form>
             </div>
+
+            <!-- Consultations List -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Consultations</h3>
             <table>
                 <thead>
-                    <tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Doctor</th><th>Status</th><th>Action</th></tr>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Symptoms</th>
+                        <th>Diagnosis</th>
+                        <th>Prescription</th>
+                        <th>Status</th>
+                    </tr>
                 </thead>
                 <tbody id="opdTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr>
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading consultations...</td></tr>
                 </tbody>
             </table>
         </div>
     </main>
+
     <footer id="footer-placeholder"></footer>
+
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../firebase-config.js"></script>
     <script src="../script.js"></script>
-    <script src="../js/departments.js"></script>
+
+    <!-- OPD Logic -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => loadDepartmentData('opd'));
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const patientSelect = document.getElementById('patientSelect');
+
+            // 1. Load Patients into Dropdown
+            db.collection('patients').orderBy('firstName').get().then((snapshot) => {
+                patientSelect.innerHTML = '<option value="">Select a patient...</option>';
+                snapshot.forEach(doc => {
+                    const p = doc.data();
+                    patientSelect.innerHTML += `<option value="${doc.id}" data-name="${p.firstName} ${p.lastName}">${p.firstName} ${p.lastName}</option>`;
+                });
+            });
+
+            // 2. Load Recent Consultations
+            db.collection('consultations').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
+                const tbody = document.getElementById('opdTableBody');
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    tbody.innerHTML += `
+                        <tr>
+                            <td>${d.patientName}</td>
+                            <td>${d.symptoms}</td>
+                            <td><strong>${d.diagnosis}</strong></td>
+                            <td>${d.prescription}</td>
+                            <td><span class="status-badge status-pending">Pending Pharmacy</span></td>
+                        </tr>
+                    `;
+                });
+            });
+
+            // 3. Handle Form Submission
+            const form = document.getElementById('opdForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                const errorDiv = document.getElementById('formError');
+                btn.textContent = 'Saving...'; btn.disabled = true;
+
+                const patientId = patientSelect.value;
+                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+
+                db.collection('consultations').add({
+                    patientId: patientId,
+                    patientName: patientName,
+                    symptoms: document.getElementById('symptoms').value,
+                    diagnosis: document.getElementById('diagnosis').value,
+                    prescription: document.getElementById('prescription').value,
+                    doctorId: user.uid,
+                    status: 'Pending Pharmacy', // This tells the Pharmacy it's ready
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                })
+                .then(() => {
+                    alert('Consultation Saved & Sent to Pharmacy!');
+                    form.reset(); btn.textContent = 'Save Consultation'; btn.disabled = false; errorDiv.style.display = 'none';
+                })
+                .catch((error) => {
+                    errorDiv.style.display = 'block'; errorDiv.textContent = "Error: " + error.message; btn.textContent = 'Save Consultation'; btn.disabled = false;
+                });
+            });
+        });
     </script>
 </body>
 </html>
