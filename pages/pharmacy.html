@@ -23,8 +23,8 @@
                     <tr>
                         <th>Patient Name</th>
                         <th>Diagnosis</th>
-                        <th>Prescription</th>
                         <th>Requested By (Dr)</th>
+                        <th>Prescription</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -66,6 +66,11 @@
                 tbody.innerHTML += `
                     <tr>
                         <td><strong>${d.patientName}</strong></td>
+                        
+                        <td>${d.doctorName || 'Unknown Doctor'} <br>
+                            <small style="color:#666;">ID: ${d.doctorStaffId || 'N/A'}</small>
+                        </td>
+                        
                         <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
                         <td>${date}</td>
                         <td><span class="status-badge status-pending">Pending</span></td>
@@ -78,7 +83,7 @@
         });
 
         if (!hasPending) {
-            tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
         }
     });
 
