@@ -8,14 +8,10 @@ const firebaseConfig = {
   appId: "1:96445469484:web:2efb94ababdc39c79a1289"
 };
 
-// 2. INITIALIZE FIREBASE
-try {
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-} catch (error) {
-    alert("Firebase Connection Error: " + error.message);
-}
+// 2. INITIALIZE FIREBASE (Global variables)
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 // 3. PAGE INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,20 +25,19 @@ function loadHeader() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const headerPath = inPagesFolder ? '../header.html' : 'header.html';
     
-    fetch(headerPath)
+    fetch(headerPath, { cache: "no-store" }) // Forces fresh load
         .then(res => res.text())
         .then(data => {
             const ph = document.getElementById('header-placeholder');
             if (ph) {
                 ph.innerHTML = data;
-                // Adjust links if inside /pages/
                 if (inPagesFolder) {
                     ph.querySelectorAll('a[href^="index"]').forEach(a => a.href = '../index.html');
                     ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
                     ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"]').forEach(a => a.href = '../' + a.getAttribute('href'));
                 }
                 initMobileMenu();
-                updateAuthUI(); // This builds the Login/Register buttons
+                updateAuthUI(); // THIS WILL NOW WORK PERFECTLY
             }
         })
         .catch(err => console.error('Header load error:', err));
@@ -52,7 +47,7 @@ function loadFooter() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const footerPath = inPagesFolder ? '../footer.html' : 'footer.html';
     
-    fetch(footerPath)
+    fetch(footerPath, { cache: "no-store" })
         .then(res => res.text())
         .then(data => {
             const ph = document.getElementById('footer-placeholder');
@@ -75,7 +70,7 @@ function initMobileMenu() {
     }
 }
 
-// 6. UPDATE AUTH UI (Injects Buttons)
+// 6. UPDATE AUTH UI (Injects Login/Register Buttons)
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
     if (!authButtons) return;
