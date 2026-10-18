@@ -110,6 +110,11 @@
                 })
                 .then(() => {
                     alert('Patient Registered Successfully!');
+                    .then(() => {
+                     logActivity(auth.currentUser, "Registered Patient", `Patient: ${firstName} ${lastName}`); // <-- ADD THIS
+                    alert('Patient Registered Successfully!');
+                    // ... rest of code
+})
                     form.reset(); btn.textContent = 'Register Patient'; btn.disabled = false; errorDiv.style.display = 'none';
                 })
                 .catch((error) => {
