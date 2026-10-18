@@ -36,7 +36,8 @@ function renderModules(userRoles) {
         lab: [ { title: '🧪 Lab Requests', desc: 'Pending tests', link: 'pages/laboratory.html' } ],
         billing: [ { title: '💳 Invoices', desc: 'Manage bills', link: 'pages/billing.html' } ],
         records: [ { title: '🗂️ Patient Files', desc: 'Access records', link: 'pages/records.html' } ],
-        admin: [ { title: '👔 Admin / HR', desc: 'Manage staff roles & access', link: 'pages/admin.html' }, { title: '🧑‍💼 Reception', desc: 'Patient registration', link: 'pages/reception.html' }, { title: '🌡️ Nursing', desc: 'Vitals & care', link: 'pages/nursing.html' }, { title: '🩺 OPD (Doctors)', desc: 'Consultations', link: 'pages/opd.html' }, { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' } ]
+        admin: [ { title: '👔 Admin / HR', desc: 'Manage staff roles & access', link: 'pages/admin.html' }, { title: '🧑‍💼 Reception', desc: 'Patient registration', link: 'pages/reception.html' }, { title: '🌡️ Nursing', desc: 'Vitals & care', link: 'pages/nursing.html' }, { title: '🩺 OPD (Doctors)', desc: 'Consultations', link: 'pages/opd.html' }, { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' } ],
+        admin: [ { title: '📜 Activity Logs', desc: 'View all staff actions', link: 'pages/activity-log.html' }]
     };
 
     let finalModules = [];
