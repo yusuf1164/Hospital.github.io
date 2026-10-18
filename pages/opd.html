@@ -16,6 +16,7 @@
                 <p>Doctor consultation, diagnosis, and routing to departments.</p>
             </div>
 
+            <!-- Form Card -->
             <div class="form-card">
                 <h3>New Consultation</h3>
                 <form id="opdForm">
@@ -50,17 +51,15 @@
                         </label>
                     </div>
 
-                    <!-- Hidden fields that appear based on checkboxes -->
+                    <!-- Hidden fields -->
                     <div id="pharmacyFields" style="display:none;" class="form-group">
                         <label>Prescription (Medications)</label>
                         <textarea id="prescription" rows="2" placeholder="e.g. Artemether-Lumefantrine..."></textarea>
                     </div>
-
                     <div id="labFields" style="display:none;" class="form-group">
                         <label>Lab Test Required</label>
                         <input type="text" id="labTest" placeholder="e.g. Full Blood Count">
                     </div>
-
                     <div id="radiologyFields" style="display:none;" class="form-group">
                         <label>Radiology Scan Required</label>
                         <input type="text" id="radiologyScan" placeholder="e.g. Chest X-Ray">
@@ -70,6 +69,23 @@
                     <div id="formError" class="error-message" style="margin-top: 10px;"></div>
                 </form>
             </div>
+
+            <!-- History Table -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Consultation & Request History</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Patient Name</th>
+                        <th>Diagnosis</th>
+                        <th>Routed To (Requests)</th>
+                        <th>Doctor</th>
+                    </tr>
+                </thead>
+                <tbody id="opdHistoryBody">
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading history...</td></tr>
+                </tbody>
+            </table>
         </div>
     </main>
 
@@ -81,7 +97,7 @@
     <script src="../script.js"></script>
 
     <script>
-        // 1. Toggle input fields based on checkboxes
+        // Toggle input fields based on checkboxes
         window.toggleFields = function() {
             document.getElementById('pharmacyFields').style.display = document.getElementById('chkPharmacy').checked ? 'block' : 'none';
             document.getElementById('labFields').style.display = document.getElementById('chkLab').checked ? 'block' : 'none';
@@ -92,8 +108,9 @@
             if (!user) { window.location.href = '../login.html'; return; }
 
             const patientSelect = document.getElementById('patientSelect');
+            const historyBody = document.getElementById('opdHistoryBody');
 
-            // 2. Load Patients into Dropdown
+            // 1. Load Patients into Dropdown
             db.collection('patients').orderBy('firstName').get().then((snapshot) => {
                 patientSelect.innerHTML = '<option value="">Select a patient...</option>';
                 snapshot.forEach(doc => {
@@ -102,99 +119,135 @@
                 });
             });
 
-            // Handle Submission
-const form = document.getElementById('opdForm');
-form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('submitBtn');
-    btn.textContent = 'Saving...'; btn.disabled = true;
+            // 2. Load Consultation History
+            db.collection('consultations').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
+                    return;
+                }
+                
+                historyBody.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString() : 'Just now';
+                    
+                    // Build the routing string based on what was saved in the database
+                    let routedTo = [];
+                    if (d.requests && d.requests.pharmacy) {
+                        routedTo.push(`<span class="status-badge status-pending" style="margin-right:5px;">💊 Pharmacy: ${d.requests.pharmacy}</span>`);
+                    }
+                    if (d.requests && d.requests.lab) {
+                        routedTo.push(`<span class="status-badge status-active" style="margin-right:5px;">🧪 Lab: ${d.requests.lab}</span>`);
+                    }
+                    if (d.requests && d.requests.radiology) {
+                        routedTo.push(`<span class="status-badge status-complete" style="margin-right:5px;">🩻 Radiology: ${d.requests.radiology}</span>`);
+                    }
 
-    const patientId = patientSelect.value;
-    const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
-    const symptoms = document.getElementById('symptoms').value;
-    const diagnosis = document.getElementById('diagnosis').value;
-    const doctorId = user.uid;
+                    if (routedTo.length === 0) routedTo.push("None");
 
-    const sendToPharmacy = document.getElementById('chkPharmacy').checked;
-    const sendToLab = document.getElementById('chkLab').checked;
-    const sendToRadiology = document.getElementById('chkRadiology').checked;
+                    historyBody.innerHTML += `
+                        <tr>
+                            <td><small>${date}</small></td>
+                            <td><strong>${d.patientName}</strong></td>
+                            <td>${d.diagnosis}</td>
+                            <td>${routedTo.join('')}</td>
+                            <td><small>${d.doctorName} (${d.doctorStaffId})</small></td>
+                        </tr>
+                    `;
+                });
+            });
 
-    // 1. Fetch the Doctor's info first
-    db.collection('users').doc(doctorId).get().then(doctorDoc => {
-        const docData = doctorDoc.data() || {};
-        const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
-        const doctorStaffId = docData.staffId || 'N/A';
+            // 3. Handle Form Submission
+            const form = document.getElementById('opdForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                const errorDiv = document.getElementById('formError');
+                
+                btn.textContent = 'Saving...'; 
+                btn.disabled = true;
+                errorDiv.style.display = 'none';
 
-        // 2. Save the main consultation record
-        return db.collection('consultations').add({
-            patientId, patientName, symptoms, diagnosis, 
-            doctorId, doctorName, doctorStaffId,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                const patientId = patientSelect.value;
+                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+                const symptoms = document.getElementById('symptoms').value;
+                const diagnosis = document.getElementById('diagnosis').value;
+                const doctorId = user.uid;
+
+                // Gather data for requests
+                const reqPharmacy = document.getElementById('chkPharmacy').checked;
+                const reqLab = document.getElementById('chkLab').checked;
+                const reqRadiology = document.getElementById('chkRadiology').checked;
+
+                const pharmVal = document.getElementById('prescription').value;
+                const labVal = document.getElementById('labTest').value;
+                const radVal = document.getElementById('radiologyScan').value;
+
+                db.collection('users').doc(doctorId).get().then(doctorDoc => {
+                    const docData = doctorDoc.data() || {};
+                    const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
+                    const doctorStaffId = docData.staffId || 'N/A';
+
+                    let promises = [];
+
+                    // Save Consultation Record (Including the request details for history)
+                    promises.push(db.collection('consultations').add({
+                        patientId, patientName, symptoms, diagnosis, 
+                        doctorId, doctorName, doctorStaffId,
+                        // Save routing info right here for the history table
+                        requests: {
+                            pharmacy: reqPharmacy ? pharmVal : null,
+                            lab: reqLab ? labVal : null,
+                            radiology: reqRadiology ? radVal : null
+                        },
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }));
+
+                    // Send to Pharmacy
+                    if (reqPharmacy) {
+                        promises.push(db.collection('prescriptions').add({
+                            patientId, patientName, medication: pharmVal,
+                            doctorId, doctorName, doctorStaffId,
+                            status: 'Pending',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }));
+                    }
+
+                    // Send to Lab
+                    if (reqLab) {
+                        promises.push(db.collection('labResults').add({
+                            patientId, patientName, testType: labVal,
+                            doctorId, doctorName, doctorStaffId,
+                            status: 'Pending', result: '',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }));
+                    }
+
+                    // Send to Radiology
+                    if (reqRadiology) {
+                        promises.push(db.collection('radiology').add({
+                            patientId, patientName, scanType: radVal,
+                            doctorId, doctorName, doctorStaffId,
+                            status: 'Pending', result: '',
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }));
+                    }
+
+                    return Promise.all(promises);
+                }).then(() => {
+                    alert('Consultation saved and requests routed!');
+                    form.reset(); 
+                    toggleFields(); 
+                    btn.textContent = 'Save & Send Requests'; 
+                    btn.disabled = false;
+                }).catch((error) => {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = "Error: " + error.message;
+                    btn.textContent = 'Save & Send Requests'; 
+                    btn.disabled = false;
+                });
+            });
         });
-
-    }).then(() => {
-        
-        // 3. Send to the selected departments
-        let promises = [];
-        
-        // We need to re-declare these since we are in a new .then() block
-        const sendToPharmacy = document.getElementById('chkPharmacy').checked;
-        const sendToLab = document.getElementById('chkLab').checked;
-        const sendToRadiology = document.getElementById('chkRadiology').checked;
-        
-        // We need the doctor details again, so let's fetch them once more or store them globally
-        return db.collection('users').doc(doctorId).get().then(doctorDoc => {
-            const docData = doctorDoc.data() || {};
-            const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
-            const doctorStaffId = docData.staffId || 'N/A';
-
-            let promises = [];
-
-            if (sendToPharmacy) {
-                promises.push(db.collection('prescriptions').add({
-                    patientId, patientName,
-                    medication: document.getElementById('prescription').value,
-                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
-                    status: 'Pending',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }));
-            }
-
-            if (sendToLab) {
-                promises.push(db.collection('labResults').add({
-                    patientId, patientName,
-                    testType: document.getElementById('labTest').value,
-                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
-                    status: 'Pending', result: '',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }));
-            }
-
-            if (sendToRadiology) {
-                promises.push(db.collection('radiology').add({
-                    patientId, patientName,
-                    scanType: document.getElementById('radiologyScan').value,
-                    doctorId, doctorName, doctorStaffId, // <-- Added Doctor Info
-                    status: 'Pending', result: '',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }));
-            }
-
-            return Promise.all(promises);
-        });
-
-    }).then(() => {
-        alert('Consultation saved and requests routed!');
-        form.reset(); 
-        toggleFields(); 
-        btn.textContent = 'Save & Send Requests'; btn.disabled = false;
-    }).catch((error) => {
-        document.getElementById('formError').style.display = 'block';
-        document.getElementById('formError').textContent = "Error: " + error.message;
-        btn.textContent = 'Save & Send Requests'; btn.disabled = false;
-    });
- });
-});
     </script>
 </body>
 </html>
