@@ -1,8 +1,4 @@
-
-
-// Add this to the very top to confirm the script runs
-alert("script.js is running!");
-
+// 1. FIREBASE CONFIGURATION
 const firebaseConfig = {
   apiKey: "AIzaSyAeoi7_GAJ1bJkHdnKGaLPRrnH3RirI1H4",
   authDomain: "deen-hospital.firebaseapp.com",
@@ -12,115 +8,165 @@ const firebaseConfig = {
   appId: "1:96445469484:web:2efb94ababdc39c79a1289"
 };
 
-// Try to connect to Firebase
+// 2. INITIALIZE FIREBASE
 try {
-    // Check if the firebase SDK actually loaded
-    if (typeof firebase === 'undefined') {
-        throw new Error("Firebase SDK not loaded! Check your HTML script tags.");
-    }
-
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    
-    // If you see this alert, Firebase connected successfully!
-    alert("Firebase connected successfully!");
-
 } catch (error) {
-    // If you see this alert, we found the problem!
-    alert("ERROR: " + error.message);
+    alert("Firebase Connection Error: " + error.message);
 }
 
-
-
-// ==========================================
-
-
-
-
-
-
-
-
+// 3. PAGE INITIALIZATION
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // 1. Load the Header dynamically
-    fetch('header.html')
-        .then(response => {
-            if (!response.ok) throw new Error('Failed to load header');
-            return response.text();
-        })
-        .then(data => {
-            document.getElementById('header-placeholder').innerHTML = data;
-            initMobileMenu();
-        })
-        .catch(error => console.error('Error loading header:', error));
-
-    // 2. Load the Footer dynamically
-    fetch('footer.html')
-        .then(response => {
-            if (!response.ok) throw new Error('Failed to load footer');
-            return response.text();
-        })
-        .then(data => {
-            document.getElementById('footer-placeholder').innerHTML = data;
-        })
-        .catch(error => console.error('Error loading footer:', error));
-
-    // 3. Initialize Form Handling
+    loadHeader();
+    loadFooter();
     initForms();
 });
 
-// --- Mobile Menu Logic ---
+// 4. LOAD HEADER & FOOTER
+function loadHeader() {
+    const inPagesFolder = window.location.pathname.includes('/pages/');
+    const headerPath = inPagesFolder ? '../header.html' : 'header.html';
+    
+    fetch(headerPath)
+        .then(res => res.text())
+        .then(data => {
+            const ph = document.getElementById('header-placeholder');
+            if (ph) {
+                ph.innerHTML = data;
+                // Adjust links if inside /pages/
+                if (inPagesFolder) {
+                    ph.querySelectorAll('a[href^="index"]').forEach(a => a.href = '../index.html');
+                    ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
+                    ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"]').forEach(a => a.href = '../' + a.getAttribute('href'));
+                }
+                initMobileMenu();
+                updateAuthUI(); // This builds the Login/Register buttons
+            }
+        })
+        .catch(err => console.error('Header load error:', err));
+}
+
+function loadFooter() {
+    const inPagesFolder = window.location.pathname.includes('/pages/');
+    const footerPath = inPagesFolder ? '../footer.html' : 'footer.html';
+    
+    fetch(footerPath)
+        .then(res => res.text())
+        .then(data => {
+            const ph = document.getElementById('footer-placeholder');
+            if (ph) {
+                ph.innerHTML = data;
+                if (inPagesFolder) {
+                    ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
+                }
+            }
+        })
+        .catch(err => console.error('Footer load error:', err));
+}
+
+// 5. MOBILE MENU
 function initMobileMenu() {
     const menuToggle = document.getElementById('menu-toggle');
     const navLinks = document.getElementById('nav-links');
-
     if (menuToggle && navLinks) {
-        menuToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
-        });
+        menuToggle.addEventListener('click', () => navLinks.classList.toggle('active'));
     }
 }
 
-// --- Form Logic ---
-function initForms() {
+// 6. UPDATE AUTH UI (Injects Buttons)
+function updateAuthUI() {
+    const authButtons = document.getElementById('auth-buttons');
+    if (!authButtons) return;
     
-    // Login Form Handling
+    const inPagesFolder = window.location.pathname.includes('/pages/');
+    const prefix = inPagesFolder ? '../' : '';
+
+    auth.onAuthStateChanged((user) => {
+        if (user) {
+            // Logged in
+            authButtons.innerHTML = `
+                <a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a>
+                <a href="#" id="logoutLink" class="btn btn-primary">Logout</a>
+            `;
+            const logoutLink = document.getElementById('logoutLink');
+            if (logoutLink) {
+                logoutLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    auth.signOut().then(() => window.location.href = prefix + 'index.html');
+                });
+            }
+        } else {
+            // Logged out
+            authButtons.innerHTML = `
+                <a href="${prefix}login.html" class="btn btn-outline">Login</a>
+                <a href="${prefix}register.html" class="btn btn-primary">Register</a>
+            `;
+        }
+    });
+}
+
+// 7. FORMS (Login & Register)
+function initForms() {
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+            const btn = document.getElementById('loginBtn');
+            btn.textContent = 'Signing in...'; btn.disabled = true;
 
-            if (email && password) {
-                alert(`Login Successful!\nWelcome back, ${email}`);
-                // window.location.href = 'dashboard.html'; 
-            } else {
-                alert('Please fill in all fields.');
-            }
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => window.location.href = 'dashboard.html')
+                .catch(err => {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = err.message;
+                    btn.textContent = 'Sign In'; btn.disabled = false;
+                });
         });
     }
 
-    // Registration Form Handling
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
+            const firstName = document.getElementById('firstname').value;
+            const lastName = document.getElementById('lastname').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
             const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const errorDiv = document.getElementById('passwordError');
+            const confirm = document.getElementById('confirmPassword').value;
+            const passwordError = document.getElementById('passwordError');
+            const registerError = document.getElementById('registerError');
+            const btn = document.getElementById('registerBtn');
 
-            if (password !== confirmPassword) {
-                errorDiv.style.display = 'block'; 
-                return; 
-            } else {
-                errorDiv.style.display = 'none'; 
+            if (password !== confirm) {
+                passwordError.style.display = 'block';
+                return;
             }
+            passwordError.style.display = 'none';
+            btn.textContent = 'Creating Account...'; btn.disabled = true;
 
-            alert('Registration Successful! You can now log in.');
-            window.location.href = 'login.html';
+            auth.createUserWithEmailAndPassword(email, password)
+                .then((cred) => {
+                    return db.collection('users').doc(cred.user.uid).set({
+                        firstName, lastName, email, phone,
+                        role: 'patient', 
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                })
+                .then(() => {
+                    alert('Registration Successful!');
+                    window.location.href = 'dashboard.html';
+                })
+                .catch(err => {
+                    registerError.style.display = 'block';
+                    registerError.textContent = err.message;
+                    btn.textContent = 'Create Account'; btn.disabled = false;
+                });
         });
     }
 }
