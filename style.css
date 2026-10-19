@@ -16,6 +16,19 @@ a { text-decoration: none; color: inherit; }
 .nav-links { display: flex; gap: 18px; font-size: 14px; align-items: center; }
 .nav-links > a:hover { color: #93c5fd; }
 
+
+/* Header Button Layout Adjustments */
+.nav-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+#dynamic-dept-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.auth-buttons { display: flex; gap: 8px; margin-left: 10px; }
+
+/* Mobile View */
+@media (max-width: 900px) {
+    .nav-links { flex-direction: column; width: 100%; gap: 12px; margin-top: 15px; }
+    #dynamic-dept-links { flex-direction: column; width: 100%; gap: 12px; }
+    .auth-buttons { flex-direction: column; width: 100%; margin-left: 0; margin-top: 10px; gap: 12px; }
+    .nav-links .btn, .auth-buttons .btn { width: 80%; text-align: center; padding: 10px; }
+}
 /* AUTH BUTTONS */
 .auth-buttons { display: flex; gap: 10px; margin-left: 10px; }
 .btn { padding: 8px 14px; border-radius: 5px; font-size: 13px; cursor: pointer; transition: 0.3s; border: none; }
