@@ -3,46 +3,42 @@
 body { display: flex; flex-direction: column; min-height: 100vh; background-color: #f3f4f6; color: #333; }
 a { text-decoration: none; color: inherit; }
 
-/* Dynamically injected header links */
-#dynamic-dept-links { display: flex; gap: 18px; align-items: center; }
-
-@media (max-width: 900px) {
-    #dynamic-dept-links { flex-direction: column; width: 100%; gap: 15px; text-align: center; margin-top: 10px; }
-}
-/* HEADER */
+/* HEADER BASE */
 .header-main { background-color: #1e3a8a; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
 .logo { font-size: 22px; font-weight: bold; }
 .menu-toggle { display: none; background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
-.nav-links { display: flex; gap: 18px; font-size: 14px; align-items: center; }
-.nav-links > a:hover { color: #93c5fd; }
+.nav-links { display: flex; gap: 10px; font-size: 14px; align-items: center; flex-wrap: wrap; }
 
-
-/* Header Button Layout Adjustments */
-.nav-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-#dynamic-dept-links { display: block; gap: 8px; align-items: center; flex-wrap: wrap; }
+/* HEADER BUTTON GROUPS (Desktop) */
+.top-links { display: flex; gap: 8px; align-items: center; }
+#dynamic-dept-links { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .auth-buttons { display: flex; gap: 8px; margin-left: 10px; }
 
-/* Mobile View */
-@media (max-width: 900px) {
-    .nav-links { flex-direction: column; width: 100%; gap: 12px; margin-top: 15px; }
-    #dynamic-dept-links { flex-direction: column; width: 100%; gap: 12px; }
-    .auth-buttons { flex-direction: column; width: 100%; margin-left: 0; margin-top: 10px; gap: 12px; }
-    .nav-links .btn, .auth-buttons .btn { width: 80%; text-align: center; padding: 10px; }
-}
-/* AUTH BUTTONS */
-.auth-buttons { display: flex; gap: 10px; margin-left: 10px; }
+/* BUTTON STYLES */
 .btn { padding: 8px 14px; border-radius: 5px; font-size: 13px; cursor: pointer; transition: 0.3s; border: none; }
 .btn-outline { background: transparent; border: 1px solid white; color: white; }
 .btn-outline:hover { background: white; color: #1e3a8a; }
 .btn-primary { background-color: #2563eb; color: white; }
 .btn-primary:hover { background-color: #1d4ed8; }
+.nav-links > a:hover, .top-links > a:hover { color: #93c5fd; }
 
-/* MOBILE NAV */
+/* MOBILE NAVIGATION */
 @media (max-width: 900px) {
     .menu-toggle { display: block; }
-    .nav-links { display: none; flex-direction: column; width: 100%; text-align: center; padding: 10px 0; margin-top: 10px; gap: 15px; }
+    .nav-links { display: none; flex-direction: column; width: 100%; text-align: center; padding: 15px 0; margin-top: 10px; gap: 15px; }
     .nav-links.active { display: flex; }
-    .auth-buttons { margin-left: 0; margin-top: 10px; flex-direction: row; justify-content: center; width: 100%; gap: 15px; }
+    
+    /* Home & Appointments (Horizontal) */
+    .top-links { flex-direction: row; justify-content: center; width: 100%; gap: 10px; }
+    .top-links .btn { width: auto; padding: 8px 16px; }
+    
+    /* Emergency, OPD, Lab, Pharmacy (Horizontal) */
+    #dynamic-dept-links { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; gap: 8px; margin-top: 0; }
+    #dynamic-dept-links .btn { width: auto; padding: 8px 12px; }
+
+    /* Dashboard & Logout (Stacked and Full Width) */
+    .auth-buttons { flex-direction: column; width: 100%; margin-left: 0; margin-top: 10px; gap: 10px; }
+    .auth-buttons .btn { width: 100%; padding: 10px; }
 }
 
 /* MAIN CONTENT */
@@ -88,7 +84,7 @@ tr:hover { background-color: #f9fafb; }
 .page-header h1 { color: #1e3a8a; font-size: 28px; margin-bottom: 8px; }
 .page-header p { color: #666; font-size: 15px; }
 
-/* RECEPTION FORM CARD */
+/* FORM CARD (Used by Reception, Nursing, etc.) */
 .form-card { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
 .form-card h3 { color: #1e3a8a; margin-bottom: 15px; font-size: 18px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
