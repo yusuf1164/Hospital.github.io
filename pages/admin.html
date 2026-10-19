@@ -12,21 +12,11 @@
         .role-item input { width: 20px; height: 20px; cursor: pointer; }
         .role-item label { cursor: pointer; font-weight: bold; color: #1e3a8a; text-transform: capitalize; }
         
-        /* Red SVG Trash Can Styling */
         .delete-btn { background: none; border: none; cursor: pointer; padding: 5px; display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s; }
         .delete-btn svg { fill: #dc2626; width: 18px; height: 18px; }
         .delete-btn:hover { transform: scale(1.15); }
-
-        /* Vertical Line Divider */
         .service-list-col { flex: 1; min-width: 250px; }
-        
-        /* Only show the vertical line on screens wider than 600px */
-        @media (min-width: 600px) {
-            .service-list-col:last-child {
-                border-left: 2px solid #e5e7eb;
-                padding-left: 20px;
-            }
-        }
+        @media (min-width: 600px) { .service-list-col:last-child { border-left: 2px solid #e5e7eb; padding-left: 20px; } }
     </style>
 </head>
 <body>
@@ -58,11 +48,11 @@
             <div class="form-card" style="border-left: 4px solid #2563eb;">
                 <h3>2. Manage Lab Tests & Radiology Scans</h3>
                 <form id="serviceForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
-                    <div class="form-group" style="flex: 0; min-width: 500px; margin-bottom: 0;">
+                    <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
                         <label>Service Name</label>
                         <input type="text" id="serviceName" required placeholder="e.g. Malaria Test">
                     </div>
-                    <div class="form-group" style="flex: 0; min-width: 500px; margin-bottom: 0;">
+                    <div class="form-group" style="flex: 1; min-width: 150px; margin-bottom: 0;">
                         <label>Department</label>
                         <select id="serviceType" required>
                             <option value="labTests">Laboratory</option>
@@ -73,18 +63,29 @@
                 </form>
 
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                    <!-- Lab Tests Column -->
                     <div class="service-list-col">
-                        <h3 style="color:#1e3a8a; margin-bottom: 10px;">Lab Tests</h3>
+                        <h4 style="color:#1e3a8a; margin-bottom: 10px;">Lab Tests</h4>
                         <ul id="labTestsList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
                     </div>
-                    
-                    <!-- Radiology Scans Column -->
                     <div class="service-list-col">
-                        <h3 style="color:#1e3a8a; margin-bottom: 10px;">Radiology Scans</h3>
+                        <h4 style="color:#1e3a8a; margin-bottom: 10px;">Radiology Scans</h4>
                         <ul id="radiologyScansList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
                     </div>
                 </div>
+            </div>
+
+            <!-- Appointment Types Management Section -->
+            <div class="form-card" style="border-left: 4px solid #10b981;">
+                <h3>3. Manage Appointment Types</h3>
+                <form id="apptTypeForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
+                    <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
+                        <label>Clinic / Appointment Type</label>
+                        <input type="text" id="apptTypeName" required placeholder="e.g. Dental Checkup, Antenatal">
+                    </div>
+                    <button type="submit" class="btn-submit" style="width: auto; padding: 10px 20px;">Add Type</button>
+                </form>
+
+                <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
             </div>
 
         </div>
@@ -104,7 +105,7 @@
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
-            // --- USER MANAGEMENT LOGIC ---
+            // --- USER MANAGEMENT ---
             const searchInput = document.getElementById('searchUser');
             const userSelect = document.getElementById('userSelect');
             const rolesSection = document.getElementById('rolesSection');
@@ -145,10 +146,8 @@
                 if (!selectedId) { rolesSection.style.display = 'none'; return; }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
-                
                 const selectedUser = allUsers.find(u => u.id === selectedId);
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
-
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
                         const box = document.getElementById(`chk_${role}`);
@@ -160,71 +159,62 @@
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
                 const selectedId = userSelect.value;
                 if (!selectedId) return;
-
                 const newRoles = [];
                 departments.forEach(dept => {
                     if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
                 });
-
                 db.collection('users').doc(selectedId).update({ roles: newRoles }).then(() => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'green';
-                    msg.textContent = 'Access updated successfully!';
+                    msg.style.color = 'green'; msg.textContent = 'Access updated successfully!';
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].roles = newRoles;
                 }).catch(err => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'red';
-                    msg.textContent = 'Error: ' + err.message;
+                    msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
                 });
             });
 
-            // --- SERVICE MANAGEMENT LOGIC ---
-            const serviceForm = document.getElementById('serviceForm');
+            // --- SERVICE MANAGEMENT ---
             const labList = document.getElementById('labTestsList');
             const radList = document.getElementById('radiologyScansList');
+            const apptList = document.getElementById('apptTypesList');
 
-            // Real-time listener for Lab Tests
             db.collection('labTests').onSnapshot(snap => {
                 labList.innerHTML = snap.empty ? '<li>No tests added.</li>' : '';
-                snap.forEach(doc => {
-                    labList.innerHTML += `
-                        <li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
-                            ${doc.data().name} 
-                            <button class="delete-btn" onclick="deleteService('labTests', '${doc.id}')">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
-                            </button>
-                        </li>`;
-                });
+                snap.forEach(doc => labList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('labTests', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
             });
 
-            // Real-time listener for Radiology Scans
             db.collection('radiologyScans').onSnapshot(snap => {
                 radList.innerHTML = snap.empty ? '<li>No scans added.</li>' : '';
-                snap.forEach(doc => {
-                    radList.innerHTML += `
-                        <li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">
-                            ${doc.data().name} 
-                            <button class="delete-btn" onclick="deleteService('radiologyScans', '${doc.id}')">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>
-                            </button>
-                        </li>`;
-                });
+                snap.forEach(doc => radList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('radiologyScans', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
             });
 
-            serviceForm.addEventListener('submit', (e) => {
+            db.collection('appointmentTypes').onSnapshot(snap => {
+                apptList.innerHTML = snap.empty ? '<li>No appointment types added.</li>' : '';
+                snap.forEach(doc => apptList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('appointmentTypes', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
+            });
+
+            document.getElementById('serviceForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = document.getElementById('serviceName').value;
                 const type = document.getElementById('serviceType').value;
-
                 db.collection(type).add({ name: name }).then(() => {
                     alert('Service added successfully!');
-                    serviceForm.reset();
+                    document.getElementById('serviceForm').reset();
+                }).catch(err => alert("Error: " + err.message));
+            });
+
+            document.getElementById('apptTypeForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const name = document.getElementById('apptTypeName').value;
+                db.collection('appointmentTypes').add({ name: name }).then(() => {
+                    alert('Appointment type added successfully!');
+                    document.getElementById('apptTypeForm').reset();
                 }).catch(err => alert("Error: " + err.message));
             });
 
             window.deleteService = function(collection, id) {
-                if(confirm("Delete this service?")) {
+                if(confirm("Delete this item?")) {
                     db.collection(collection).doc(id).delete();
                 }
             };
