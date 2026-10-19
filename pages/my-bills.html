@@ -26,7 +26,7 @@
                 </div>
             </div>
 
-            <!-- Empty State (If no IDs linked) -->
+            <!-- Empty State -->
             <div class="form-card" id="emptyState" style="text-align: center; display: none;">
                 <h3 style="color: #1e3a8a;">No Records Linked Yet</h3>
                 <p style="margin-bottom: 20px;">You haven't linked any hospital records to your account.</p>
@@ -57,7 +57,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=103"></script>
+    <script src="../script.js?v=104"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
@@ -70,7 +70,6 @@
             const tbody = document.getElementById('billsTableBody');
             let allPatientsData = [];
 
-            // 1. Get User's Linked IDs
             db.collection('users').doc(user.uid).get().then(doc => {
                 const userData = doc.data();
                 const linkedIds = userData.linkedPatientIds || [];
@@ -82,23 +81,19 @@
 
                 selectorCard.style.display = 'block';
 
-                // 2. Fetch the details (names) for these linked IDs
                 db.collection('patients').get().then(snapshot => {
                     snapshot.forEach(doc => {
                         const p = doc.data();
-                        // Ensure we match the P0001 format
                         if (linkedIds.includes(p.patientId)) {
                             allPatientsData.push({ firestoreId: doc.id, ...p });
                         }
                     });
 
-                    // Populate Dropdown
                     profileSelect.innerHTML = '<option value="">Select a profile...</option>';
                     allPatientsData.forEach(p => {
                         profileSelect.innerHTML += `<option value="${p.firestoreId}">${p.firstName} ${p.lastName} (ID: ${p.patientId})</option>`;
                     });
 
-                    // Auto-select if only 1 profile is linked
                     if (allPatientsData.length === 1) {
                         profileSelect.selectedIndex = 1;
                         loadBills(allPatientsData[0].firestoreId);
@@ -106,7 +101,6 @@
                 });
             });
 
-            // 3. Handle Dropdown Change
             profileSelect.addEventListener('change', (e) => {
                 const firestoreId = e.target.value;
                 if (firestoreId) {
@@ -116,7 +110,6 @@
                 }
             });
 
-            // 4. Load Bills Function
             function loadBills(firestorePatientId) {
                 billsContainer.style.display = 'block';
                 tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">Loading bills...</td></tr>`;
@@ -130,7 +123,6 @@
                     let bills = [];
                     snapshot.forEach(doc => bills.push(doc.data()));
 
-                    // Sort by date manually (newest first)
                     bills.sort((a, b) => {
                         const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                         const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
@@ -144,7 +136,6 @@
                         const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'N/A';
                         const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
                         
-                        // Calculate total outstanding balance
                         if (d.status !== 'Paid') totalPending += Number(d.amount);
 
                         tbody.innerHTML += `
@@ -157,7 +148,6 @@
                         `;
                     });
 
-                    // Add total pending summary at the bottom of the table
                     if (totalPending > 0) {
                         tbody.innerHTML += `
                             <tr style="background-color: #fef3c7;">
