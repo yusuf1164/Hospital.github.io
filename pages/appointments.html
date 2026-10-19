@@ -115,29 +115,44 @@
                 });
             });
 
-            // Query Appointments
-            let query = db.collection('appointments').orderBy('createdAt', 'desc');
+            // Query Appointments WITHOUT orderBy (to avoid index requirement for patients)
+            let query;
             if (isStrictlyPatient) {
-                query = query.where('patientUid', '==', user.uid);
+                query = db.collection('appointments').where('patientUid', '==', user.uid);
+            } else {
+                query = db.collection('appointments');
             }
 
-            // Added an error callback to the onSnapshot
             query.onSnapshot(snapshot => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
                     return;
                 }
-                tbody.innerHTML = '';
+                
+                // 1. Put all appointments into an array
+                let appointments = [];
                 snapshot.forEach(doc => {
-                    const d = doc.data();
+                    appointments.push({ id: doc.id, ...doc.data() });
+                });
+
+                // 2. Sort the array manually in JavaScript by createdAt (newest first)
+                appointments.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA; 
+                });
+
+                // 3. Render the table
+                tbody.innerHTML = '';
+                appointments.forEach(d => {
                     const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
                     
                     let actionHtml = '<span style="color:#888;">None</span>';
                     if (userRoles.includes('admin') || userRoles.includes('reception') || userRoles.includes('doctor') || userRoles.includes('appointments')) {
                         if (d.status === 'Pending') {
                             actionHtml = `
-                                <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${doc.id}', 'Confirmed')">Confirm</button>
-                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${doc.id}', 'Cancelled')">Cancel</button>
+                                <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
+                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
                             `;
                         }
                     }
@@ -154,9 +169,8 @@
                     `;
                 });
             }, error => {
-                // THIS WILL SHOW THE ERROR ON THE SCREEN
                 console.error("Firestore Error:", error);
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; font-weight:bold;">Database Error: ${error.message}<br><br>Check the browser console for the index creation link.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
         });
 
@@ -197,6 +211,6 @@
             }
         };
     });
- </script>
+</script>
 </body>
 </html>
