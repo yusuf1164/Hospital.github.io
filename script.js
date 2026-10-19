@@ -122,15 +122,16 @@ function updateAuthUI() {
                 });
             }
         } else {
+            // Logged out state: 3 buttons for clarity
             authButtons.innerHTML = `
-                <a href="${prefix}login.html" class="btn btn-outline">Login</a>
-                <a href="${prefix}register.html" class="btn btn-primary">Register</a>
+                <a href="${prefix}login.html" class="btn btn-outline">Staff Login</a>
+                <a href="${prefix}register.html" class="btn btn-outline">Staff Register</a>
+                <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Portal</a>
             `;
             if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
         }
     });
 }
-
 // ==========================================
 // 6. AUTHENTICATION FORMS
 // ==========================================
