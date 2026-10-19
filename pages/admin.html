@@ -32,6 +32,8 @@
             <!-- User Management Section -->
             <div class="form-card">
                 <h3>1. Staff Access Management</h3>
+                <button id="fixIdsBtn" class="btn btn-outline" style="margin-bottom: 15px; border-color: #1e3a8a; color: #1e3a8a; font-weight: bold; width: 100%;">⚙️ Generate Missing Staff IDs</button>
+                
                 <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
                 <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
                     <option value="">Select a staff member...</option>
@@ -84,7 +86,6 @@
                     </div>
                     <button type="submit" class="btn-submit" style="width: auto; padding: 10px 20px;">Add Type</button>
                 </form>
-
                 <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
             </div>
 
@@ -114,12 +115,51 @@
             db.collection('users').get().then((snapshot) => {
                 snapshot.forEach(doc => {
                     const u = doc.data();
-                    // ONLY add to the list if they have a staffId (meaning they are staff)
                     if (u.staffId) {
                         allUsers.push({ id: doc.id, ...u });
                     }
                 });
                 populateDropdown(allUsers);
+            });
+
+            // --- GENERATE MISSING IDS BUTTON ---
+            document.getElementById('fixIdsBtn').addEventListener('click', () => {
+                if(!confirm("This will scan all users and assign a Staff ID to anyone missing one. Proceed?")) return;
+                
+                db.collection('users').get().then(snapshot => {
+                    let usersToFix = [];
+                    snapshot.forEach(doc => {
+                        const u = doc.data();
+                        // If they don't have a staffId, and they aren't strictly a patient
+                        if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) {
+                            usersToFix.push(doc.id);
+                        }
+                    });
+
+                    if (usersToFix.length === 0) {
+                        alert("All staff members already have IDs!");
+                        return;
+                    }
+
+                    const counterRef = db.collection('settings').doc('counters');
+                    let promises = usersToFix.map(uid => {
+                        return db.runTransaction(transaction => {
+                            return transaction.get(counterRef).then(doc => {
+                                let nextId = 1002;
+                                if (doc.exists && doc.data().lastStaffId) {
+                                    nextId = doc.data().lastStaffId + 1;
+                                }
+                                transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                                return db.collection('users').doc(uid).update({ staffId: String(nextId) });
+                            });
+                        });
+                    });
+
+                    Promise.all(promises).then(() => {
+                        alert(`Successfully generated IDs for ${usersToFix.length} staff members! Please refresh the page.`);
+                        window.location.reload();
+                    }).catch(err => alert("Error: " + err.message));
+                });
             });
 
             roleCheckboxes.innerHTML = departments.map(dept => `
