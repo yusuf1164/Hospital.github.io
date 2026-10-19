@@ -25,20 +25,28 @@ a { text-decoration: none; color: inherit; }
 /* MOBILE NAVIGATION */
 @media (max-width: 900px) {
     .menu-toggle { display: block; }
-    .nav-links { display: none; flex-direction: column; width: 100%; text-align: center; padding: 15px 0; margin-top: 10px; gap: 15px; }
+    .nav-links { display: none; flex-direction: column; width: 100%; text-align: center; padding: 15px 0; margin-top: 10px; gap: 12px; }
     .nav-links.active { display: flex; }
     
-    /* Home & Appointments (Horizontal) */
-    .top-links { flex-direction: row; justify-content: center; width: 100%; gap: 10px; }
-    .top-links .btn { width: auto; padding: 8px 16px; }
+    /* Make ALL button groups horizontal */
+    .top-links, #dynamic-dept-links, .auth-buttons { 
+        display: flex; 
+        flex-direction: row; 
+        flex-wrap: wrap; 
+        justify-content: center; 
+        width: 100%; 
+        gap: 8px; 
+        margin-left: 0; 
+    }
     
-    /* Emergency, OPD, Lab, Pharmacy (Horizontal) */
-    #dynamic-dept-links { flex-direction: row; flex-wrap: wrap; justify-content: center; width: 100%; gap: 8px; margin-top: 0; }
-    #dynamic-dept-links .btn { width: auto; padding: 8px 12px; }
-
-    /* Dashboard & Logout (Stacked and Full Width) */
-    .auth-buttons { flex-direction: column; width: 100%; margin-left: 0; margin-top: 10px; gap: 10px; }
-    .auth-buttons .btn { width: 100%; padding: 10px; }
+    /* Make ALL buttons uniform in size so they align perfectly */
+    .nav-links .btn { 
+        flex: 1; 
+        min-width: 80px; 
+        max-width: 160px; 
+        padding: 10px 5px; 
+        text-align: center;
+    }
 }
 
 /* MAIN CONTENT */
