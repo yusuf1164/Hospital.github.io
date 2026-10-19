@@ -25,28 +25,18 @@ a { text-decoration: none; color: inherit; }
 /* MOBILE NAVIGATION */
 @media (max-width: 900px) {
     .menu-toggle { display: block; }
-    .nav-links { display: none; flex-direction: column; width: 100%; text-align: center; padding: 15px 0; margin-top: 10px; gap: 12px; }
-    .nav-links.active { display: flex; }
     
-    /* Make ALL button groups horizontal */
-    .top-links, #dynamic-dept-links, .auth-buttons { 
-        display: flex; 
-        flex-direction: row; 
-        flex-wrap: wrap; 
-        justify-content: center; 
-        width: 100%; 
-        gap: 8px; 
-        margin-left: 0; 
-    }
+    /* Hide menu by default */
+    .nav-links { display: none; }
     
-    /* Make ALL buttons uniform in size so they align perfectly */
-    .nav-links .btn { 
-        flex: 1; 
-        min-width: 80px; 
-        max-width: 160px; 
-        padding: 10px 5px; 
-        text-align: center;
-    }
+    /* When open, create a grid-like row layout */
+    .nav-links.active { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; padding: 15px 0; margin-top: 10px; gap: 10px; }
+    
+    /* Make the wrapper divs full width */
+    .top-links, #dynamic-dept-links, .auth-buttons { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; gap: 10px; margin: 0; }
+    
+    /* Force EVERY button to take up exactly 48% of the width (2 per row) */
+    .nav-links .btn { width: 48%; margin: 0; padding: 12px 5px; text-align: center; box-sizing: border-box; }
 }
 
 /* MAIN CONTENT */
