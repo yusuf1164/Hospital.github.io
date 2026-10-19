@@ -228,21 +228,32 @@ function initForms() {
 }
 
 // ==========================================
+// ==========================================
 // 7. GLOBAL ACTIVITY LOGGER
 // ==========================================
 function logActivity(user, action, details) {
     if (!user) return;
     
-    // Fetch the staff profile first to get their Name and Staff ID
     db.collection('users').doc(user.uid).get().then(doc => {
         const data = doc.data() || {};
-        const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Unknown Staff';
-        const staffId = data.staffId || 'N/A';
+        const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member';
+        
+        // Determine their ID / Role
+        let displayId = data.staffId;
+        
+        if (!displayId) {
+            // If they don't have a Staff ID, check if they are a Patient
+            if (data.roles && data.roles.includes('patient') && data.roles.length === 1) {
+                displayId = 'Patient';
+            } else {
+                displayId = 'Staff (No ID)';
+            }
+        }
         
         db.collection('auditLogs').add({
             userId: user.uid,
             staffName: staffName,
-            staffId: staffId,
+            staffId: displayId,
             action: action,
             details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -250,10 +261,9 @@ function logActivity(user, action, details) {
         
     }).catch(err => {
         console.error("Error fetching user for log:", err);
-        // Fallback if the user document cannot be read
         db.collection('auditLogs').add({
             userId: user.uid,
-            staffName: user.email,
+            staffName: 'Unknown User',
             staffId: 'N/A',
             action: action,
             details: details,
