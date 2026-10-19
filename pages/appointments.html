@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Appointments - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>📅 Appointments</h1>
+                <p>Book and manage clinic visits.</p>
+            </div>
+
+            <!-- Booking Form (Visible to Patients OR Admins/Reception) -->
+            <div class="form-card" id="bookingSection" style="display: none;">
+                <h3>Book New Appointment</h3>
+                <form id="appointmentForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Appointment Type</label>
+                            <select id="apptType" required>
+                                <option value="">Loading types...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Select Doctor</label>
+                            <select id="doctorSelect" required>
+                                <option value="">Loading doctors...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Date & Time</label>
+                            <input type="datetime-local" id="apptDate" required>
+                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Reason for Visit / Symptoms</label>
+                            <textarea id="reason" rows="2" required placeholder="Briefly describe why you need to see the doctor..."></textarea>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 250px;">Book Appointment</button>
+                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
+                </form>
+            </div>
+
+            <!-- Appointments List -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Appointment Schedule</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Patient Name</th>
+                        <th>Doctor</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="appointmentsTableBody">
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading appointments...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const bookingSection = document.getElementById('bookingSection');
+            const apptTypeSelect = document.getElementById('apptType');
+            const doctorSelect = document.getElementById('doctorSelect');
+            const tbody = document.getElementById('appointmentsTableBody');
+            let userRoles = ['patient'];
+            let patientName = user.email;
+
+            // 1. Get User Role & Setup UI
+            db.collection('users').doc(user.uid).get().then(doc => {
+                const data = doc.data() || {};
+                userRoles = data.roles || (data.role ? [data.role] : ['patient']);
+                patientName = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
+
+                // Show form for patients, reception, or admin
+                if (userRoles.includes('patient') || userRoles.includes('reception') || userRoles.includes('admin')) {
+                    bookingSection.style.display = 'block';
+                }
+
+                // 2. Load Appointment Types
+                db.collection('appointmentTypes').get().then(snap => {
+                    apptTypeSelect.innerHTML = '<option value="">Select type...</option>';
+                    snap.forEach(d => apptTypeSelect.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`);
+                });
+
+                // 3. Load Doctors
+                db.collection('users').where('roles', 'array-contains', 'doctor').get().then(snap => {
+                    doctorSelect.innerHTML = '<option value="">Select doctor...</option>';
+                    snap.forEach(d => {
+                        const docData = d.data();
+                        doctorSelect.innerHTML += `<option value="${docData.firstName} ${docData.lastName}">Dr. ${docData.firstName} ${docData.lastName}</option>`;
+                    });
+                });
+
+                // 4. Load Appointments (Patients see only their own, Staff see all)
+                let query = db.collection('appointments').orderBy('createdAt', 'desc');
+                if (userRoles.includes('patient') && !userRoles.includes('admin') && !userRoles.includes('reception') && !userRoles.includes('doctor')) {
+                    query = query.where('patientUid', '==', user.uid);
+                }
+
+                query.onSnapshot(snapshot => {
+                    if (snapshot.empty) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
+                        return;
+                    }
+                    tbody.innerHTML = '';
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
+                        
+                        // Only staff can see action buttons
+                        let actionHtml = '<span style="color:#888;">None</span>';
+                        if (userRoles.includes('admin') || userRoles.includes('reception') || userRoles.includes('doctor')) {
+                            if (d.status === 'Pending') {
+                                actionHtml = `
+                                    <button class="btn btn-primary" style="padding:4px 8px; font-size:12px;" onclick="updateAppt('${doc.id}', 'Confirmed')">Confirm</button>
+                                    <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${doc.id}', 'Cancelled')">Cancel</button>
+                                `;
+                            }
+                        }
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${d.dateTime}</td>
+                                <td><strong>${d.patientName}</strong></td>
+                                <td>${d.doctor}</td>
+                                <td>${d.type}</td>
+                                <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                                <td>${actionHtml}</td>
+                            </tr>
+                        `;
+                    });
+                });
+            });
+
+            // 5. Handle Booking
+            const form = document.getElementById('appointmentForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                btn.textContent = 'Booking...'; btn.disabled = true;
+
+                db.collection('appointments').add({
+                    patientUid: user.uid,
+                    patientName: patientName,
+                    type: apptTypeSelect.value,
+                    doctor: doctorSelect.value,
+                    dateTime: document.getElementById('apptDate').value,
+                    reason: document.getElementById('reason').value,
+                    status: 'Pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    logActivity(auth.currentUser, "Booked Appointment", `Type: ${apptTypeSelect.value}, Doctor: ${doctorSelect.value}`);
+                    alert('Appointment Booked Successfully!');
+                    form.reset();
+                    btn.textContent = 'Book Appointment'; btn.disabled = false;
+                }).catch(err => {
+                    document.getElementById('formError').style.display = 'block';
+                    document.getElementById('formError').textContent = "Error: " + err.message;
+                    btn.textContent = 'Book Appointment'; btn.disabled = false;
+                });
+            });
+
+            // 6. Function for Staff to Confirm/Cancel
+            window.updateAppt = function(id, status) {
+                if(confirm(`Mark this appointment as ${status}?`)) {
+                    db.collection('appointments').doc(id).update({ status: status })
+                    .then(() => logActivity(auth.currentUser, `Appointment ${status}`, `ID: ${id}`))
+                    .catch(err => alert(err.message));
+                }
+            };
+        });
+    </script>
+</body>
+</html>
