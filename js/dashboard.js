@@ -19,7 +19,9 @@ function renderModules(userRoles) {
     
     const allModules = {
         patient: [ 
-            { title: '📅 Book Appointment', desc: 'Schedule a visit', link: 'pages/appointments.html' } 
+            { title: '📅 My Appointments', desc: 'Schedule or view visits', link: 'pages/appointments.html' },
+            { title: '📋 My Health Records', desc: 'View your medical history', link: '#' },
+            { title: '💳 My Bills', desc: 'View and pay invoices', link: '#' }
         ],
         doctor: [ 
             { title: '🩺 OPD (Consultations)', desc: 'See patients & prescribe', link: 'pages/opd.html' },
