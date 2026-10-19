@@ -20,7 +20,7 @@
                 <thead>
                     <tr>
                         <th>Date & Time</th>
-                        <th>Staff Email</th>
+                        <th>Staff Info (ID & Name)</th>
                         <th>Action</th>
                         <th>Details</th>
                     </tr>
@@ -45,6 +45,7 @@
 
             const tbody = document.getElementById('logTableBody');
 
+            // Fetch the most recent 100 logs
             db.collection('auditLogs').orderBy('timestamp', 'desc').limit(100).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No activity recorded yet.</td></tr>`;
@@ -60,10 +61,17 @@
                     if (d.action.includes('Registered')) badgeColor = 'status-complete';
                     if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
 
+                    // Fallback to userEmail if staffName doesn't exist (for old logs)
+                    const displayName = d.staffName || d.userEmail || 'Unknown';
+                    const displayId = d.staffId || 'N/A';
+
                     tbody.innerHTML += `
                         <tr>
                             <td><small>${date}</small></td>
-                            <td><strong>${d.userEmail}</strong></td>
+                            <td>
+                                <strong>${displayName}</strong><br>
+                                <small style="color:#666;">ID: ${displayId}</small>
+                            </td>
                             <td><span class="status-badge ${badgeColor}">${d.action}</span></td>
                             <td>${d.details}</td>
                         </tr>
