@@ -34,14 +34,15 @@
                             </select>
                         </div>
                         <div class="form-group"><label>Phone Number</label><input type="tel" id="phone" required placeholder="+1 (555) 000-0000"></div>
-                        <div class="form-group"><label>Address</label><input type="text" id="address" required placeholder="123 Main St"></div>
+                        <div class="form-group"><label>Email Address (or Parent's Email)</label><input type="email" id="email" placeholder="patient@example.com"></div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Address</label><input type="text" id="address" required placeholder="123 Main St"></div>
                     </div>
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Register Patient</button>
                     <div id="formError" class="error-message" style="margin-top: 10px;"></div>
                 </form>
             </div>
 
-            <!-- Patient List Preview (Recent 5) -->
+            <!-- Patient List Preview -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Registrations</h3>
             <table>
                 <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Phone</th></tr></thead>
@@ -70,7 +71,6 @@
                     tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
                     return;
                 }
-                
                 tbody.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
@@ -99,32 +99,37 @@
                 const age = document.getElementById('age').value;
                 const gender = document.getElementById('gender').value;
                 const phone = document.getElementById('phone').value;
+                const email = document.getElementById('email').value;
                 const address = document.getElementById('address').value;
 
-                let generatedPatientId = ""; // Variable to hold the new ID
+                let generatedPatientId = "";
+                let generatedPin = "";
 
-                // 1. Generate Sequential Patient ID (P0001)
+                // 1. Generate Sequential Patient ID (P0001) and a 6-digit PIN
                 const counterRef = db.collection('settings').doc('counters');
                 db.runTransaction((transaction) => {
                     return transaction.get(counterRef).then((doc) => {
-                        let nextId = 1; // Start at P0001
+                        let nextId = 1; 
                         if (doc.exists && doc.data().lastPatientId) {
                             nextId = doc.data().lastPatientId + 1;
                         }
                         transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
                         
-                        // Format as P0001, P0002, etc.
                         generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
+                        // Generate a random 6-digit PIN
+                        generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
                     });
                 }).then(() => {
                     // 2. Save the Patient Data
                     return db.collection('patients').add({
                         patientId: generatedPatientId,
+                        pin: generatedPin, // Save the PIN securely
                         firstName: firstName,
                         lastName: lastName,
                         age: age,
                         gender: gender,
                         phone: phone,
+                        email: email,
                         address: address,
                         registeredBy: user.uid,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -132,8 +137,8 @@
                 }).then(() => {
                     logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`);
                     
-                    // 3. Show Success Modal with the ID
-                    alert(`✅ Patient Registered Successfully!\n\nPatient Name: ${firstName} ${lastName}\nPatient ID: ${generatedPatientId}\n\nPlease write this ID on the patient's card.`);
+                    // 3. Show Success Modal with ID and PIN
+                    alert(`✅ Patient Registered Successfully!\n\nPatient Name: ${firstName} ${lastName}\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient/parent. They will need BOTH to link their online portal.`);
                     
                     form.reset(); 
                     btn.textContent = 'Register Patient'; 
