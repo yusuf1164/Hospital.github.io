@@ -20,9 +20,9 @@ function renderModules(userRoles) {
     const allModules = {
         patient: [ 
             { title: '📅 My Appointments', desc: 'Book and view visits', link: 'pages/appointments.html' },
-            { title: '📋 My Health Records', desc: 'View your medical history', link: '#' },
-            { title: '🔗 Link Hospital Record', desc: 'Connect a new Patient ID', link: 'pages/link-record.html' } // <-- ADDED
-       ],
+            { title: '📋 My Health Records', desc: 'View linked profiles', link: 'pages/patient-records.html' },
+            { title: '🔗 Link Hospital Record', desc: 'Connect a new Patient ID', link: 'pages/link-record.html' }
+        ],
         appointments: [
             { title: '📅 Manage Appointments', desc: 'Confirm or cancel patient bookings', link: 'pages/appointments.html' }
         ],
