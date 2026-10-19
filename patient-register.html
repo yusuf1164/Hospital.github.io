@@ -82,10 +82,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="script.js?v=100"></script>
+    <script src="script.js?v=101"></script>
 
     <script>
-        document.getElementById('patientRegisterForm').addEventListener('submit', (e) => {
+        document.getElementById('patientRegisterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const firstName = document.getElementById('firstname').value;
@@ -107,66 +107,65 @@
                 return;
             }
             passwordError.style.display = 'none';
+            registerError.style.display = 'none';
             btn.textContent = 'Creating Account...'; btn.disabled = true;
 
-            let generatedPatientId = "";
-            let generatedPin = "";
+            try {
+                // 1. Create the Auth User
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
 
-            // 1. Create Auth User
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((cred) => {
-                    // 2. Generate Sequential Patient ID (P0001) and a 6-digit PIN
-                    const counterRef = db.collection('settings').doc('counters');
-                    
-                    return db.runTransaction((transaction) => {
-                        return transaction.get(counterRef).then((doc) => {
-                            let nextId = 1; 
-                            if (doc.exists && doc.data().lastPatientId) {
-                                nextId = doc.data().lastPatientId + 1;
-                            }
-                            transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
-                            
-                            generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
-                            generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
-                        });
-                    }).then(() => {
-                        // 3. Save to the HOSPITAL 'patients' collection
-                        return db.collection('patients').add({
-                            patientId: generatedPatientId,
-                            pin: generatedPin,
-                            firstName: firstName,
-                            lastName: lastName,
-                            age: age,
-                            gender: gender,
-                            phone: phone,
-                            email: email,
-                            address: address,
-                            registeredBy: cred.user.uid,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }).then(() => {
-                        // 4. Save to the 'users' collection (Online Account) and auto-link the P ID
-                        return db.collection('users').doc(cred.user.uid).set({
-                            firstName: firstName,
-                            lastName: lastName,
-                            email: email,
-                            phone: phone,
-                            roles: ['patient'],
-                            linkedPatientIds: [generatedPatientId], // Auto-linked!
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    });
-                })
-                .then(() => {
-                    alert(`✅ Patient Account Created Successfully!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease save this ID and PIN. You will need it for your hospital visits.`);
-                    window.location.href = 'dashboard.html';
-                })
-                .catch(err => {
-                    registerError.style.display = 'block';
-                    registerError.textContent = err.message;
-                    btn.textContent = 'Create Patient Account'; 
-                    btn.disabled = false;
+                // 2. Generate Sequential Patient ID (P0001) and PIN
+                const counterRef = db.collection('settings').doc('counters');
+                let generatedPatientId = "";
+                let generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
+
+                await db.runTransaction(async (transaction) => {
+                    const doc = await transaction.get(counterRef);
+                    let nextId = 1; 
+                    if (doc.exists && doc.data().lastPatientId) {
+                        nextId = doc.data().lastPatientId + 1;
+                    }
+                    transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
+                    generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
                 });
+
+                // 3. Save to the HOSPITAL 'patients' collection
+                await db.collection('patients').add({
+                    patientId: generatedPatientId,
+                    pin: generatedPin,
+                    firstName: firstName,
+                    lastName: lastName,
+                    age: age,
+                    gender: gender,
+                    phone: phone,
+                    email: email,
+                    address: address,
+                    registeredBy: cred.user.uid,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 4. Save to the 'users' collection and auto-link the P ID
+                await db.collection('users').doc(cred.user.uid).set({
+                    firstName: firstName,
+                    lastName: lastName,
+                    email: email,
+                    phone: phone,
+                    roles: ['patient'],
+                    linkedPatientIds: [generatedPatientId],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 5. Success!
+                alert(`✅ Patient Account Created Successfully!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease save this ID and PIN. You will need it for your hospital visits.`);
+                window.location.href = 'dashboard.html';
+
+            } catch (err) {
+                console.error(err);
+                registerError.style.display = 'block';
+                registerError.textContent = "Error: " + err.message;
+                btn.textContent = 'Create Patient Account'; 
+                btn.disabled = false;
+            }
         });
     </script>
 </body>
