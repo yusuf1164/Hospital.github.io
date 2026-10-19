@@ -99,16 +99,17 @@ function updateAuthUI() {
                 const data = doc.data() || {};
                 let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
                 
-                let linksHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
+                // Added btn classes to dynamic links
+                let linksHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
 
                 if (userRoles.includes('admin') || userRoles.includes('doctor')) {
-                    linksHTML += `<a href="${prefix}pages/opd.html">OPD</a>`;
+                    linksHTML += `<a href="${prefix}pages/opd.html" class="btn btn-outline">OPD</a>`;
                 }
                 if (userRoles.includes('admin') || userRoles.includes('lab')) {
-                    linksHTML += `<a href="${prefix}pages/laboratory.html">Lab</a>`;
+                    linksHTML += `<a href="${prefix}pages/laboratory.html" class="btn btn-outline">Lab</a>`;
                 }
                 if (userRoles.includes('admin') || userRoles.includes('pharmacy')) {
-                    linksHTML += `<a href="${prefix}pages/pharmacy.html">Pharmacy</a>`;
+                    linksHTML += `<a href="${prefix}pages/pharmacy.html" class="btn btn-outline">Pharmacy</a>`;
                 }
                 
                 if(dynamicLinks) dynamicLinks.innerHTML = linksHTML;
@@ -122,16 +123,17 @@ function updateAuthUI() {
                 });
             }
         } else {
-            // Logged out state: 3 buttons for clarity
             authButtons.innerHTML = `
-                <a href="${prefix}login.html" class="btn btn-outline">Staff Login</a>
+                <a href="${prefix}login.html" class="btn btn-outline">Login</a>
                 <a href="${prefix}register.html" class="btn btn-outline">Staff Register</a>
-                <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Portal</a>
+                <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Register</a>
             `;
-            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html">Emergency</a>`;
+            // Added btn class to logged out dynamic link
+            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
         }
     });
 }
+
 // ==========================================
 // 6. AUTHENTICATION FORMS
 // ==========================================
