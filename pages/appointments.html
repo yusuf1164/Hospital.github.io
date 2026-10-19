@@ -75,142 +75,152 @@
     <script src="../script.js"></script>
 
     <script>
-    auth.onAuthStateChanged((user) => {
-        if (!user) { window.location.href = '../login.html'; return; }
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
 
-        const bookingSection = document.getElementById('bookingSection');
-        const apptTypeSelect = document.getElementById('apptType');
-        const doctorSelect = document.getElementById('doctorSelect');
-        const tbody = document.getElementById('appointmentsTableBody');
-        let userRoles = ['patient'];
-        let patientName = user.email;
+            const bookingSection = document.getElementById('bookingSection');
+            const apptTypeSelect = document.getElementById('apptType');
+            const doctorSelect = document.getElementById('doctorSelect');
+            const tbody = document.getElementById('appointmentsTableBody');
+            let userRoles = ['patient'];
+            let patientName = user.email;
 
-        db.collection('users').doc(user.uid).get().then(doc => {
-            const data = doc.data() || {};
-            userRoles = data.roles || (data.role ? [data.role] : ['patient']);
-            patientName = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
+            db.collection('users').doc(user.uid).get().then(doc => {
+                const data = doc.data() || {};
+                userRoles = data.roles || (data.role ? [data.role] : ['patient']);
+                patientName = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
 
-            const isStrictlyPatient = userRoles.includes('patient') && 
-                                      !userRoles.includes('admin') && 
-                                      !userRoles.includes('reception') && 
-                                      !userRoles.includes('doctor') && 
-                                      !userRoles.includes('nurse') && 
-                                      !userRoles.includes('appointments');
+                const isStrictlyPatient = userRoles.includes('patient') && 
+                                          !userRoles.includes('admin') && 
+                                          !userRoles.includes('reception') && 
+                                          !userRoles.includes('doctor') && 
+                                          !userRoles.includes('nurse') && 
+                                          !userRoles.includes('appointments');
 
-            if (isStrictlyPatient) {
-                bookingSection.style.display = 'block';
-            }
-
-            // Load Dropdowns
-            db.collection('appointmentTypes').get().then(snap => {
-                apptTypeSelect.innerHTML = '<option value="">Select type...</option>';
-                snap.forEach(d => apptTypeSelect.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`);
-            });
-
-            db.collection('users').where('roles', 'array-contains', 'doctor').get().then(snap => {
-                doctorSelect.innerHTML = '<option value="">Select doctor...</option>';
-                snap.forEach(d => {
-                    const docData = d.data();
-                    doctorSelect.innerHTML += `<option value="${docData.firstName} ${docData.lastName}">Dr. ${docData.firstName} ${docData.lastName}</option>`;
-                });
-            });
-
-            // Query Appointments WITHOUT orderBy (to avoid index requirement for patients)
-            let query;
-            if (isStrictlyPatient) {
-                query = db.collection('appointments').where('patientUid', '==', user.uid);
-            } else {
-                query = db.collection('appointments');
-            }
-
-            query.onSnapshot(snapshot => {
-                if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
-                    return;
+                if (isStrictlyPatient) {
+                    bookingSection.style.display = 'block';
                 }
-                
-                // 1. Put all appointments into an array
-                let appointments = [];
-                snapshot.forEach(doc => {
-                    appointments.push({ id: doc.id, ...doc.data() });
+
+                // Load Appointment Types
+                db.collection('appointmentTypes').get().then(snap => {
+                    apptTypeSelect.innerHTML = '<option value="">Select type...</option>';
+                    snap.forEach(d => apptTypeSelect.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`);
                 });
 
-                // 2. Sort the array manually in JavaScript by createdAt (newest first)
-                appointments.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA; 
-                });
-
-                // 3. Render the table
-                tbody.innerHTML = '';
-                appointments.forEach(d => {
-                    const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
+                // Load Doctors (Robust JS Filtering)
+                db.collection('users').get().then(snap => {
+                    doctorSelect.innerHTML = '<option value="">Select doctor...</option>';
+                    let foundDoctors = false;
                     
-                    let actionHtml = '<span style="color:#888;">None</span>';
-                    if (userRoles.includes('admin') || userRoles.includes('reception') || userRoles.includes('doctor') || userRoles.includes('appointments')) {
-                        if (d.status === 'Pending') {
-                            actionHtml = `
-                                <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
-                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
-                            `;
+                    snap.forEach(d => {
+                        const docData = d.data();
+                        if (docData.roles && docData.roles.includes('doctor')) {
+                            foundDoctors = true;
+                            doctorSelect.innerHTML += `<option value="${docData.firstName} ${docData.lastName}">Dr. ${docData.firstName} ${docData.lastName}</option>`;
                         }
+                    });
+
+                    if (!foundDoctors) {
+                        doctorSelect.innerHTML = '<option value="">No doctors available</option>';
                     }
-
-                    tbody.innerHTML += `
-                        <tr>
-                            <td>${d.dateTime}</td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.doctor}</td>
-                            <td>${d.type}</td>
-                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-                            <td>${actionHtml}</td>
-                        </tr>
-                    `;
+                }).catch(error => {
+                    console.error("Error loading doctors:", error);
+                    doctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
                 });
-            }, error => {
-                console.error("Firestore Error:", error);
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+
+                // Query Appointments (with JS sorting to avoid index errors)
+                let query;
+                if (isStrictlyPatient) {
+                    query = db.collection('appointments').where('patientUid', '==', user.uid);
+                } else {
+                    query = db.collection('appointments');
+                }
+
+                query.onSnapshot(snapshot => {
+                    if (snapshot.empty) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
+                        return;
+                    }
+                    
+                    let appointments = [];
+                    snapshot.forEach(doc => {
+                        appointments.push({ id: doc.id, ...doc.data() });
+                    });
+
+                    appointments.sort((a, b) => {
+                        const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                        const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                        return timeB - timeA; 
+                    });
+
+                    tbody.innerHTML = '';
+                    appointments.forEach(d => {
+                        const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
+                        
+                        let actionHtml = '<span style="color:#888;">None</span>';
+                        if (userRoles.includes('admin') || userRoles.includes('reception') || userRoles.includes('doctor') || userRoles.includes('appointments')) {
+                            if (d.status === 'Pending') {
+                                actionHtml = `
+                                    <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
+                                    <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
+                                `;
+                            }
+                        }
+
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>${d.dateTime}</td>
+                                <td><strong>${d.patientName}</strong></td>
+                                <td>${d.doctor}</td>
+                                <td>${d.type}</td>
+                                <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                                <td>${actionHtml}</td>
+                            </tr>
+                        `;
+                    });
+                }, error => {
+                    console.error("Firestore Error:", error);
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                });
             });
-        });
 
-        // Handle Booking
-        const form = document.getElementById('appointmentForm');
-        form.addEventListener('submit', (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('submitBtn');
-            const errorDiv = document.getElementById('formError');
-            btn.textContent = 'Booking...'; btn.disabled = true;
+            // Handle Booking
+            const form = document.getElementById('appointmentForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                const errorDiv = document.getElementById('formError');
+                btn.textContent = 'Booking...'; btn.disabled = true;
 
-            db.collection('appointments').add({
-                patientUid: user.uid,
-                patientName: patientName,
-                type: apptTypeSelect.value,
-                doctor: doctorSelect.value,
-                dateTime: document.getElementById('apptDate').value,
-                reason: document.getElementById('reason').value,
-                status: 'Pending',
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).then(() => {
-                logActivity(auth.currentUser, "Booked Appointment", `Type: ${apptTypeSelect.value}, Doctor: ${doctorSelect.value}`);
-                alert('Appointment Booked Successfully!');
-                form.reset();
-                btn.textContent = 'Book Appointment'; btn.disabled = false;
-            }).catch(err => {
-                errorDiv.style.display = 'block';
-                errorDiv.textContent = "Error: " + err.message;
-                btn.textContent = 'Book Appointment'; btn.disabled = false;
+                db.collection('appointments').add({
+                    patientUid: user.uid,
+                    patientName: patientName,
+                    type: apptTypeSelect.value,
+                    doctor: doctorSelect.value,
+                    dateTime: document.getElementById('apptDate').value,
+                    reason: document.getElementById('reason').value,
+                    status: 'Pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    logActivity(auth.currentUser, "Booked Appointment", `Type: ${apptTypeSelect.value}, Doctor: ${doctorSelect.value}`);
+                    alert('Appointment Booked Successfully!');
+                    form.reset();
+                    btn.textContent = 'Book Appointment'; btn.disabled = false;
+                }).catch(err => {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = "Error: " + err.message;
+                    btn.textContent = 'Book Appointment'; btn.disabled = false;
+                });
             });
-        });
 
-        window.updateAppt = function(id, status) {
-            if(confirm(`Mark this appointment as ${status}?`)) {
-                db.collection('appointments').doc(id).update({ status: status })
-                .then(() => logActivity(auth.currentUser, `Appointment ${status}`, `ID: ${id}`))
-                .catch(err => alert(err.message));
-            }
-        };
-    });
-</script>
+            window.updateAppt = function(id, status) {
+                if(confirm(`Mark this appointment as ${status}?`)) {
+                    db.collection('appointments').doc(id).update({ status: status })
+                    .then(() => logActivity(auth.currentUser, `Appointment ${status}`, `ID: ${id}`))
+                    .catch(err => alert(err.message));
+                }
+            };
+        });
+    </script>
 </body>
 </html>
