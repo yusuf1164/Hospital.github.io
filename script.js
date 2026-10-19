@@ -232,11 +232,32 @@ function initForms() {
 // ==========================================
 function logActivity(user, action, details) {
     if (!user) return;
-    db.collection('auditLogs').add({
-        userId: user.uid,
-        userEmail: user.email,
-        action: action,
-        details: details,
-        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-    }).catch(err => console.error("Error logging activity:", err));
+    
+    // Fetch the staff profile first to get their Name and Staff ID
+    db.collection('users').doc(user.uid).get().then(doc => {
+        const data = doc.data() || {};
+        const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Unknown Staff';
+        const staffId = data.staffId || 'N/A';
+        
+        db.collection('auditLogs').add({
+            userId: user.uid,
+            staffName: staffName,
+            staffId: staffId,
+            action: action,
+            details: details,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(err => console.error("Error logging activity:", err));
+        
+    }).catch(err => {
+        console.error("Error fetching user for log:", err);
+        // Fallback if the user document cannot be read
+        db.collection('auditLogs').add({
+            userId: user.uid,
+            staffName: user.email,
+            staffId: 'N/A',
+            action: action,
+            details: details,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    });
 }
