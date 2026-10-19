@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Patient Record - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="form-container">
+            <h2>🔗 Link Hospital Record</h2>
+            <p>Enter the Patient ID and PIN given to you by the receptionist.</p>
+            
+            <form id="linkForm">
+                <div class="form-group">
+                    <label>Patient ID</label>
+                    <input type="text" id="patientId" required placeholder="e.g. P0001">
+                </div>
+                <div class="form-group">
+                    <label>Security PIN</label>
+                    <input type="password" id="pin" required placeholder="6-digit PIN">
+                </div>
+                
+                <button type="submit" class="btn-submit" id="submitBtn">Link Record</button>
+                <div id="errorMsg" class="error-message" style="text-align:center; margin-top:10px;"></div>
+            </form>
+
+            <div class="form-footer">
+                <a href="dashboard.html">Back to Dashboard</a>
+            </div>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
+
+            const form = document.getElementById('linkForm');
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('submitBtn');
+                const errorDiv = document.getElementById('errorMsg');
+                btn.textContent = 'Verifying...'; btn.disabled = true;
+                errorDiv.style.display = 'none';
+
+                const inputId = document.getElementById('patientId').value.trim().toUpperCase();
+                const inputPin = document.getElementById('pin').value.trim();
+
+                // 1. Get the current user's profile (to check their email/phone)
+                db.collection('users').doc(user.uid).get().then(userDoc => {
+                    const userData = userDoc.data();
+
+                    // 2. Find the patient record
+                    return db.collection('patients').where('patientId', '==', inputId).get().then(snapshot => {
+                        if (snapshot.empty) {
+                            throw new Error("Patient ID not found in hospital database.");
+                        }
+
+                        const patientDoc = snapshot.docs[0];
+                        const patientData = patientDoc.data();
+
+                        // 3. Security Checks
+                        if (patientData.pin !== inputPin) {
+                            throw new Error("Incorrect Security PIN.");
+                        }
+
+                        // Verify if the logged-in user's phone or email matches the hospital record
+                        const matchesEmail = patientData.email && patientData.email.toLowerCase() === userData.email.toLowerCase();
+                        const matchesPhone = patientData.phone && patientData.phone === userData.phone;
+
+                        if (!matchesEmail && !matchesPhone) {
+                            throw new Error("Security Error: The email/phone on your portal account does not match the hospital record.");
+                        }
+
+                        // 4. Success! Add the Patient ID to the user's linked IDs array
+                        let linkedIds = userData.linkedPatientIds || [];
+                        
+                        if (linkedIds.includes(inputId)) {
+                            throw new Error("This Patient ID is already linked to your account.");
+                        }
+                        
+                        linkedIds.push(inputId); // Add the new ID to the array
+
+                        return db.collection('users').doc(user.uid).update({
+                            linkedPatientIds: linkedIds
+                        });
+                    });
+                }).then(() => {
+                    alert('✅ Record Linked Successfully! You can now view this patient\'s history from your dashboard.');
+                    window.location.href = 'dashboard.html';
+                }).catch(err => {
+                    errorDiv.style.display = 'block';
+                    errorDiv.textContent = err.message;
+                    btn.textContent = 'Link Record'; btn.disabled = false;
+                });
+            });
+        });
+    </script>
+</body>
+</html>
