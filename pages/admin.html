@@ -31,10 +31,10 @@
 
             <!-- User Management Section -->
             <div class="form-card">
-                <h3>1. User Access Management</h3>
-                <input type="text" id="searchUser" class="search-box" placeholder="Type Name or Staff ID...">
+                <h3>1. Staff Access Management</h3>
+                <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
                 <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
-                    <option value="">Select a user...</option>
+                    <option value="">Select a staff member...</option>
                 </select>
                 
                 <div id="rolesSection" style="display: none; margin-top: 20px;">
@@ -112,7 +112,13 @@
             const roleCheckboxes = document.getElementById('roleCheckboxes');
 
             db.collection('users').get().then((snapshot) => {
-                snapshot.forEach(doc => allUsers.push({ id: doc.id, ...doc.data() }));
+                snapshot.forEach(doc => {
+                    const u = doc.data();
+                    // ONLY add to the list if they have a staffId (meaning they are staff)
+                    if (u.staffId) {
+                        allUsers.push({ id: doc.id, ...u });
+                    }
+                });
                 populateDropdown(allUsers);
             });
 
@@ -134,10 +140,11 @@
             });
 
             function populateDropdown(users) {
-                userSelect.innerHTML = '<option value="">Select a user...</option>';
+                userSelect.innerHTML = '<option value="">Select a staff member...</option>';
                 users.forEach(u => {
                     const fullName = `${u.firstName || 'User'} ${u.lastName || ''}`;
-                    userSelect.innerHTML += `<option value="${u.id}">${fullName} (ID: ${u.staffId || 'None'})</option>`;
+                    const rolesText = u.roles ? u.roles.join(', ') : 'No roles';
+                    userSelect.innerHTML += `<option value="${u.id}">${fullName} (ID: ${u.staffId}) - [${rolesText}]</option>`;
                 });
             }
 
@@ -146,8 +153,10 @@
                 if (!selectedId) { rolesSection.style.display = 'none'; return; }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
+                
                 const selectedUser = allUsers.find(u => u.id === selectedId);
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
+
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
                         const box = document.getElementById(`chk_${role}`);
@@ -159,18 +168,22 @@
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
                 const selectedId = userSelect.value;
                 if (!selectedId) return;
+
                 const newRoles = [];
                 departments.forEach(dept => {
                     if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
                 });
+
                 db.collection('users').doc(selectedId).update({ roles: newRoles }).then(() => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'green'; msg.textContent = 'Access updated successfully!';
+                    msg.style.color = 'green';
+                    msg.textContent = 'Access updated successfully!';
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].roles = newRoles;
                 }).catch(err => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
+                    msg.style.color = 'red';
+                    msg.textContent = 'Error: ' + err.message;
                 });
             });
 
