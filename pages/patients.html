@@ -49,6 +49,8 @@
     <script src="../script.js"></script>
 
     <script>
+        <script>
+    enforceAuth(['reception', 'doctor', 'nurse']); // <-- ADD THIS LINE: Reroute all entry to the backdoor & check role
         let allPatients = []; // Store patients in memory for fast searching
 
         auth.onAuthStateChanged((user) => {
