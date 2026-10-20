@@ -13,43 +13,31 @@
         <div class="table-container">
             <div class="page-header">
                 <h1>🌡️ Nursing Department</h1>
-                <p>Record patient vitals before they see the doctor.</p>
+                <p>Record patient vitals.</p>
             </div>
 
-            <!-- Vitals Form -->
             <div class="form-card">
-                <h3>Record Patient Vitals</h3>
+                <h3>Record Vitals</h3>
                 <form id="nursingForm">
                     <div class="form-grid">
                         <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>Select Patient</label>
-                            <!-- This dropdown will be populated by JavaScript -->
-                            <select id="patientSelect" required>
-                                <option value="">Loading patients...</option>
-                            </select>
+                            <label>Search Patient</label>
+                            <input type="text" id="searchNursePatient" placeholder="Type Name, P ID, or Phone..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
+                            <select id="nursePatientSelect" required style="display: none; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></select>
                         </div>
-                        <div class="form-group"><label>Blood Pressure (mmHg)</label><input type="text" id="bp" required placeholder="e.g. 120/80"></div>
-                        <div class="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" id="temp" required placeholder="e.g. 37.2"></div>
-                        <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" id="weight" required placeholder="e.g. 70.5"></div>
-                        <div class="form-group"><label>Pulse (bpm)</label><input type="number" id="pulse" required placeholder="e.g. 72"></div>
+                        <div class="form-group"><label>BP (mmHg)</label><input type="text" id="bp" required placeholder="120/80"></div>
+                        <div class="form-group"><label>Temp (°C)</label><input type="number" step="0.1" id="temp" required placeholder="37.2"></div>
+                        <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" id="weight" required placeholder="70.5"></div>
+                        <div class="form-group"><label>Pulse (bpm)</label><input type="number" id="pulse" required placeholder="72"></div>
                     </div>
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Save Vitals</button>
-                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
                 </form>
             </div>
 
-            <!-- Vitals List -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Vitals</h3>
             <table>
                 <thead>
-                    <tr>
-                        <th>Patient Name</th>
-                        <th>BP</th>
-                        <th>Temp (°C)</th>
-                        <th>Weight (kg)</th>
-                        <th>Pulse</th>
-                        <th>Date</th>
-                    </tr>
+                    <tr><th>Patient (ID)</th><th>BP</th><th>Temp</th><th>Weight</th><th>Pulse</th><th>Date</th></tr>
                 </thead>
                 <tbody id="vitalsTableBody">
                     <tr><td colspan="6" style="text-align:center; color:#888;">Loading vitals...</td></tr>
@@ -60,63 +48,77 @@
 
     <footer id="footer-placeholder"></footer>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=105"></script>
 
-    <!-- Nursing Logic -->
     <script>
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
-            const patientSelect = document.getElementById('patientSelect');
+            const searchNursePatient = document.getElementById('searchNursePatient');
+            const nursePatientSelect = document.getElementById('nursePatientSelect');
+            const tbody = document.getElementById('vitalsTableBody');
+            let allPatients = [];
 
-            // 1. Load Patients into the Dropdown
-            db.collection('patients').orderBy('firstName').get().then((snapshot) => {
-                patientSelect.innerHTML = '<option value="">Select a patient...</option>';
-                snapshot.forEach(doc => {
-                    const p = doc.data();
-                    patientSelect.innerHTML += `<option value="${doc.id}" data-name="${p.firstName} ${p.lastName}">${p.firstName} ${p.lastName} (ID: ${doc.id.slice(0,4)})</option>`;
-                });
+            // Load Patients
+            db.collection('patients').get().then(snap => {
+                snap.forEach(doc => allPatients.push(doc.data()));
             });
 
-            // 2. Load Recent Vitals into Table
-            db.collection('vitals').orderBy('createdAt', 'desc').limit(20).onSnapshot((snapshot) => {
-                const tbody = document.getElementById('vitalsTableBody');
+            // Search Logic
+            searchNursePatient.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                if (term.length < 2) { nursePatientSelect.style.display = 'none'; return; }
+
+                const filtered = allPatients.filter(p => {
+                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                    const pid = String(p.patientId).toLowerCase();
+                    const phone = String(p.phone).toLowerCase();
+                    return name.includes(term) || pid.includes(term) || phone.includes(term);
+                });
+
+                nursePatientSelect.innerHTML = '<option value="">Select patient...</option>';
+                filtered.forEach(p => nursePatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
+                nursePatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+            });
+
+            // Load Recent Vitals
+            db.collection('vitals').onSnapshot(snapshot => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
                     return;
                 }
+                
+                let vitals = [];
+                snapshot.forEach(doc => vitals.push(doc.data()));
+                
+                vitals.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+
                 tbody.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const d = doc.data();
+                vitals.slice(0, 20).forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
                     tbody.innerHTML += `
                         <tr>
-                            <td>${d.patientName}</td>
-                            <td>${d.bp}</td>
-                            <td>${d.temp}</td>
-                            <td>${d.weight}</td>
-                            <td>${d.pulse}</td>
-                            <td>${date}</td>
+                            <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
+                            <td>${d.bp}</td><td>${d.temp}°C</td><td>${d.weight}kg</td><td>${d.pulse}</td><td>${date}</td>
                         </tr>
                     `;
                 });
             });
 
-            // 3. Handle Form Submission
-            const form = document.getElementById('nursingForm');
-            form.addEventListener('submit', (e) => {
+            // Submit Form
+            document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                const btn = document.getElementById('submitBtn');
-                const errorDiv = document.getElementById('formError');
-                btn.textContent = 'Saving...'; btn.disabled = true;
+                if(!nursePatientSelect.value) { alert("Please select a patient."); return; }
 
-                // Get the selected patient's ID and Name
-                const patientId = patientSelect.value;
-                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+                const patientId = nursePatientSelect.value;
+                const patientName = nursePatientSelect.options[nursePatientSelect.selectedIndex].getAttribute('data-name');
 
                 db.collection('vitals').add({
                     patientId: patientId,
@@ -127,13 +129,10 @@
                     pulse: document.getElementById('pulse').value,
                     recordedBy: user.uid,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                })
-                .then(() => {
-                    alert('Vitals Saved Successfully!');
-                    form.reset(); btn.textContent = 'Save Vitals'; btn.disabled = false; errorDiv.style.display = 'none';
-                })
-                .catch((error) => {
-                    errorDiv.style.display = 'block'; errorDiv.textContent = "Error: " + error.message; btn.textContent = 'Save Vitals'; btn.disabled = false;
+                }).then(() => {
+                    alert('Vitals Saved!');
+                    document.getElementById('nursingForm').reset();
+                    nursePatientSelect.style.display = 'none';
                 });
             });
         });
