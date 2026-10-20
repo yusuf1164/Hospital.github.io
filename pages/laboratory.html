@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -27,9 +26,7 @@
                         </div>
                         <div class="form-group">
                             <label>Test Type</label>
-                            <select id="testType" required>
-                                <option value="">Loading tests...</option>
-                            </select>
+                            <select id="testType" required><option value="">Loading tests...</option></select>
                         </div>
                         <div class="form-group">
                             <label>Requested By</label>
@@ -42,23 +39,13 @@
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Laboratory Queue</h3>
             <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Test Type</th>
-                        <th>Requested By</th>
-                        <th>Status</th>
-                        <th>Result / Action</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Patient ID</th><th>Patient Name</th><th>Test Type</th><th>Requested By</th><th>Status</th><th>Result / Action</th></tr></thead>
                 <tbody id="labTableBody">
                     <tr><td colspan="6" style="text-align:center; color:#888;">Loading lab requests...</td></tr>
                 </tbody>
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -67,20 +54,15 @@
     <script src="../script.js"></script>
 
     <script>
-        <script>
-    enforceAuth(['lab']); // <-- ADD THIS LINE: Reroute all entry to frontdoor and check role
+        enforceAuth(['lab']);
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
-
+            if (!user) return;
             const tbody = document.getElementById('labTableBody');
             const searchLabPatient = document.getElementById('searchLabPatient');
             const labPatientSelect = document.getElementById('labPatientSelect');
             let allPatients = [];
 
-            db.collection('patients').get().then(snap => {
-                snap.forEach(doc => allPatients.push(doc.data()));
-            });
-
+            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); }).catch(err => console.error(err));
             db.collection('labTests').get().then(snap => {
                 const testSelect = document.getElementById('testType');
                 testSelect.innerHTML = '<option value="">Select test...</option>';
@@ -106,7 +88,6 @@
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
                     return;
                 }
-                
                 let results = [];
                 snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
                 results.sort((a, b) => {
@@ -114,18 +95,15 @@
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
-
                 tbody.innerHTML = '';
                 results.forEach(d => {
                     const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
                     let actionHtml = '';
-                    
                     if (d.status === 'Pending') {
                         actionHtml = `<div style="display:flex; gap:5px;"><input type="text" id="result_${d.id}" placeholder="Result..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:100px;"><button class="btn btn-primary" onclick="saveResult('${d.id}')">Save</button></div>`;
                     } else {
                         actionHtml = `<strong>${d.result}</strong>`;
                     }
-
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
@@ -137,34 +115,26 @@
                         </tr>
                     `;
                 });
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
             document.getElementById('labForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!labPatientSelect.value) { alert("Please select a patient."); return; }
-                
-                const patientId = labPatientSelect.value;
-                const patientName = labPatientSelect.options[labPatientSelect.selectedIndex].getAttribute('data-name');
-                
                 db.collection('labResults').add({
-                    patientId: patientId,
-                    patientName: patientName,
-                    testType: document.getElementById('testType').value,
-                    requestedBy: document.getElementById('requestedBy').value,
-                    status: 'Pending', result: '',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    patientId: labPatientSelect.value, patientName: labPatientSelect.options[labPatientSelect.selectedIndex].getAttribute('data-name'),
+                    testType: document.getElementById('testType').value, requestedBy: document.getElementById('requestedBy').value,
+                    status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Lab test requested!');
-                    document.getElementById('labForm').reset();
-                    labPatientSelect.style.display = 'none';
+                    alert('Lab test requested!'); document.getElementById('labForm').reset(); labPatientSelect.style.display = 'none';
                 });
             });
 
             window.saveResult = function(docId) {
                 const resultInput = document.getElementById(`result_${docId}`).value;
                 if (!resultInput) { alert("Please enter a result."); return; }
-                db.collection('labResults').doc(docId).update({ result: resultInput, status: 'Completed' })
-                .then(() => alert('Result saved!'));
+                db.collection('labResults').doc(docId).update({ result: resultInput, status: 'Completed' }).then(() => alert('Result saved!'));
             };
         });
     </script>
