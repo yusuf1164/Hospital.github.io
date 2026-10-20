@@ -15,7 +15,7 @@
     <main>
         <div class="table-container">
             <div class="page-header">
-                <h1>👥 Patient Lists</h1>
+                <h1>👥 Patient List</h1>
                 <p>Search and view all registered patients.</p>
             </div>
 
@@ -27,7 +27,7 @@
                 <thead>
                     <tr>
                         <th>Patient ID</th>
-                        <th>Name</th>
+                        <th>Patient Name</th>
                         <th>Age</th>
                         <th>Gender</th>
                         <th>Phone</th>
@@ -49,26 +49,40 @@
     <script src="../script.js"></script>
 
     <script>
-        <script>
-    enforceAuth(['reception', 'doctor', 'nurse']); // <-- ADD THIS LINE: Reroute all entry to the backdoor & check role
-        let allPatients = []; // Store patients in memory for fast searching
+        // 1. APPLY THE GUARD
+        enforceAuth(['reception', 'doctor', 'nurse', 'admin', 'records']);
+
+        // 2. PAGE LOGIC
+        let allPatients = []; 
 
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+            if (!user) return;
 
             const tbody = document.getElementById('patientListBody');
             const searchInput = document.getElementById('searchPatient');
 
-            // 1. Fetch all patients
-            db.collection('patients').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
-                allPatients = []; // Clear array
+            // Fetch all patients
+            db.collection('patients').onSnapshot((snapshot) => {
+                allPatients = []; 
                 snapshot.forEach(doc => {
                     allPatients.push({ firestoreId: doc.id, ...doc.data() });
                 });
+
+                // Manually sort by createdAt in JavaScript (Newest first)
+                allPatients.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+
                 renderTable(allPatients);
+            }, error => {
+                // Catch errors so it doesn't freeze
+                console.error("Firestore Error: ", error);
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Database Error: ${error.message}</td></tr>`;
             });
 
-            // 2. Search Logic
+            // Search Logic
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 const filtered = allPatients.filter(p => {
@@ -81,7 +95,7 @@
                 renderTable(filtered);
             });
 
-            // 3. Render Table Function
+            // Render Table Function
             function renderTable(patients) {
                 if (patients.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients found.</td></tr>`;
@@ -94,7 +108,7 @@
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${p.patientId || 'N/A'}</strong></td>
-                            <td>${p.firstName} ${p.lastName}</td>
+                            <td><strong>${p.firstName} ${p.lastName}</strong></td>
                             <td>${p.age}</td>
                             <td>${p.gender}</td>
                             <td>${p.phone}</td>
