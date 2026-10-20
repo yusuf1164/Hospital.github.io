@@ -16,6 +16,16 @@
                 <p>Book and manage clinic visits.</p>
             </div>
 
+            <!-- Family Profile Selector (Patient Only) -->
+            <div class="form-card" id="profileSelectorCard" style="display: none; border-left: 4px solid #2563eb; margin-bottom: 20px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Select Profile</label>
+                    <select id="familyProfileSelect" required>
+                        <option value="">Loading profiles...</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Booking Form (Visible to Patients OR Admins/Reception) -->
             <div class="form-card" id="bookingSection" style="display: none;">
                 <h3>Book New Appointment</h3>
@@ -72,46 +82,46 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=104"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
+            const profileSelectorCard = document.getElementById('profileSelectorCard');
+            const familyProfileSelect = document.getElementById('familyProfileSelect');
             const bookingSection = document.getElementById('bookingSection');
             const apptTypeSelect = document.getElementById('apptType');
             const doctorSelect = document.getElementById('doctorSelect');
             const tbody = document.getElementById('appointmentsTableBody');
+            
             let userRoles = ['patient'];
-            let patientName = user.email;
+            let isStrictlyPatient = false;
+            let allPatientsData = [];
+            let selectedPatientId = ""; // The P0001 ID currently selected
+            let unsubscribeAppts = null; // To stop listening to old queries
 
             db.collection('users').doc(user.uid).get().then(doc => {
                 const data = doc.data() || {};
                 userRoles = data.roles || (data.role ? [data.role] : ['patient']);
-                patientName = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
+                const linkedIds = data.linkedPatientIds || [];
 
-                const isStrictlyPatient = userRoles.includes('patient') && 
-                                          !userRoles.includes('admin') && 
-                                          !userRoles.includes('reception') && 
-                                          !userRoles.includes('doctor') && 
-                                          !userRoles.includes('nurse') && 
-                                          !userRoles.includes('appointments');
+                isStrictlyPatient = userRoles.includes('patient') && 
+                                    !userRoles.includes('admin') && 
+                                    !userRoles.includes('reception') && 
+                                    !userRoles.includes('doctor') && 
+                                    !userRoles.includes('nurse') && 
+                                    !userRoles.includes('appointments');
 
-                if (isStrictlyPatient) {
-                    bookingSection.style.display = 'block';
-                }
-
-                // Load Appointment Types
+                // Load Dropdowns
                 db.collection('appointmentTypes').get().then(snap => {
                     apptTypeSelect.innerHTML = '<option value="">Select type...</option>';
                     snap.forEach(d => apptTypeSelect.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`);
                 });
 
-                // Load Doctors (Robust JS Filtering)
                 db.collection('users').get().then(snap => {
                     doctorSelect.innerHTML = '<option value="">Select doctor...</option>';
                     let foundDoctors = false;
-                    
                     snap.forEach(d => {
                         const docData = d.data();
                         if (docData.roles && docData.roles.includes('doctor')) {
@@ -119,33 +129,81 @@
                             doctorSelect.innerHTML += `<option value="${docData.firstName} ${docData.lastName}">Dr. ${docData.firstName} ${docData.lastName}</option>`;
                         }
                     });
-
-                    if (!foundDoctors) {
-                        doctorSelect.innerHTML = '<option value="">No doctors available</option>';
-                    }
-                }).catch(error => {
-                    console.error("Error loading doctors:", error);
-                    doctorSelect.innerHTML = '<option value="">Error loading doctors</option>';
+                    if (!foundDoctors) doctorSelect.innerHTML = '<option value="">No doctors available</option>';
                 });
 
-                // Query Appointments (with JS sorting to avoid index errors)
-                let query;
+                // Setup UI for Patients (Family Account Logic)
                 if (isStrictlyPatient) {
-                    query = db.collection('appointments').where('patientUid', '==', user.uid);
+                    bookingSection.style.display = 'block'; // Show form
+                    profileSelectorCard.style.display = 'block'; // Show dropdown
+
+                    if (linkedIds.length > 0) {
+                        // Fetch names for linked IDs
+                        db.collection('patients').get().then(snapshot => {
+                            snapshot.forEach(doc => {
+                                const p = doc.data();
+                                if (linkedIds.includes(p.patientId)) {
+                                    allPatientsData.push(p);
+                                }
+                            });
+
+                            familyProfileSelect.innerHTML = '<option value="">Select a profile...</option>';
+                            allPatientsData.forEach(p => {
+                                familyProfileSelect.innerHTML += `<option value="${p.patientId}">${p.firstName} ${p.lastName} (ID: ${p.patientId})</option>`;
+                            });
+
+                            // Auto select if only one
+                            if (allPatientsData.length === 1) {
+                                familyProfileSelect.selectedIndex = 1;
+                                selectedPatientId = allPatientsData[0].patientId;
+                                loadAppointments();
+                            } else {
+                                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Please select a profile above.</td></tr>`;
+                            }
+                        });
+                    } else {
+                        familyProfileSelect.innerHTML = '<option value="">No linked IDs found</option>';
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">You need to link a hospital ID first.</td></tr>`;
+                    }
                 } else {
-                    query = db.collection('appointments');
+                    // Staff view: Load all appointments
+                    profileSelectorCard.style.display = 'none';
+                    bookingSection.style.display = 'none';
+                    loadAppointments();
+                }
+            });
+
+            // Handle Profile Switch
+            familyProfileSelect.addEventListener('change', (e) => {
+                selectedPatientId = e.target.value;
+                if (selectedPatientId) {
+                    loadAppointments();
+                } else {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Please select a profile above.</td></tr>`;
+                    if(unsubscribeAppts) unsubscribeAppts();
+                }
+            });
+
+            // Function to Load Appointments
+            function loadAppointments() {
+                if (unsubscribeAppts) unsubscribeAppts(); // Unsubscribe from previous listener
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Loading appointments...</td></tr>`;
+
+                let query = db.collection('appointments');
+
+                if (isStrictlyPatient) {
+                    if (!selectedPatientId) return; // Wait for selection
+                    query = query.where('patientId', '==', selectedPatientId);
                 }
 
-                query.onSnapshot(snapshot => {
+                unsubscribeAppts = query.onSnapshot(snapshot => {
                     if (snapshot.empty) {
                         tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
                         return;
                     }
-                    
+
                     let appointments = [];
-                    snapshot.forEach(doc => {
-                        appointments.push({ id: doc.id, ...doc.data() });
-                    });
+                    snapshot.forEach(doc => appointments.push({ id: doc.id, ...doc.data() }));
 
                     appointments.sort((a, b) => {
                         const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
@@ -158,7 +216,7 @@
                         const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
                         
                         let actionHtml = '<span style="color:#888;">None</span>';
-                        if (userRoles.includes('admin') || userRoles.includes('reception') || userRoles.includes('doctor') || userRoles.includes('appointments')) {
+                        if (!isStrictlyPatient) { // Only staff can confirm/cancel
                             if (d.status === 'Pending') {
                                 actionHtml = `
                                     <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
@@ -182,19 +240,33 @@
                     console.error("Firestore Error:", error);
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
                 });
-            });
+            }
 
             // Handle Booking
             const form = document.getElementById('appointmentForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
+                
+                // Safety check: Patients must select a profile first
+                let patientNameToBook = "";
+                if (isStrictlyPatient) {
+                    if (!selectedPatientId) { alert("Please select a profile first."); return; }
+                    const pData = allPatientsData.find(p => p.patientId === selectedPatientId);
+                    patientNameToBook = `${pData.firstName} ${pData.lastName}`;
+                } else {
+                    // If staff is booking (shouldn't happen based on UI, but just in case)
+                    patientNameToBook = "Walk-in Patient"; 
+                }
+
                 const btn = document.getElementById('submitBtn');
                 const errorDiv = document.getElementById('formError');
                 btn.textContent = 'Booking...'; btn.disabled = true;
+                errorDiv.style.display = 'none';
 
                 db.collection('appointments').add({
-                    patientUid: user.uid,
-                    patientName: patientName,
+                    patientUid: user.uid, // The account that booked it (parent)
+                    patientId: selectedPatientId, // The P0001 ID (child)
+                    patientName: patientNameToBook,
                     type: apptTypeSelect.value,
                     doctor: doctorSelect.value,
                     dateTime: document.getElementById('apptDate').value,
@@ -202,7 +274,7 @@
                     status: 'Pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    logActivity(auth.currentUser, "Booked Appointment", `Type: ${apptTypeSelect.value}, Doctor: ${doctorSelect.value}`);
+                    logActivity(auth.currentUser, "Booked Appointment", `For: ${patientNameToBook} (${selectedPatientId}), Doctor: ${doctorSelect.value}`);
                     alert('Appointment Booked Successfully!');
                     form.reset();
                     btn.textContent = 'Book Appointment'; btn.disabled = false;
