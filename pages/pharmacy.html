@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -20,15 +19,7 @@
 
             <table>
                 <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Requested By</th>
-                        <th>Prescription</th>
-                        <th>Date</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
+                    <tr><th>Patient ID</th><th>Patient Name</th><th>Requested By</th><th>Prescription</th><th>Date</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody id="pharmacyTableBody">
                     <tr><td colspan="7" style="text-align:center; color:#888;">Loading prescriptions...</td></tr>
@@ -36,7 +27,6 @@
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -45,11 +35,9 @@
     <script src="../script.js"></script>
 
     <script>
-        <script>
-    enforceAuth(['pharmacy']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
+        enforceAuth(['pharmacy']);
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
-
+            if (!user) return;
             const tbody = document.getElementById('pharmacyTableBody');
             const searchInput = document.getElementById('searchPharmacy');
             let allPrescriptions = [];
@@ -57,14 +45,14 @@
             db.collection('prescriptions').onSnapshot((snapshot) => {
                 allPrescriptions = [];
                 snapshot.forEach(doc => allPrescriptions.push({ id: doc.id, ...doc.data() }));
-                
                 allPrescriptions.sort((a, b) => {
                     const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
-
                 renderTable(allPrescriptions);
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
             searchInput.addEventListener('input', (e) => {
@@ -82,25 +70,17 @@
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No prescriptions found.</td></tr>`;
                     return;
                 }
-
                 tbody.innerHTML = '';
                 prescriptions.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
-                    
-                    let actionHtml = '';
-                    if (d.status === 'Pending') {
-                        actionHtml = `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}')">Dispense</button>`;
-                    } else {
-                        actionHtml = `<span style="color:#065f46; font-weight:bold;">Done</span>`;
-                    }
-
+                    let actionHtml = d.status === 'Pending' ? `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}')">Dispense</button>` : `<span style="color:#065f46; font-weight:bold;">Done</span>`;
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
                             <td><strong>${d.patientName}</strong></td>
-                            <td>${d.doctorName || 'Doctor'} <br><small>ID: ${d.doctorStaffId || 'N/A'}</small></td>
-                            <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
+                            <td>${d.doctorName || 'Doctor'} (ID: ${d.doctorStaffId || 'N/A'})</td>
+                            <td class="allow-wrap" style="color: #2563eb; font-weight: bold;">${d.medication}</td>
                             <td>${date}</td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
                             <td>${actionHtml}</td>
@@ -111,12 +91,9 @@
 
             window.dispenseDrug = function(id) {
                 if(confirm("Have you dispensed these drugs?")) {
-                    db.collection('prescriptions').doc(id).update({
-                        status: 'Dispensed'
-                    }).then(() => {
-                        logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`);
-                        alert('Dispensed successfully!');
-                    }).catch((error) => alert("Error: " + error.message));
+                    db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
+                    .then(() => { logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`); alert('Dispensed successfully!'); })
+                    .catch((error) => alert("Error: " + error.message));
                 }
             };
         });
