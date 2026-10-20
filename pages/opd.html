@@ -27,7 +27,6 @@
                                 <option value="">Select matching patient...</option>
                             </select>
                         </div>
-
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Presenting Symptoms</label>
                             <textarea id="symptoms" rows="2" required placeholder="e.g. Fever, headache..."></textarea>
@@ -98,7 +97,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=108"></script>
+    <script src="../script.js?v=110"></script>
 
     <script>
         window.toggleFields = function() {
@@ -162,11 +161,13 @@
 
                 historyBody.innerHTML = '';
                 consults.slice(0, 20).forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString() : 'Just now';
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    
+                    // Stack badges vertically to avoid horizontal squishing
                     let badges = '';
-                    if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending">💊 ${d.requests.pharmacy}</span>`;
-                    if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active">🧪 ${d.requests.lab}</span>`;
-                    if (d.requests && d.requests.radiology) badges += `<span class="status-badge status-complete">🩻 ${d.requests.radiology}</span>`;
+                    if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending" style="width:max-content;">💊 ${d.requests.pharmacy}</span>`;
+                    if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active" style="width:max-content;">🧪 ${d.requests.lab}</span>`;
+                    if (d.requests && d.requests.radiology) badges += `<span class="status-badge status-complete" style="width:max-content;">🩻 ${d.requests.radiology}</span>`;
                     if (!badges) badges = "None";
 
                     historyBody.innerHTML += `
@@ -175,7 +176,7 @@
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
                             <td><strong>${d.patientName}</strong></td>
                             <td>${d.diagnosis}</td>
-                            <td><div class="badge-container">${badges}</div></td>
+                            <td><div style="display:flex; flex-direction:column; gap:5px;">${badges}</div></td>
                         </tr>
                     `;
                 });
@@ -212,11 +213,7 @@
 
                     await db.collection('consultations').add({
                         patientId, patientName, symptoms, diagnosis, doctorId, doctorName, doctorStaffId,
-                        requests: {
-                            pharmacy: reqPharmacy ? pharmVal : null,
-                            lab: reqLab ? labVal : null,
-                            radiology: reqRadiology ? radVal : null
-                        },
+                        requests: { pharmacy: reqPharmacy ? pharmVal : null, lab: reqLab ? labVal : null, radiology: reqRadiology ? radVal : null },
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
