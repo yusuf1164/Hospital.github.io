@@ -262,3 +262,49 @@ function logActivity(user, action, details) {
         });
     });
 }
+// ==========================================
+// 8. FRONT DOOR ROUTE GUARD (Security)
+// ==========================================
+function enforceAuth(allowedRoles) {
+    // 1. Instantly hide the main content so the UI doesn't flash on the screen
+    document.body.style.visibility = 'hidden';
+
+    auth.onAuthStateChanged((user) => {
+        if (!user) {
+            // Not logged in? Kick to login page.
+            window.location.href = '../login.html';
+            return;
+        }
+
+        // Logged in? Check their role.
+        db.collection('users').doc(user.uid).get().then(doc => {
+            if (!doc.exists) {
+                window.location.href = '../login.html';
+                return;
+            }
+
+            const data = doc.data();
+            let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
+
+            // Admins can access everything
+            if (userRoles.includes('admin')) {
+                document.body.style.visibility = 'visible';
+                return;
+            }
+
+            // Check if the user has at least one of the allowed roles for this page
+            const hasAccess = allowedRoles.some(role => userRoles.includes(role));
+
+            if (hasAccess) {
+                document.body.style.visibility = 'visible';
+            } else {
+                // They are logged in, but don't have permission. Kick to dashboard.
+                alert("Access Denied: You do not have permission to view this page.");
+                window.location.href = '../dashboard.html';
+            }
+        }).catch(err => {
+            console.error("Auth check error:", err);
+            window.location.href = '../login.html';
+        });
+    });
+}
