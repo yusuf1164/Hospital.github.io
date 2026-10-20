@@ -16,21 +16,44 @@
                 <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
             </div>
 
-            <!-- Radiology Queue Table -->
+            <!-- New Request Form -->
+            <div class="form-card">
+                <h3>New Scan Request (Walk-in)</h3>
+                <form id="radForm">
+                    <div class="form-grid">
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Search Patient</label>
+                            <input type="text" id="searchRadPatient" placeholder="Type Name, P ID, or Phone..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
+                            <select id="radPatientSelect" required style="display: none; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Scan Type</label>
+                            <select id="scanType" required>
+                                <option value="">Loading scans...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Requested By</label>
+                            <input type="text" id="requestedBy" required placeholder="Doctor's Name / Walk-in">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Send to Radiology</button>
+                </form>
+            </div>
+
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Pending Scan Requests</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>Date</th>
-                        <th>Patient Name</th>
+                        <th>Patient (P ID)</th>
                         <th>Scan Type</th>
-                        <th>Requested By (Doctor)</th>
+                        <th>Requested By</th>
                         <th>Status</th>
                         <th>Result / Action</th>
                     </tr>
                 </thead>
                 <tbody id="radiologyTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading scan requests...</td></tr>
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading requests...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -38,52 +61,76 @@
 
     <footer id="footer-placeholder"></footer>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=106"></script>
 
-    <!-- Radiology Logic -->
     <script>
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
+            const searchRadPatient = document.getElementById('searchRadPatient');
+            const radPatientSelect = document.getElementById('radPatientSelect');
             const tbody = document.getElementById('radiologyTableBody');
+            let allPatients = [];
 
-            // 1. Load Radiology Requests in Real-Time
-            db.collection('radiology').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
+            // Load Patients
+            db.collection('patients').get().then(snap => {
+                snap.forEach(doc => allPatients.push(doc.data()));
+            });
+
+            // Load Scans
+            db.collection('radiologyScans').get().then(snap => {
+                const scanSelect = document.getElementById('scanType');
+                scanSelect.innerHTML = '<option value="">Select scan...</option>';
+                snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+            });
+
+            // Search Logic
+            searchRadPatient.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                if (term.length < 2) { radPatientSelect.style.display = 'none'; return; }
+                const filtered = allPatients.filter(p => {
+                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                    const pid = String(p.patientId).toLowerCase();
+                    const phone = String(p.phone).toLowerCase();
+                    return name.includes(term) || pid.includes(term) || phone.includes(term);
+                });
+                radPatientSelect.innerHTML = '<option value="">Select patient...</option>';
+                filtered.forEach(p => radPatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
+                radPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+            });
+
+            // Load Queue (Manual Sort)
+            db.collection('radiology').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
                     return;
                 }
-                
+                let results = [];
+                snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+                results.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+
                 tbody.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
-                    
+                results.forEach(d => {
                     const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
-                    
-                    // If pending, show input box. If completed, show the result.
                     let actionHtml = '';
                     if (d.status === 'Pending') {
-                        actionHtml = `
-                            <div style="display:flex; gap:5px; flex-wrap:wrap;">
-                                <input type="text" id="result_${doc.id}" placeholder="Enter scan findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:150px;">
-                                <button class="btn btn-primary" onclick="saveScanResult('${doc.id}')">Save</button>
-                            </div>
-                        `;
+                        actionHtml = `<div style="display:flex; gap:5px;"><input type="text" id="result_${d.id}" placeholder="Findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:100px;"><button class="btn btn-primary" onclick="saveScanResult('${d.id}')">Save</button></div>`;
                     } else {
                         actionHtml = `<strong>${d.result}</strong>`;
                     }
 
                     tbody.innerHTML += `
                         <tr>
-                            <td><small>${date}</small></td>
-                            <td><strong>${d.patientName}</strong></td>
+                            <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
                             <td>${d.scanType}</td>
-                            <td>${d.doctorName || 'Unknown'} <br><small>ID: ${d.doctorStaffId || 'N/A'}</small></td>
+                            <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
                             <td>${actionHtml}</td>
                         </tr>
@@ -91,25 +138,30 @@
                 });
             });
 
-            // 2. Function to Save Scan Results
+            document.getElementById('radForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                if(!radPatientSelect.value) { alert("Please select a patient."); return; }
+                const patientId = radPatientSelect.value;
+                const patientName = radPatientSelect.options[radPatientSelect.selectedIndex].getAttribute('data-name');
+
+                db.collection('radiology').add({
+                    patientId: patientId, patientName: patientName,
+                    scanType: document.getElementById('scanType').value,
+                    requestedBy: document.getElementById('requestedBy').value,
+                    status: 'Pending', result: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    alert('Scan requested!');
+                    document.getElementById('radForm').reset();
+                    radPatientSelect.style.display = 'none';
+                });
+            });
+
             window.saveScanResult = function(docId) {
                 const resultInput = document.getElementById(`result_${docId}`).value;
-                if (!resultInput) {
-                    alert("Please enter the scan findings before saving.");
-                    return;
-                }
-
-                db.collection('radiology').doc(docId).update({
-                    result: resultInput,
-                    status: 'Completed'
-                }).then(() => {
-                    // Log the activity for the Admin
-                    logActivity(auth.currentUser, "Completed Scan", `Scan ID: ${docId}, Result: ${resultInput}`);
-                    
-                    alert('Scan result saved and marked as Completed!');
-                }).catch(err => {
-                    alert("Error saving result: " + err.message);
-                });
+                if (!resultInput) { alert("Please enter findings."); return; }
+                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' })
+                .then(() => alert('Result saved!'));
             };
         });
     </script>
