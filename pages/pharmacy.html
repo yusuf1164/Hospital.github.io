@@ -16,15 +16,13 @@
                 <p>Dispense medications based on doctor consultations.</p>
             </div>
 
-            <!-- Pharmacy Queue Table -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Prescription Queue</h3>
             <table>
                 <thead>
                     <tr>
-                        <th>Patient Name</th>
-                        <th>Diagnosis</th>
+                        <th>Patient (P ID)</th>
+                        <th>Requested By</th>
                         <th>Prescription</th>
-                        <th>Requested By (Dr)</th>
                         <th>Date</th>
                         <th>Status</th>
                         <th>Action</th>
@@ -39,59 +37,68 @@
 
     <footer id="footer-placeholder"></footer>
 
-    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=106"></script>
 
-    <!-- Pharmacy Logic -->
     <script>
-    auth.onAuthStateChanged((user) => {
-        if (!user) { window.location.href = '../login.html'; return; }
+        auth.onAuthStateChanged((user) => {
+            if (!user) { window.location.href = '../login.html'; return; }
 
-        const tbody = document.getElementById('pharmacyTableBody');
+            const tbody = document.getElementById('pharmacyTableBody');
 
-        db.collection('prescriptions').orderBy('createdAt', 'desc').onSnapshot((snapshot) => {
-            tbody.innerHTML = '';
-            let hasPending = false;
+            // Load Prescriptions (Manual Sort to avoid index issues)
+            db.collection('prescriptions').onSnapshot((snapshot) => {
+                tbody.innerHTML = '';
+                let hasPending = false;
+                let prescriptions = [];
 
-            snapshot.forEach(doc => {
-                const d = doc.data();
+                snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
                 
-                if (d.status === 'Pending') {
-                    hasPending = true;
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
-                    
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.doctorName || 'Unknown'} <br><small>ID: ${d.doctorStaffId || 'N/A'}</small></td>
-                            <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
-                            <td>${date}</td>
-                            <td><span class="status-badge status-pending">Pending</span></td>
-                            <td><button class="btn btn-primary" onclick="dispenseDrug('${doc.id}')">Dispense</button></td>
-                        </tr>
-                    `;
+                // Sort newest first
+                prescriptions.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+
+                prescriptions.forEach(d => {
+                    if (d.status === 'Pending') {
+                        hasPending = true;
+                        const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                        
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
+                                <td>${d.doctorName || 'Doctor'} <br><small>ID: ${d.doctorStaffId || 'N/A'}</small></td>
+                                <td style="color: #2563eb; font-weight: bold;">${d.medication}</td>
+                                <td>${date}</td>
+                                <td><span class="status-badge status-pending">Pending</span></td>
+                                <td>
+                                    <button class="btn btn-primary" onclick="dispenseDrug('${d.id}')">Dispense</button>
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+
+                if (!hasPending) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
                 }
             });
 
-            if (!hasPending) {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No pending prescriptions in the queue.</td></tr>`;
-            }
+            window.dispenseDrug = function(id) {
+                if(confirm("Have you dispensed these drugs?")) {
+                    db.collection('prescriptions').doc(id).update({
+                        status: 'Dispensed'
+                    }).then(() => {
+                        logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`);
+                        alert('Dispensed successfully!');
+                    }).catch((error) => alert("Error: " + error.message));
+                }
+            };
         });
-
-        window.dispenseDrug = function(id) {
-            if(confirm("Have you dispensed these drugs?")) {
-                db.collection('prescriptions').doc(id).update({
-                    status: 'Dispensed'
-                }).then(() => {
-                    logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`); // <-- LOGGING ADDED
-                    alert('Dispensed successfully!');
-                }).catch((error) => alert("Error: " + error.message));
-            }
-        };
-    });
-</script>
+    </script>
 </body>
 </html>
