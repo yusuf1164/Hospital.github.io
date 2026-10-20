@@ -15,7 +15,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container" style="max-width: 900px;">
             <div class="page-header">
@@ -23,107 +22,63 @@
                 <p>View complete patient history across all departments.</p>
             </div>
 
-            <!-- Search Patient -->
             <div class="form-card" style="margin-bottom: 30px;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Search Patient (Name, ID, or Phone)</label>
                     <input type="text" id="searchPatientInput" placeholder="Type to search..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; margin-bottom: 10px;">
-                    <select id="patientSelect" required size="4" style="width: 100%; padding: 10px; border-radius: 5px; display: none;">
-                        <!-- Options will be injected by JS -->
-                    </select>
+                    <select id="patientSelect" required size="4" style="width: 100%; padding: 10px; border-radius: 5px; display: none;"></select>
                 </div>
             </div>
 
-            <!-- Patient History Container (Hidden by default) -->
             <div id="historyContainer" style="display: none;">
-                
-                <div class="record-block">
-                    <h3>🌡️ Nursing Vitals</h3>
-                    <div id="vitalsList"></div>
-                </div>
-
-                <div class="record-block">
-                    <h3>🩺 OPD Consultations</h3>
-                    <div id="consultationsList"></div>
-                </div>
-
-                <div class="record-block">
-                    <h3>🧪 Laboratory Results</h3>
-                    <div id="labsList"></div>
-                </div>
-
-                <div class="record-block">
-                    <h3>🩻 Radiology Scans</h3>
-                    <div id="radiologyList"></div>
-                </div>
-
-                <div class="record-block">
-                    <h3>💳 Billing History</h3>
-                    <div id="billingList"></div>
-                </div>
-
+                <div class="record-block"><h3>🌡️ Nursing Vitals</h3><div id="vitalsList"></div></div>
+                <div class="record-block"><h3>🩺 OPD Consultations</h3><div id="consultationsList"></div></div>
+                <div class="record-block"><h3>🧪 Laboratory Results</h3><div id="labsList"></div></div>
+                <div class="record-block"><h3>🩻 Radiology Scans</h3><div id="radiologyList"></div></div>
+                <div class="record-block"><h3>💳 Billing History</h3><div id="billingList"></div></div>
             </div>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=116"></script>
 
     <script>
-        <script>
-    enforceAuth(['records', 'doctor']); // <-- ADD THIS LINE: Reroute all entry to the backdoor & check role 
+        enforceAuth(['records', 'doctor']);
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
-
+            if (!user) return;
             const patientSelect = document.getElementById('patientSelect');
             const searchInput = document.getElementById('searchPatientInput');
             const historyContainer = document.getElementById('historyContainer');
             let allPatients = [];
 
-            // 1. Load Patients into Memory
-            db.collection('patients').orderBy('firstName').get().then((snapshot) => {
+            db.collection('patients').get().then((snapshot) => {
                 snapshot.forEach(doc => allPatients.push({ id: doc.id, ...doc.data() }));
-            });
+            }).catch(err => console.error(err));
 
-            // 2. Live Search Logic
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
-                if (term.length < 2) {
-                    patientSelect.style.display = 'none';
-                    return;
-                }
-
+                if (term.length < 2) { patientSelect.style.display = 'none'; return; }
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-
                 patientSelect.innerHTML = '<option value="">Select matching patient...</option>';
-                filtered.forEach(p => {
-                    patientSelect.innerHTML += `<option value="${p.id}">${p.patientId} - ${p.firstName} ${p.lastName} (${p.phone})</option>`;
-                });
-                
+                filtered.forEach(p => patientSelect.innerHTML += `<option value="${p.id}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
                 patientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
-            // 3. Fetch all records when a patient is selected
             patientSelect.addEventListener('change', (e) => {
                 const pid = e.target.value;
-                if (!pid) {
-                    historyContainer.style.display = 'none';
-                    return;
-                }
-
+                if (!pid) { historyContainer.style.display = 'none'; return; }
                 historyContainer.style.display = 'block';
-
                 const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
-                sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
+                sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading...</p>');
 
                 Promise.all([
                     db.collection('vitals').where('patientId', '==', pid).get(),
@@ -132,61 +87,28 @@
                     db.collection('radiology').where('patientId', '==', pid).get(),
                     db.collection('bills').where('patientId', '==', pid).get()
                 ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
-                    
                     const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
-
-                    let vitalsHTML = '';
-                    if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
-                    vitalsSnap.forEach(doc => {
-                        const d = doc.data();
-                        vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg | <strong>Pulse:</strong> ${d.pulse} bpm</div>`;
-                    });
+                    
+                    let vitalsHTML = ''; if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals.</p>';
+                    vitalsSnap.forEach(doc => { const d = doc.data(); vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg</div>`; });
                     document.getElementById('vitalsList').innerHTML = vitalsHTML;
 
-                    let consultHTML = '';
-                    if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
-                    consultSnap.forEach(doc => {
-                        const d = doc.data();
-                        consultHTML += `
-                            <div class="record-item">
-                                <span class="record-date">${formatDate(d.createdAt)}</span>
-                                <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
-                                <strong>Symptoms:</strong> ${d.symptoms}<br>
-                                <strong>Diagnosis:</strong> ${d.diagnosis}
-                            </div>`;
-                    });
+                    let consultHTML = ''; if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations.</p>';
+                    consultSnap.forEach(doc => { const d = doc.data(); consultHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>Doctor:</strong> ${d.doctorName || 'Doctor'}<br><strong>Diagnosis:</strong> ${d.diagnosis}</div>`; });
                     document.getElementById('consultationsList').innerHTML = consultHTML;
 
-                    let labsHTML = '';
-                    if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
-                    labsSnap.forEach(doc => {
-                        const d = doc.data();
-                        const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                        labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`;
-                    });
+                    let labsHTML = ''; if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests.</p>';
+                    labsSnap.forEach(doc => { const d = doc.data(); const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>'; labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`; });
                     document.getElementById('labsList').innerHTML = labsHTML;
 
-                    let radHTML = '';
-                    if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
-                    radSnap.forEach(doc => {
-                        const d = doc.data();
-                        const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                        radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`;
-                    });
+                    let radHTML = ''; if (radSnap.empty) radHTML = '<p style="color:#888;">No scans.</p>';
+                    radSnap.forEach(doc => { const d = doc.data(); const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>'; radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`; });
                     document.getElementById('radiologyList').innerHTML = radHTML;
 
-                    let billsHTML = '';
-                    if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
-                    billsSnap.forEach(doc => {
-                        const d = doc.data();
-                        const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
-                        billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`;
-                    });
+                    let billsHTML = ''; if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills.</p>';
+                    billsSnap.forEach(doc => { const d = doc.data(); const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>'; billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`; });
                     document.getElementById('billingList').innerHTML = billsHTML;
-
-                }).catch(err => {
-                    alert("Error fetching records: " + err.message);
-                });
+                }).catch(err => alert("Error fetching records: " + err.message));
             });
         });
     </script>
