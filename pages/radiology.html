@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -27,9 +26,7 @@
                         </div>
                         <div class="form-group">
                             <label>Scan Type</label>
-                            <select id="scanType" required>
-                                <option value="">Loading scans...</option>
-                            </select>
+                            <select id="scanType" required><option value="">Loading scans...</option></select>
                         </div>
                         <div class="form-group">
                             <label>Requested By</label>
@@ -42,23 +39,13 @@
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Pending Scan Requests</h3>
             <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Scan Type</th>
-                        <th>Requested By</th>
-                        <th>Status</th>
-                        <th>Result / Action</th>
-                    </tr>
-                </thead>
+                <thead><tr><th>Patient ID</th><th>Patient Name</th><th>Scan Type</th><th>Requested By</th><th>Status</th><th>Result / Action</th></tr></thead>
                 <tbody id="radiologyTableBody">
                     <tr><td colspan="6" style="text-align:center; color:#888;">Loading requests...</td></tr>
                 </tbody>
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -67,20 +54,15 @@
     <script src="../script.js"></script>
 
     <script>
-        <script>
-    enforceAuth(['radiology']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
+        enforceAuth(['radiology']);
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
-
+            if (!user) return;
             const searchRadPatient = document.getElementById('searchRadPatient');
             const radPatientSelect = document.getElementById('radPatientSelect');
             const tbody = document.getElementById('radiologyTableBody');
             let allPatients = [];
 
-            db.collection('patients').get().then(snap => {
-                snap.forEach(doc => allPatients.push(doc.data()));
-            });
-
+            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); }).catch(err => console.error(err));
             db.collection('radiologyScans').get().then(snap => {
                 const scanSelect = document.getElementById('scanType');
                 scanSelect.innerHTML = '<option value="">Select scan...</option>';
@@ -113,7 +95,6 @@
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
-
                 tbody.innerHTML = '';
                 results.forEach(d => {
                     const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
@@ -123,7 +104,6 @@
                     } else {
                         actionHtml = `<strong>${d.result}</strong>`;
                     }
-
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
@@ -135,32 +115,26 @@
                         </tr>
                     `;
                 });
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
             document.getElementById('radForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!radPatientSelect.value) { alert("Please select a patient."); return; }
-                const patientId = radPatientSelect.value;
-                const patientName = radPatientSelect.options[radPatientSelect.selectedIndex].getAttribute('data-name');
-
                 db.collection('radiology').add({
-                    patientId: patientId, patientName: patientName,
-                    scanType: document.getElementById('scanType').value,
-                    requestedBy: document.getElementById('requestedBy').value,
-                    status: 'Pending', result: '',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    patientId: radPatientSelect.value, patientName: radPatientSelect.options[radPatientSelect.selectedIndex].getAttribute('data-name'),
+                    scanType: document.getElementById('scanType').value, requestedBy: document.getElementById('requestedBy').value,
+                    status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Scan requested!');
-                    document.getElementById('radForm').reset();
-                    radPatientSelect.style.display = 'none';
+                    alert('Scan requested!'); document.getElementById('radForm').reset(); radPatientSelect.style.display = 'none';
                 });
             });
 
             window.saveScanResult = function(docId) {
                 const resultInput = document.getElementById(`result_${docId}`).value;
                 if (!resultInput) { alert("Please enter findings."); return; }
-                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' })
-                .then(() => alert('Result saved!'));
+                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' }).then(() => alert('Result saved!'));
             };
         });
     </script>
