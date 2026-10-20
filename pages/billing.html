@@ -16,7 +16,6 @@
                 <p>Generate invoices and process payments.</p>
             </div>
 
-            <!-- Billing Form -->
             <div class="form-card">
                 <h3>Create New Invoice</h3>
                 <form id="billingForm">
@@ -39,7 +38,6 @@
                 </form>
             </div>
 
-            <!-- Billing Queue Table -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Invoices</h3>
             <table>
                 <thead>
@@ -65,7 +63,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=109"></script>
+    <script src="../script.js?v=110"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
@@ -76,12 +74,10 @@
             const tbody = document.getElementById('billingTableBody');
             let allPatients = [];
 
-            // Load Patients for Search
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
             });
 
-            // Search Logic
             searchBillPatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { billPatientSelect.style.display = 'none'; return; }
@@ -98,7 +94,6 @@
                 billPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
-            // Load Bills (Manual Sort)
             db.collection('bills').onSnapshot(snapshot => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No invoices generated yet.</td></tr>`;
@@ -136,7 +131,6 @@
                 });
             });
 
-            // Handle New Bill Submission
             document.getElementById('billingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!billPatientSelect.value) { alert("Please search and select a patient."); return; }
@@ -158,7 +152,6 @@
                 });
             });
 
-            // Pay Bill Function
             window.payBill = function(billId, patientName, amount) {
                 if(confirm(`Confirm payment of ₦${amount} from ${patientName}?`)) {
                     db.collection('bills').doc(billId).update({ status: 'Paid' })
