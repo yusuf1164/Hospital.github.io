@@ -87,8 +87,6 @@ function updateAuthUI() {
     
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const prefix = inPagesFolder ? '../' : '';
-
-    // Calculate the absolute root URL (e.g., https://yusuf1164.github.io/Hospital.github.io/)
     const rootUrl = window.location.origin + window.location.pathname.split('/pages/')[0];
 
     auth.onAuthStateChanged((user) => {
@@ -121,12 +119,9 @@ function updateAuthUI() {
             if (logoutLink) {
                 logoutLink.addEventListener('click', (e) => {
                     e.preventDefault();
-                    // Bulletproof logout: forces a redirect to the absolute root index.html
                     auth.signOut().then(() => {
                         window.location.href = rootUrl + '/index.html';
-                    }).catch((err) => {
-                        console.error("Logout error:", err);
-                        // Even if signOut fails, force the redirect
+                    }).catch(() => {
                         window.location.href = rootUrl + '/index.html';
                     });
                 });
@@ -235,76 +230,43 @@ function initForms() {
 // ==========================================
 function logActivity(user, action, details) {
     if (!user) return;
-    
     db.collection('users').doc(user.uid).get().then(doc => {
         const data = doc.data() || {};
         const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member';
         const staffId = data.staffId || 'N/A';
-        
         db.collection('auditLogs').add({
-            userId: user.uid,
-            staffName: staffName,
-            staffId: staffId,
-            action: action,
-            details: details,
+            userId: user.uid, staffName: staffName, staffId: staffId, action: action, details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(err => console.error("Error logging activity:", err));
-        
     }).catch(err => {
-        console.error("Error fetching user for log:", err);
         db.collection('auditLogs').add({
-            userId: user.uid,
-            staffName: 'Staff Member',
-            staffId: 'N/A',
-            action: action,
-            details: details,
+            userId: user.uid, staffName: 'Staff Member', staffId: 'N/A', action: action, details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
     });
 }
+
 // ==========================================
-// 8. FRONT DOOR ROUTE GUARD (Security)
+// 8. BACK DOOR ROUTE GUARD (Security)
 // ==========================================
 function enforceAuth(allowedRoles) {
-    // 1. Instantly hide the main content so the UI doesn't flash on the screen
-    document.body.style.visibility = 'hidden';
-
     auth.onAuthStateChanged((user) => {
         if (!user) {
-            // Not logged in? Kick to login page.
             window.location.href = '../login.html';
             return;
         }
-
-        // Logged in? Check their role.
         db.collection('users').doc(user.uid).get().then(doc => {
-            if (!doc.exists) {
-                window.location.href = '../login.html';
-                return;
-            }
-
+            if (!doc.exists) { window.location.href = '../login.html'; return; }
             const data = doc.data();
             let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
-
-            // Admins can access everything
-            if (userRoles.includes('admin')) {
-                document.body.style.visibility = 'visible';
-                return;
-            }
-
-            // Check if the user has at least one of the allowed roles for this page
+            
+            if (userRoles.includes('admin')) return; // Admins bypass
+            
             const hasAccess = allowedRoles.some(role => userRoles.includes(role));
-
-            if (hasAccess) {
-                document.body.style.visibility = 'visible';
-            } else {
-                // They are logged in, but don't have permission. Kick to dashboard.
+            if (!hasAccess) {
                 alert("Access Denied: You do not have permission to view this page.");
                 window.location.href = '../dashboard.html';
             }
-        }).catch(err => {
-            console.error("Auth check error:", err);
-            window.location.href = '../login.html';
-        });
+        }).catch(() => window.location.href = '../login.html');
     });
 }
