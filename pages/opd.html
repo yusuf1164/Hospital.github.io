@@ -8,14 +8,9 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
-            <div class="page-header">
-                <h1>🩺 General Medicine / OPD</h1>
-                <p>Doctor consultation, diagnosis, and routing to departments.</p>
-            </div>
-
+            <div class="page-header"><h1>🩺 General Medicine / OPD</h1><p>Doctor consultation, diagnosis, and routing to departments.</p></div>
             <div class="form-card">
                 <h3>New Consultation</h3>
                 <form id="opdForm">
@@ -23,103 +18,53 @@
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient (Name, P ID, or Phone)</label>
                             <input type="text" id="searchPatient" placeholder="Type to search..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
-                            <select id="patientSelect" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: none;">
-                                <option value="">Select matching patient...</option>
-                            </select>
+                            <select id="patientSelect" required style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; display: none;"><option value="">Select matching patient...</option></select>
                         </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>Presenting Symptoms</label>
-                            <textarea id="symptoms" rows="2" required placeholder="e.g. Fever, headache..."></textarea>
-                        </div>
-                        <div class="form-group" style="grid-column: 1 / -1;">
-                            <label>Diagnosis</label>
-                            <input type="text" id="diagnosis" required placeholder="e.g. Malaria, Typhoid">
-                        </div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Presenting Symptoms</label><textarea id="symptoms" rows="2" required placeholder="e.g. Fever, headache..."></textarea></div>
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Diagnosis</label><input type="text" id="diagnosis" required placeholder="e.g. Malaria, Typhoid"></div>
                     </div>
-
                     <h4 style="margin-top: 20px; margin-bottom: 10px; color: #1e3a8a;">Send Patient To:</h4>
                     <div style="display: flex; gap: 20px; margin-bottom: 15px; flex-wrap: wrap;">
-                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="chkPharmacy" onchange="toggleFields()"> Pharmacy
-                        </label>
-                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="chkLab" onchange="toggleFields()"> Laboratory
-                        </label>
-                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;">
-                            <input type="checkbox" id="chkRadiology" onchange="toggleFields()"> Radiology
-                        </label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="chkPharmacy" onchange="toggleFields()"> Pharmacy</label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="chkLab" onchange="toggleFields()"> Laboratory</label>
+                        <label style="display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" id="chkRadiology" onchange="toggleFields()"> Radiology</label>
                     </div>
-
-                    <div id="pharmacyFields" style="display:none;" class="form-group">
-                        <label>Prescription (Medications)</label>
-                        <textarea id="prescription" rows="2" placeholder="e.g. Artemether-Lumefantrine..."></textarea>
-                    </div>
-
-                    <div id="labFields" style="display:none;" class="form-group">
-                        <label>Lab Test Required</label>
-                        <select id="labTest" required>
-                            <option value="">Loading tests...</option>
-                        </select>
-                    </div>
-
-                    <div id="radiologyFields" style="display:none;" class="form-group">
-                        <label>Radiology Scan Required</label>
-                        <select id="radiologyScan" required>
-                            <option value="">Loading scans...</option>
-                        </select>
-                    </div>
-
+                    <div id="pharmacyFields" style="display:none;" class="form-group"><label>Prescription (Medications)</label><textarea id="prescription" rows="2" placeholder="e.g. Artemether-Lumefantrine..."></textarea></div>
+                    <div id="labFields" style="display:none;" class="form-group"><label>Lab Test Required</label><select id="labTest" required><option value="">Loading tests...</option></select></div>
+                    <div id="radiologyFields" style="display:none;" class="form-group"><label>Radiology Scan Required</label><select id="radiologyScan" required><option value="">Loading scans...</option></select></div>
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 250px;">Save & Send Requests</button>
                     <div id="formError" class="error-message" style="margin-top: 10px;"></div>
                 </form>
             </div>
-
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Consultation History</h3>
             <table>
-                <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Diagnosis</th>
-                        <th>Routed To</th>
-                    </tr>
-                </thead>
-                <tbody id="opdHistoryBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading history...</td></tr>
-                </tbody>
+                <thead><tr><th>Date</th><th>Patient ID</th><th>Patient Name</th><th>Diagnosis</th><th>Routed To</th></tr></thead>
+                <tbody id="opdHistoryBody"><tr><td colspan="5" style="text-align:center; color:#888;">Loading history...</td></tr></tbody>
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
     <script>
+        enforceAuth(['doctor']);
         window.toggleFields = function() {
             document.getElementById('pharmacyFields').style.display = document.getElementById('chkPharmacy').checked ? 'block' : 'none';
             document.getElementById('labFields').style.display = document.getElementById('chkLab').checked ? 'block' : 'none';
             document.getElementById('radiologyFields').style.display = document.getElementById('chkRadiology').checked ? 'block' : 'none';
         };
-        <script>
-    enforceAuth(['doctor']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
 
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
-
+            if (!user) return;
             const searchPatient = document.getElementById('searchPatient');
             const patientSelect = document.getElementById('patientSelect');
             const historyBody = document.getElementById('opdHistoryBody');
             let allPatients = [];
 
-            db.collection('patients').get().then((snapshot) => {
-                snapshot.forEach(doc => allPatients.push({ firestoreId: doc.id, ...doc.data() }));
-            });
-
+            db.collection('patients').get().then((snapshot) => { snapshot.forEach(doc => allPatients.push({ firestoreId: doc.id, ...doc.data() })); });
             searchPatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { patientSelect.style.display = 'none'; return; }
@@ -130,9 +75,7 @@
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
                 patientSelect.innerHTML = '<option value="">Select patient...</option>';
-                filtered.forEach(p => {
-                    patientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`;
-                });
+                filtered.forEach(p => patientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
                 patientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
@@ -141,7 +84,6 @@
                 labSelect.innerHTML = '<option value="">Select test...</option>';
                 snap.forEach(doc => labSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
-
             db.collection('radiologyScans').get().then(snap => {
                 const radSelect = document.getElementById('radiologyScan');
                 radSelect.innerHTML = '<option value="">Select scan...</option>';
@@ -149,104 +91,43 @@
             });
 
             db.collection('consultations').onSnapshot((snapshot) => {
-                if (snapshot.empty) {
-                    historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
-                    return;
-                }
-                let consults = [];
-                snapshot.forEach(doc => consults.push(doc.data()));
-                consults.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA;
-                });
-
+                if (snapshot.empty) { historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`; return; }
+                let consults = []; snapshot.forEach(doc => consults.push(doc.data()));
+                consults.sort((a, b) => { return (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0); });
                 historyBody.innerHTML = '';
                 consults.slice(0, 20).forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
-                    
-                    // Stack badges vertically to avoid horizontal squishing
                     let badges = '';
                     if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending" style="width:max-content;">💊 ${d.requests.pharmacy}</span>`;
                     if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active" style="width:max-content;">🧪 ${d.requests.lab}</span>`;
                     if (d.requests && d.requests.radiology) badges += `<span class="status-badge status-complete" style="width:max-content;">🩻 ${d.requests.radiology}</span>`;
                     if (!badges) badges = "None";
-
-                    historyBody.innerHTML += `
-                        <tr>
-                            <td><small>${date}</small></td>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.diagnosis}</td>
-                            <td><div style="display:flex; flex-direction:column; gap:5px;">${badges}</div></td>
-                        </tr>
-                    `;
+                    historyBody.innerHTML += `<tr><td><small>${date}</small></td><td><strong style="color:#2563eb;">${d.patientId}</strong></td><td><strong>${d.patientName}</strong></td><td>${d.diagnosis}</td><td><div style="display:flex; flex-direction:column; gap:5px;">${badges}</div></td></tr>`;
                 });
-            });
+            }, error => { historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`; });
 
-            const form = document.getElementById('opdForm');
-            form.addEventListener('submit', async (e) => {
+            document.getElementById('opdForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const btn = document.getElementById('submitBtn');
-                const errorDiv = document.getElementById('formError');
-                
+                const btn = document.getElementById('submitBtn'); const errorDiv = document.getElementById('formError');
                 if (!patientSelect.value) { alert("Please search and select a patient."); return; }
                 btn.textContent = 'Saving...'; btn.disabled = true; errorDiv.style.display = 'none';
-
-                const patientId = patientSelect.value; 
-                const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
-                const symptoms = document.getElementById('symptoms').value;
-                const diagnosis = document.getElementById('diagnosis').value;
-                const doctorId = user.uid;
-
-                const reqPharmacy = document.getElementById('chkPharmacy').checked;
-                const reqLab = document.getElementById('chkLab').checked;
-                const reqRadiology = document.getElementById('chkRadiology').checked;
-
-                const pharmVal = document.getElementById('prescription').value;
-                const labVal = document.getElementById('labTest').value;
-                const radVal = document.getElementById('radiologyScan').value;
+                const patientId = patientSelect.value; const patientName = patientSelect.options[patientSelect.selectedIndex].getAttribute('data-name');
+                const reqPharmacy = document.getElementById('chkPharmacy').checked; const reqLab = document.getElementById('chkLab').checked; const reqRadiology = document.getElementById('chkRadiology').checked;
 
                 try {
-                    const doctorDoc = await db.collection('users').doc(doctorId).get();
-                    const docData = doctorDoc.data() || {};
-                    const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`;
-                    const doctorStaffId = docData.staffId || 'N/A';
-
+                    const doctorDoc = await db.collection('users').doc(user.uid).get(); const docData = doctorDoc.data() || {};
+                    const doctorName = `Dr. ${docData.firstName || 'Unknown'} ${docData.lastName || ''}`; const doctorStaffId = docData.staffId || 'N/A';
                     await db.collection('consultations').add({
-                        patientId, patientName, symptoms, diagnosis, doctorId, doctorName, doctorStaffId,
-                        requests: { pharmacy: reqPharmacy ? pharmVal : null, lab: reqLab ? labVal : null, radiology: reqRadiology ? radVal : null },
+                        patientId, patientName, symptoms: document.getElementById('symptoms').value, diagnosis: document.getElementById('diagnosis').value, doctorId: user.uid, doctorName, doctorStaffId,
+                        requests: { pharmacy: reqPharmacy ? document.getElementById('prescription').value : null, lab: reqLab ? document.getElementById('labTest').value : null, radiology: reqRadiology ? document.getElementById('radiologyScan').value : null },
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
-
-                    if (reqPharmacy) {
-                        if (!pharmVal) throw new Error("Please enter the prescription medication.");
-                        await db.collection('prescriptions').add({
-                            patientId, patientName, medication: pharmVal, doctorId, doctorName, doctorStaffId,
-                            status: 'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                    if (reqLab) {
-                        if (!labVal) throw new Error("Please select a lab test.");
-                        await db.collection('labResults').add({
-                            patientId, patientName, testType: labVal, doctorId, doctorName, doctorStaffId,
-                            status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-                    if (reqRadiology) {
-                        if (!radVal) throw new Error("Please select a radiology scan.");
-                        await db.collection('radiology').add({
-                            patientId, patientName, scanType: radVal, doctorId, doctorName, doctorStaffId,
-                            status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    }
-
-                    alert('Consultation saved and requests routed successfully!');
-                    form.reset(); toggleFields(); searchPatient.value = ''; patientSelect.style.display = 'none';
-                    btn.textContent = 'Save & Send Requests'; btn.disabled = false;
+                    if (reqPharmacy) await db.collection('prescriptions').add({ patientId, patientName, medication: document.getElementById('prescription').value, doctorId: user.uid, doctorName, doctorStaffId, status: 'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    if (reqLab) await db.collection('labResults').add({ patientId, patientName, testType: document.getElementById('labTest').value, doctorId: user.uid, doctorName, doctorStaffId, status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    if (reqRadiology) await db.collection('radiology').add({ patientId, patientName, scanType: document.getElementById('radiologyScan').value, doctorId: user.uid, doctorName, doctorStaffId, status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    alert('Consultation saved!'); document.getElementById('opdForm').reset(); toggleFields(); searchPatient.value = ''; patientSelect.style.display = 'none'; btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 } catch (error) {
-                    errorDiv.style.display = 'block'; errorDiv.textContent = "Error: " + error.message;
-                    btn.textContent = 'Save & Send Requests'; btn.disabled = false;
+                    errorDiv.style.display = 'block'; errorDiv.textContent = "Error: " + error.message; btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 }
             });
         });
