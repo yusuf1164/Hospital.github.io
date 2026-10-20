@@ -39,7 +39,7 @@ function loadHeader() {
                 if (inPagesFolder) {
                     ph.querySelectorAll('a[href^="index"]').forEach(a => a.href = '../index.html');
                     ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
-                    ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"]').forEach(a => a.href = '../' + a.getAttribute('href'));
+                    ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"], a[href^="patient-register"]').forEach(a => a.href = '../' + a.getAttribute('href'));
                 }
                 initMobileMenu();
                 updateAuthUI();
@@ -78,7 +78,7 @@ function initMobileMenu() {
 }
 
 // ==========================================
-// 5. DYNAMIC HEADER BUTTONS
+// 5. DYNAMIC HEADER BUTTONS & LOGOUT
 // ==========================================
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
@@ -87,6 +87,9 @@ function updateAuthUI() {
     
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const prefix = inPagesFolder ? '../' : '';
+
+    // Calculate the absolute root URL (e.g., https://yusuf1164.github.io/Hospital.github.io/)
+    const rootUrl = window.location.origin + window.location.pathname.split('/pages/')[0];
 
     auth.onAuthStateChanged((user) => {
         if (user) {
@@ -99,7 +102,6 @@ function updateAuthUI() {
                 const data = doc.data() || {};
                 let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
                 
-                // Added btn classes to dynamic links
                 let linksHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
 
                 if (userRoles.includes('admin') || userRoles.includes('doctor')) {
@@ -119,7 +121,14 @@ function updateAuthUI() {
             if (logoutLink) {
                 logoutLink.addEventListener('click', (e) => {
                     e.preventDefault();
-                    auth.signOut().then(() => window.location.href = prefix + 'index.html');
+                    // Bulletproof logout: forces a redirect to the absolute root index.html
+                    auth.signOut().then(() => {
+                        window.location.href = rootUrl + '/index.html';
+                    }).catch((err) => {
+                        console.error("Logout error:", err);
+                        // Even if signOut fails, force the redirect
+                        window.location.href = rootUrl + '/index.html';
+                    });
                 });
             }
         } else {
@@ -128,7 +137,6 @@ function updateAuthUI() {
                 <a href="${prefix}register.html" class="btn btn-outline">Staff Register</a>
                 <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Register</a>
             `;
-            // Added btn class to logged out dynamic link
             if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
         }
     });
@@ -138,7 +146,6 @@ function updateAuthUI() {
 // 6. AUTHENTICATION FORMS
 // ==========================================
 function initForms() {
-    // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -148,21 +155,18 @@ function initForms() {
             const errorDiv = document.getElementById('loginError');
             const btn = document.getElementById('loginBtn');
             
-            btn.textContent = 'Signing in...'; 
-            btn.disabled = true;
+            btn.textContent = 'Signing in...'; btn.disabled = true;
 
             auth.signInWithEmailAndPassword(email, password)
                 .then(() => window.location.href = 'dashboard.html')
                 .catch(err => {
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = err.message;
-                    btn.textContent = 'Sign In'; 
-                    btn.disabled = false;
+                    btn.textContent = 'Sign In'; btn.disabled = false;
                 });
         });
     }
 
-    // --- REGISTER FORM ---
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
@@ -185,8 +189,7 @@ function initForms() {
             }
             passwordError.style.display = 'none';
             
-            btn.textContent = 'Creating Account...'; 
-            btn.disabled = true;
+            btn.textContent = 'Creating Account...'; btn.disabled = true;
 
             auth.createUserWithEmailAndPassword(email, password)
                 .then((cred) => {
@@ -208,7 +211,7 @@ function initForms() {
                             email: email,
                             phone: phone,
                             staffId: generatedStaffId, 
-                            roles: ['patient'],
+                            roles: [],
                             createdAt: firebase.firestore.FieldValue.serverTimestamp()
                         });
                     });
@@ -228,7 +231,6 @@ function initForms() {
 }
 
 // ==========================================
-// ==========================================
 // 7. GLOBAL ACTIVITY LOGGER
 // ==========================================
 function logActivity(user, action, details) {
@@ -237,23 +239,12 @@ function logActivity(user, action, details) {
     db.collection('users').doc(user.uid).get().then(doc => {
         const data = doc.data() || {};
         const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member';
-        
-        // Determine their ID / Role
-        let displayId = data.staffId;
-        
-        if (!displayId) {
-            // If they don't have a Staff ID, check if they are a Patient
-            if (data.roles && data.roles.includes('patient') && data.roles.length === 1) {
-                displayId = 'Patient';
-            } else {
-                displayId = 'Staff (No ID)';
-            }
-        }
+        const staffId = data.staffId || 'N/A';
         
         db.collection('auditLogs').add({
             userId: user.uid,
             staffName: staffName,
-            staffId: displayId,
+            staffId: staffId,
             action: action,
             details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
@@ -263,7 +254,7 @@ function logActivity(user, action, details) {
         console.error("Error fetching user for log:", err);
         db.collection('auditLogs').add({
             userId: user.uid,
-            staffName: 'Unknown User',
+            staffName: 'Staff Member',
             staffId: 'N/A',
             action: action,
             details: details,
