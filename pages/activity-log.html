@@ -38,13 +38,15 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=109"></script>
+    <script src="../script.js?v=113"></script>
 
     <script>
-        <script>
-    enforceAuth(['admin']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
+        // 1. APPLY THE GUARD
+        enforceAuth(['admin']);
+
+        // 2. LOAD THE DATA
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+            if (!user) { return; }
 
             const tbody = document.getElementById('logTableBody');
 
@@ -73,6 +75,9 @@
                         </tr>
                     `;
                 });
+            }, error => {
+                console.error("Firestore Error:", error);
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
         });
     </script>
