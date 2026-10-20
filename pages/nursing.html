@@ -54,10 +54,10 @@
     <script src="../script.js"></script>
 
     <script>
-        <script>
-    enforceAuth(['nurse']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
+        enforceAuth(['nurse']);
+
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+            if (!user) return;
 
             const searchNursePatient = document.getElementById('searchNursePatient');
             const nursePatientSelect = document.getElementById('nursePatientSelect');
@@ -66,19 +66,17 @@
 
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
-            });
+            }).catch(err => console.error(err));
 
             searchNursePatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { nursePatientSelect.style.display = 'none'; return; }
-
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-
                 nursePatientSelect.innerHTML = '<option value="">Select patient...</option>';
                 filtered.forEach(p => nursePatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
                 nursePatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
@@ -89,16 +87,13 @@
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
                     return;
                 }
-                
                 let vitals = [];
                 snapshot.forEach(doc => vitals.push(doc.data()));
-                
                 vitals.sort((a, b) => {
                     const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
-
                 tbody.innerHTML = '';
                 vitals.slice(0, 20).forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
@@ -110,24 +105,21 @@
                         </tr>
                     `;
                 });
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
             document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!nursePatientSelect.value) { alert("Please select a patient."); return; }
-
                 const patientId = nursePatientSelect.value;
                 const patientName = nursePatientSelect.options[nursePatientSelect.selectedIndex].getAttribute('data-name');
 
                 db.collection('vitals').add({
-                    patientId: patientId,
-                    patientName: patientName,
-                    bp: document.getElementById('bp').value,
-                    temp: document.getElementById('temp').value,
-                    weight: document.getElementById('weight').value,
-                    pulse: document.getElementById('pulse').value,
-                    recordedBy: user.uid,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    patientId: patientId, patientName: patientName,
+                    bp: document.getElementById('bp').value, temp: document.getElementById('temp').value,
+                    weight: document.getElementById('weight').value, pulse: document.getElementById('pulse').value,
+                    recordedBy: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
                     alert('Vitals Saved!');
                     document.getElementById('nursingForm').reset();
