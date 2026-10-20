@@ -97,16 +97,18 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="../script.js?v=114"></script>
 
     <script>
+        // 1. APPLY THE GUARD
+        enforceAuth(['admin', 'hr']);
+
+        // 2. PAGE LOGIC
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
-        <script>
-    enforceAuth(['admin', 'hr']); // <-- ADD THIS LINE: Enforce all routing to the frontdoor & check role
 
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+            if (!user) { return; } // Guard handles redirect
 
             // --- USER MANAGEMENT ---
             const searchInput = document.getElementById('searchUser');
@@ -117,7 +119,7 @@
             db.collection('users').get().then((snapshot) => {
                 snapshot.forEach(doc => {
                     const u = doc.data();
-                    if (u.staffId) {
+                    if (u.staffId) { // Only show staff with IDs
                         allUsers.push({ id: doc.id, ...u });
                     }
                 });
@@ -132,7 +134,6 @@
                     let usersToFix = [];
                     snapshot.forEach(doc => {
                         const u = doc.data();
-                        // If they don't have a staffId, and they aren't strictly a patient
                         if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) {
                             usersToFix.push(doc.id);
                         }
