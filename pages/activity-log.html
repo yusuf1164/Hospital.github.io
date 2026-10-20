@@ -41,6 +41,8 @@
     <script src="../script.js?v=109"></script>
 
     <script>
+        <script>
+    enforceAuth(['admin']); // <-- ADD THIS LINE: Reroute all entry to the frontdoor & check role
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
