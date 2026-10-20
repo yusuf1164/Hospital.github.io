@@ -60,12 +60,15 @@ main { flex: 1; padding: 30px 20px; display: flex; justify-content: center; alig
 .dash-card h3 { color: #1e3a8a; margin-bottom: 8px; font-size: 16px; }
 .dash-card p { color: #6b7280; font-size: 13px; }
 
-/* TABLES (ALLOW WRAPPING, PREVENT SQUISHING) */
+/* TABLES */
 .table-container { width: 100%; overflow-x: auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 700px; /* Forces scrolling instead of squishing */ }
-th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 800px; /* Forces horizontal scrolling */ }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: middle; white-space: nowrap; /* Forces single line */ }
 th { background-color: #f9fafb; color: #1e3a8a; font-weight: 600; }
-tr:hover { background-color: #e5e7eb; transition: background-color 0.2s; } /* Darker hover */
+tr:hover { background-color: #e5e7eb; transition: background-color 0.2s; }
+
+/* NEW: Allows ONLY specific columns to wrap naturally */
+td.allow-wrap { white-space: normal; min-width: 150px; max-width: 250px; }
 
 /* Badge Fixes */
 .badge-container { display: flex; flex-direction: column; gap: 5px; }
