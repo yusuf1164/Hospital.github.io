@@ -37,10 +37,10 @@
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Vitals</h3>
             <table>
                 <thead>
-                    <tr><th>Patient (ID)</th><th>BP</th><th>Temp</th><th>Weight</th><th>Pulse</th><th>Date</th></tr>
+                    <tr><th>Patient ID</th><th>Patient Name</th><th>BP</th><th>Temp</th><th>Weight</th><th>Pulse</th><th>Date</th></tr>
                 </thead>
                 <tbody id="vitalsTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading vitals...</td></tr>
+                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading vitals...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -51,7 +51,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=105"></script>
+    <script src="../script.js?v=110"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
@@ -62,12 +62,10 @@
             const tbody = document.getElementById('vitalsTableBody');
             let allPatients = [];
 
-            // Load Patients
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
             });
 
-            // Search Logic
             searchNursePatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { nursePatientSelect.style.display = 'none'; return; }
@@ -84,10 +82,9 @@
                 nursePatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
-            // Load Recent Vitals
             db.collection('vitals').onSnapshot(snapshot => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
                     return;
                 }
                 
@@ -105,14 +102,14 @@
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
                     tbody.innerHTML += `
                         <tr>
-                            <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
+                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
+                            <td><strong>${d.patientName}</strong></td>
                             <td>${d.bp}</td><td>${d.temp}°C</td><td>${d.weight}kg</td><td>${d.pulse}</td><td>${date}</td>
                         </tr>
                     `;
                 });
             });
 
-            // Submit Form
             document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!nursePatientSelect.value) { alert("Please select a patient."); return; }
