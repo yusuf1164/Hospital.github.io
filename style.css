@@ -25,17 +25,9 @@ a { text-decoration: none; color: inherit; }
 /* MOBILE NAVIGATION */
 @media (max-width: 900px) {
     .menu-toggle { display: block; }
-    
-    /* Hide menu by default */
     .nav-links { display: none; }
-    
-    /* When open, create a grid-like row layout */
     .nav-links.active { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; padding: 15px 0; margin-top: 10px; gap: 10px; }
-    
-    /* Make the wrapper divs full width */
     .top-links, #dynamic-dept-links, .auth-buttons { display: flex; flex-wrap: wrap; justify-content: space-between; width: 100%; gap: 10px; margin: 0; }
-    
-    /* Force EVERY button to take up exactly 48% of the width (2 per row) */
     .nav-links .btn { width: 48%; margin: 0; padding: 12px 5px; text-align: center; box-sizing: border-box; }
 }
 
@@ -68,21 +60,25 @@ main { flex: 1; padding: 30px 20px; display: flex; justify-content: center; alig
 .dash-card h3 { color: #1e3a8a; margin-bottom: 8px; font-size: 16px; }
 .dash-card p { color: #6b7280; font-size: 13px; }
 
-/* TABLES & RECEPTION FORM CARD */
+/* TABLES (FIXED FOR RESPONSIVENESS & BADGES) */
 .table-container { width: 100%; overflow-x: auto; background: #fff; border-radius: 10px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 20px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 600px; /* Forces scroll on small screens */ }
+th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
 th { background-color: #f9fafb; color: #1e3a8a; font-weight: 600; }
 tr:hover { background-color: #f9fafb; }
-.status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+
+/* Badge Fixes */
+.badge-container { display: flex; flex-wrap: wrap; gap: 5px; }
+.status-badge { padding: 4px 10px; border-radius: 12px; font-size: 12px; font-weight: bold; white-space: nowrap; display: inline-block; }
 .status-pending { background-color: #fef3c7; color: #92400e; }
 .status-complete { background-color: #d1fae5; color: #065f46; }
 .status-active { background-color: #dbeafe; color: #1e40af; }
+
 .page-header { margin-bottom: 25px; text-align: center; }
 .page-header h1 { color: #1e3a8a; font-size: 28px; margin-bottom: 8px; }
 .page-header p { color: #666; font-size: 15px; }
 
-/* FORM CARD (Used by Reception, Nursing, etc.) */
+/* FORM CARD */
 .form-card { background: #f9fafb; border: 1px solid #e5e7eb; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
 .form-card h3 { color: #1e3a8a; margin-bottom: 15px; font-size: 18px; }
 .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
