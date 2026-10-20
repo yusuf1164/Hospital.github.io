@@ -16,7 +16,6 @@
                 <p>Manage test requests and input results.</p>
             </div>
 
-            <!-- Lab Request Form -->
             <div class="form-card">
                 <h3>New Lab Request (Walk-in)</h3>
                 <form id="labForm">
@@ -45,7 +44,8 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Patient (P ID)</th>
+                        <th>Patient ID</th>
+                        <th>Patient Name</th>
                         <th>Test Type</th>
                         <th>Requested By</th>
                         <th>Status</th>
@@ -53,7 +53,7 @@
                     </tr>
                 </thead>
                 <tbody id="labTableBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading lab requests...</td></tr>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading lab requests...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -64,7 +64,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=105"></script>
+    <script src="../script.js?v=110"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
@@ -75,46 +75,38 @@
             const labPatientSelect = document.getElementById('labPatientSelect');
             let allPatients = [];
 
-            // Load Patients for Search
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
             });
 
-            // Load Tests
             db.collection('labTests').get().then(snap => {
                 const testSelect = document.getElementById('testType');
                 testSelect.innerHTML = '<option value="">Select test...</option>';
                 snap.forEach(doc => testSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
 
-            // Search Logic
             searchLabPatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { labPatientSelect.style.display = 'none'; return; }
-
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-
                 labPatientSelect.innerHTML = '<option value="">Select patient...</option>';
                 filtered.forEach(p => labPatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
                 labPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
-            // Load Queue (Without orderBy to prevent index errors)
             db.collection('labResults').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
                     return;
                 }
                 
                 let results = [];
                 snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-                
-                // Sort in JS: Newest first
                 results.sort((a, b) => {
                     const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
@@ -134,7 +126,8 @@
 
                     tbody.innerHTML += `
                         <tr>
-                            <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
+                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
+                            <td><strong>${d.patientName}</strong></td>
                             <td>${d.testType}</td>
                             <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
@@ -144,7 +137,6 @@
                 });
             });
 
-            // Submit new request
             document.getElementById('labForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!labPatientSelect.value) { alert("Please select a patient."); return; }
