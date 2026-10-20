@@ -11,7 +11,6 @@
         .role-item { display: flex; align-items: center; gap: 10px; background: #fff; padding: 12px; border-radius: 5px; border: 1px solid #e5e7eb; cursor: pointer; }
         .role-item input { width: 20px; height: 20px; cursor: pointer; }
         .role-item label { cursor: pointer; font-weight: bold; color: #1e3a8a; text-transform: capitalize; }
-        
         .delete-btn { background: none; border: none; cursor: pointer; padding: 5px; display: inline-flex; align-items: center; justify-content: center; transition: transform 0.2s; }
         .delete-btn svg { fill: #dc2626; width: 18px; height: 18px; }
         .delete-btn:hover { transform: scale(1.15); }
@@ -21,32 +20,25 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
                 <h1>👔 Admin / HR Panel</h1>
                 <p>Manage staff access and hospital services.</p>
             </div>
-
-            <!-- User Management Section -->
             <div class="form-card">
                 <h3>1. Staff Access Management</h3>
                 <button id="fixIdsBtn" class="btn btn-outline" style="margin-bottom: 15px; border-color: #1e3a8a; color: #1e3a8a; font-weight: bold; width: 100%;">⚙️ Generate Missing Staff IDs</button>
-                
                 <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
                 <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
                     <option value="">Select a staff member...</option>
                 </select>
-                
                 <div id="rolesSection" style="display: none; margin-top: 20px;">
                     <div class="role-grid" id="roleCheckboxes"></div>
                     <button id="saveRolesBtn" class="btn-submit" style="margin-top: 20px; max-width: 250px;">Save User Access</button>
                     <div id="msgBox" style="margin-top: 15px; font-weight: bold;"></div>
                 </div>
             </div>
-
-            <!-- Service Management Section -->
             <div class="form-card" style="border-left: 4px solid #2563eb;">
                 <h3>2. Manage Lab Tests & Radiology Scans</h3>
                 <form id="serviceForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
@@ -63,7 +55,6 @@
                     </div>
                     <button type="submit" class="btn-submit" style="width: auto; padding: 10px 20px;">Add Service</button>
                 </form>
-
                 <div style="display: flex; gap: 20px; flex-wrap: wrap;">
                     <div class="service-list-col">
                         <h4 style="color:#1e3a8a; margin-bottom: 10px;">Lab Tests</h4>
@@ -75,8 +66,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Appointment Types Management Section -->
             <div class="form-card" style="border-left: 4px solid #10b981;">
                 <h3>3. Manage Appointment Types</h3>
                 <form id="apptTypeForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
@@ -88,29 +77,21 @@
                 </form>
                 <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
             </div>
-
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
     <script>
-        // 1. APPLY THE GUARD
         enforceAuth(['admin', 'hr']);
-
-        // 2. PAGE LOGIC
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
 
         auth.onAuthStateChanged((user) => {
-            if (!user) { return; } // Guard handles redirect
-
-            // --- USER MANAGEMENT ---
+            if (!user) return;
             const searchInput = document.getElementById('searchUser');
             const userSelect = document.getElementById('userSelect');
             const rolesSection = document.getElementById('rolesSection');
@@ -119,47 +100,33 @@
             db.collection('users').get().then((snapshot) => {
                 snapshot.forEach(doc => {
                     const u = doc.data();
-                    if (u.staffId) { // Only show staff with IDs
-                        allUsers.push({ id: doc.id, ...u });
-                    }
+                    if (u.staffId) allUsers.push({ id: doc.id, ...u });
                 });
                 populateDropdown(allUsers);
             });
 
-            // --- GENERATE MISSING IDS BUTTON ---
             document.getElementById('fixIdsBtn').addEventListener('click', () => {
                 if(!confirm("This will scan all users and assign a Staff ID to anyone missing one. Proceed?")) return;
-                
                 db.collection('users').get().then(snapshot => {
                     let usersToFix = [];
                     snapshot.forEach(doc => {
                         const u = doc.data();
-                        if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) {
-                            usersToFix.push(doc.id);
-                        }
+                        if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) usersToFix.push(doc.id);
                     });
-
-                    if (usersToFix.length === 0) {
-                        alert("All staff members already have IDs!");
-                        return;
-                    }
-
+                    if (usersToFix.length === 0) { alert("All staff members already have IDs!"); return; }
                     const counterRef = db.collection('settings').doc('counters');
                     let promises = usersToFix.map(uid => {
                         return db.runTransaction(transaction => {
                             return transaction.get(counterRef).then(doc => {
                                 let nextId = 1002;
-                                if (doc.exists && doc.data().lastStaffId) {
-                                    nextId = doc.data().lastStaffId + 1;
-                                }
+                                if (doc.exists && doc.data().lastStaffId) nextId = doc.data().lastStaffId + 1;
                                 transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
                                 return db.collection('users').doc(uid).update({ staffId: String(nextId) });
                             });
                         });
                     });
-
                     Promise.all(promises).then(() => {
-                        alert(`Successfully generated IDs for ${usersToFix.length} staff members! Please refresh the page.`);
+                        alert(`Successfully generated IDs for ${usersToFix.length} staff members! Please refresh.`);
                         window.location.reload();
                     }).catch(err => alert("Error: " + err.message));
                 });
@@ -196,10 +163,8 @@
                 if (!selectedId) { rolesSection.style.display = 'none'; return; }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
-                
                 const selectedUser = allUsers.find(u => u.id === selectedId);
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
-
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
                         const box = document.getElementById(`chk_${role}`);
@@ -211,26 +176,21 @@
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
                 const selectedId = userSelect.value;
                 if (!selectedId) return;
-
                 const newRoles = [];
                 departments.forEach(dept => {
                     if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
                 });
-
                 db.collection('users').doc(selectedId).update({ roles: newRoles }).then(() => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'green';
-                    msg.textContent = 'Access updated successfully!';
+                    msg.style.color = 'green'; msg.textContent = 'Access updated successfully!';
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].roles = newRoles;
                 }).catch(err => {
                     const msg = document.getElementById('msgBox');
-                    msg.style.color = 'red';
-                    msg.textContent = 'Error: ' + err.message;
+                    msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
                 });
             });
 
-            // --- SERVICE MANAGEMENT ---
             const labList = document.getElementById('labTestsList');
             const radList = document.getElementById('radiologyScansList');
             const apptList = document.getElementById('apptTypesList');
@@ -239,12 +199,10 @@
                 labList.innerHTML = snap.empty ? '<li>No tests added.</li>' : '';
                 snap.forEach(doc => labList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('labTests', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
             });
-
             db.collection('radiologyScans').onSnapshot(snap => {
                 radList.innerHTML = snap.empty ? '<li>No scans added.</li>' : '';
                 snap.forEach(doc => radList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('radiologyScans', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
             });
-
             db.collection('appointmentTypes').onSnapshot(snap => {
                 apptList.innerHTML = snap.empty ? '<li>No appointment types added.</li>' : '';
                 snap.forEach(doc => apptList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('appointmentTypes', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
@@ -255,24 +213,18 @@
                 const name = document.getElementById('serviceName').value;
                 const type = document.getElementById('serviceType').value;
                 db.collection(type).add({ name: name }).then(() => {
-                    alert('Service added successfully!');
-                    document.getElementById('serviceForm').reset();
+                    alert('Service added successfully!'); document.getElementById('serviceForm').reset();
                 }).catch(err => alert("Error: " + err.message));
             });
-
             document.getElementById('apptTypeForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = document.getElementById('apptTypeName').value;
                 db.collection('appointmentTypes').add({ name: name }).then(() => {
-                    alert('Appointment type added successfully!');
-                    document.getElementById('apptTypeForm').reset();
+                    alert('Appointment type added successfully!'); document.getElementById('apptTypeForm').reset();
                 }).catch(err => alert("Error: " + err.message));
             });
-
             window.deleteService = function(collection, id) {
-                if(confirm("Delete this item?")) {
-                    db.collection(collection).doc(id).delete();
-                }
+                if(confirm("Delete this item?")) db.collection(collection).doc(id).delete();
             };
         });
     </script>
