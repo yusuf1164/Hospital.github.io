@@ -16,7 +16,6 @@
                 <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
             </div>
 
-            <!-- New Request Form -->
             <div class="form-card">
                 <h3>New Scan Request (Walk-in)</h3>
                 <form id="radForm">
@@ -45,7 +44,8 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Patient (P ID)</th>
+                        <th>Patient ID</th>
+                        <th>Patient Name</th>
                         <th>Scan Type</th>
                         <th>Requested By</th>
                         <th>Status</th>
@@ -53,7 +53,7 @@
                     </tr>
                 </thead>
                 <tbody id="radiologyTableBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading requests...</td></tr>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading requests...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -64,7 +64,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js?v=106"></script>
+    <script src="../script.js?v=110"></script>
 
     <script>
         auth.onAuthStateChanged((user) => {
@@ -75,19 +75,16 @@
             const tbody = document.getElementById('radiologyTableBody');
             let allPatients = [];
 
-            // Load Patients
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
             });
 
-            // Load Scans
             db.collection('radiologyScans').get().then(snap => {
                 const scanSelect = document.getElementById('scanType');
                 scanSelect.innerHTML = '<option value="">Select scan...</option>';
                 snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
 
-            // Search Logic
             searchRadPatient.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
                 if (term.length < 2) { radPatientSelect.style.display = 'none'; return; }
@@ -102,10 +99,9 @@
                 radPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
             });
 
-            // Load Queue (Manual Sort)
             db.collection('radiology').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
                     return;
                 }
                 let results = [];
@@ -128,7 +124,8 @@
 
                     tbody.innerHTML += `
                         <tr>
-                            <td><strong>${d.patientName}</strong><br><small style="color:#2563eb;">${d.patientId}</small></td>
+                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
+                            <td><strong>${d.patientName}</strong></td>
                             <td>${d.scanType}</td>
                             <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
