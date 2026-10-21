@@ -44,9 +44,19 @@
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Laboratory Queue</h3>
             <table>
-                <thead><tr><th>Patient ID</th><th>Patient Name</th><th>Test Type</th><th>Requested By</th><th>Status</th><th>Result / Action</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Patient Name</th>
+                        <th>Test Type</th>
+                        <th>Requested By</th>
+                        <th>Date & Time</th> <!-- ADDED DATE COLUMN -->
+                        <th>Status</th>
+                        <th>Result / Action</th>
+                    </tr>
+                </thead>
                 <tbody id="labTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading lab requests...</td></tr>
+                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading lab requests...</td></tr> <!-- UPDATED COLSPAN -->
                 </tbody>
             </table>
         </div>
@@ -116,7 +126,7 @@
             // Load Queue
             db.collection('labResults').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
                     return;
                 }
                 let results = [];
@@ -126,8 +136,16 @@
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
+                
                 tbody.innerHTML = '';
                 results.forEach(d => {
+                    // NEW 12-HOUR LOCAL DATE FORMAT
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: true 
+                    }) : 'Just now';
+
                     const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
                     let actionHtml = '';
                     if (d.status === 'Pending') {
@@ -135,19 +153,21 @@
                     } else {
                         actionHtml = `<strong>${d.result}</strong>`;
                     }
+                    
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
                             <td><strong>${d.patientName}</strong></td>
                             <td>${d.testType}</td>
                             <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
+                            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
                             <td>${actionHtml}</td>
                         </tr>
                     `;
                 });
             }, error => {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
             // Submit Lab Request
