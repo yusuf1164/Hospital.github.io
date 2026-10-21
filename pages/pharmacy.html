@@ -72,7 +72,16 @@
                 }
                 tbody.innerHTML = '';
                 prescriptions.forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                     year: 'numeric', 
+                     month: 'short', 
+                     day: 'numeric', 
+                     hour: '2-digit',
+                     minute: '2-digit',
+                     second: '2-digit',
+                     hour12: true 
+                     }) : 'Just now';
+                    
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
                     let actionHtml = d.status === 'Pending' ? `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}')">Dispense</button>` : `<span style="color:#065f46; font-weight:bold;">Done</span>`;
                     tbody.innerHTML += `
