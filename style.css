@@ -110,3 +110,73 @@ footer { background-color: #111827; color: #9ca3af; padding: 40px 20px 20px; }
 .footer-section p, .footer-section ul { font-size: 13px; line-height: 1.9; list-style: none; }
 .footer-section ul a:hover { color: white; }
 .footer-bottom { text-align: center; border-top: 1px solid #374151; margin-top: 30px; padding-top: 20px; font-size: 13px; }
+
+
+/* ========================================= */
+/* --- START UI POLISH & ANIMATIONS --- */
+/* ========================================= */
+
+/* 1. Fade-in animation for table rows */
+@keyframes fadeInRow {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+tbody tr {
+    animation: fadeInRow 0.3s ease-out forwards;
+}
+
+/* 2. Smooth hover and click effects for all buttons */
+.btn, .btn-submit {
+    transition: all 0.2s ease;
+}
+
+.btn:active, .btn-submit:active {
+    transform: scale(0.96); /* Shrinks slightly when tapped */
+    box-shadow: none;
+}
+
+/* 3. Custom sleek scrollbar for tables */
+.table-container::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.table-container::-webkit-scrollbar-track {
+    background: #f1f5f9; 
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb {
+    background: #cbd5e1; 
+    border-radius: 4px;
+}
+
+.table-container::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8; 
+}
+
+/* 4. Smooth focus effects on inputs */
+.form-group input, .form-group select, .form-group textarea {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15); /* Soft blue glow */
+}
+
+/* 5. Pulse animation for "Loading..." text */
+@keyframes pulseText {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; font-weight: bold; color: #2563eb; }
+    100% { opacity: 0.6; }
+}
+
+td[style*="text-align:center"] {
+    animation: pulseText 1.5s infinite;
+}
+
+/* ========================================= */
+/* --- END UI POLISH & ANIMATIONS --- */
+/* ========================================= */
