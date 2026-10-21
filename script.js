@@ -17,15 +17,19 @@ const db = firebase.firestore();
 // ==========================================
 // 2. PAGE INITIALIZATION
 // ==========================================
+// --- START INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     loadHeader();
     loadFooter();
     initForms();
 });
+// --- END INITIALIZATION ---
+
 
 // ==========================================
 // 3. LOAD HEADER & FOOTER
 // ==========================================
+// --- START LOAD HEADER ---
 function loadHeader() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const headerPath = inPagesFolder ? '../header.html' : 'header.html';
@@ -47,7 +51,9 @@ function loadHeader() {
         })
         .catch(err => console.error('Header load error:', err));
 }
+// --- END LOAD HEADER ---
 
+// --- START LOAD FOOTER ---
 function loadFooter() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const footerPath = inPagesFolder ? '../footer.html' : 'footer.html';
@@ -65,10 +71,13 @@ function loadFooter() {
         })
         .catch(err => console.error('Footer load error:', err));
 }
+// --- END LOAD FOOTER ---
+
 
 // ==========================================
 // 4. MOBILE MENU TOGGLE
 // ==========================================
+// --- START MOBILE MENU ---
 function initMobileMenu() {
     const menuToggle = document.getElementById('menu-toggle');
     const navLinks = document.getElementById('nav-links');
@@ -76,10 +85,13 @@ function initMobileMenu() {
         menuToggle.addEventListener('click', () => navLinks.classList.toggle('active'));
     }
 }
+// --- END MOBILE MENU ---
+
 
 // ==========================================
 // 5. DYNAMIC HEADER BUTTONS & LOGOUT
 // ==========================================
+// --- START AUTH UI ---
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
     const dynamicLinks = document.getElementById('dynamic-dept-links');
@@ -100,16 +112,17 @@ function updateAuthUI() {
                 const data = doc.data() || {};
                 let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
                 
-                let linksHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
+                // Using the new 'nav-link' class for text links
+                let linksHTML = `<a href="${prefix}pages/emergency.html" class="nav-link">Emergency</a>`;
 
                 if (userRoles.includes('admin') || userRoles.includes('doctor')) {
-                    linksHTML += `<a href="${prefix}pages/opd.html" class="btn btn-outline">OPD</a>`;
+                    linksHTML += `<a href="${prefix}pages/opd.html" class="nav-link">OPD</a>`;
                 }
                 if (userRoles.includes('admin') || userRoles.includes('lab')) {
-                    linksHTML += `<a href="${prefix}pages/laboratory.html" class="btn btn-outline">Lab</a>`;
+                    linksHTML += `<a href="${prefix}pages/laboratory.html" class="nav-link">Lab</a>`;
                 }
                 if (userRoles.includes('admin') || userRoles.includes('pharmacy')) {
-                    linksHTML += `<a href="${prefix}pages/pharmacy.html" class="btn btn-outline">Pharmacy</a>`;
+                    linksHTML += `<a href="${prefix}pages/pharmacy.html" class="nav-link">Pharmacy</a>`;
                 }
                 
                 if(dynamicLinks) dynamicLinks.innerHTML = linksHTML;
@@ -132,15 +145,20 @@ function updateAuthUI() {
                 <a href="${prefix}register.html" class="btn btn-outline">Staff Register</a>
                 <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Register</a>
             `;
-            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html" class="btn btn-outline">Emergency</a>`;
+            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html" class="nav-link">Emergency</a>`;
         }
     });
 }
+// --- END AUTH UI ---
+
 
 // ==========================================
 // 6. AUTHENTICATION FORMS
 // ==========================================
+// --- START FORMS ---
 function initForms() {
+    
+    // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -162,6 +180,7 @@ function initForms() {
         });
     }
 
+    // --- REGISTER FORM ---
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
@@ -224,43 +243,66 @@ function initForms() {
         });
     }
 }
+// --- END FORMS ---
+
 
 // ==========================================
 // 7. GLOBAL ACTIVITY LOGGER
 // ==========================================
+// --- START ACTIVITY LOGGER ---
 function logActivity(user, action, details) {
     if (!user) return;
+    
     db.collection('users').doc(user.uid).get().then(doc => {
         const data = doc.data() || {};
         const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member';
         const staffId = data.staffId || 'N/A';
+        
         db.collection('auditLogs').add({
-            userId: user.uid, staffName: staffName, staffId: staffId, action: action, details: details,
+            userId: user.uid,
+            staffName: staffName,
+            staffId: staffId,
+            action: action,
+            details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         }).catch(err => console.error("Error logging activity:", err));
+        
     }).catch(err => {
+        console.error("Error fetching user for log:", err);
         db.collection('auditLogs').add({
-            userId: user.uid, staffName: 'Staff Member', staffId: 'N/A', action: action, details: details,
+            userId: user.uid,
+            staffName: 'Staff Member',
+            staffId: 'N/A',
+            action: action,
+            details: details,
             timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
     });
 }
+// --- END ACTIVITY LOGGER ---
+
 
 // ==========================================
-// 8. BACK DOOR ROUTE GUARD (Security)
+// 8. FRONT DOOR ROUTE GUARD (Security)
 // ==========================================
+// --- START ROUTE GUARD ---
 function enforceAuth(allowedRoles) {
     auth.onAuthStateChanged((user) => {
         if (!user) {
             window.location.href = '../login.html';
             return;
         }
+        
         db.collection('users').doc(user.uid).get().then(doc => {
-            if (!doc.exists) { window.location.href = '../login.html'; return; }
+            if (!doc.exists) { 
+                window.location.href = '../login.html'; 
+                return; 
+            }
+            
             const data = doc.data();
             let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
             
-            if (userRoles.includes('admin')) return; // Admins bypass
+            if (userRoles.includes('admin')) return; 
             
             const hasAccess = allowedRoles.some(role => userRoles.includes(role));
             if (!hasAccess) {
@@ -270,3 +312,4 @@ function enforceAuth(allowedRoles) {
         }).catch(() => window.location.href = '../login.html');
     });
 }
+// --- END ROUTE GUARD ---
