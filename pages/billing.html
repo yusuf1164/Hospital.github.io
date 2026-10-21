@@ -135,11 +135,12 @@
                     const actionHtml = d.status === 'Paid' ? `<span style="color:#065f46; font-weight:bold;">Completed</span>` : `<button class="btn btn-primary" onclick="payBill('${d.id}', '${d.patientName}', '${d.amount}')">Mark as Paid</button>`;
                     tbody.innerHTML += `
                         <tr>
-                            <td>${date}</td>
+                            
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
                             <td><strong>${d.patientName}</strong></td>
                             <td>${d.service}</td>
                             <td>₦${Number(d.amount).toLocaleString()}</td>
+                            <td>${date}</td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
                             <td>${actionHtml}</td>
                         </tr>
