@@ -50,7 +50,7 @@
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Appointment Schedule</h3>
             <table>
                 <thead>
-                    <tr><th>Date & Time</th><th>Patient Name</th><th>Doctor</th><th>Type</th><th>Status</th><th>Action</th></tr>
+                    <tr><th>Date & Time</th><th>Patient Name</th><th>Doctor</th><th>Type</th><th>Booked on</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody id="appointmentsTableBody">
                     <tr><td colspan="6" style="text-align:center; color:#888;">Loading appointments...</td></tr>
@@ -163,28 +163,47 @@
                         const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                         const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                         return timeB - timeA; 
-                    });
-                    tbody.innerHTML = '';
-                    appointments.forEach(d => {
-                        const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
-                        let actionHtml = '<span style="color:#888;">None</span>';
-                        if (!isStrictlyPatient && d.status === 'Pending') {
-                            actionHtml = `
-                                <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
-                                <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
-                            `;
-                        }
-                        tbody.innerHTML += `
-                            <tr>
-                                <td>${d.dateTime}</td>
-                                <td><strong>${d.patientName}</strong></td>
-                                <td>${d.doctor}</td>
-                                <td>${d.type}</td>
-                                <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-                                <td>${actionHtml}</td>
-                            </tr>
-                        `;
-                    });
+                    });tbody.innerHTML = '';
+appointments.forEach(d => {
+    // Format the Booked On date (createdAt)
+    const bookedDate = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', hour12: true 
+    }) : 'Just now';
+
+    // Format the Scheduled Appointment Date (dateTime string)
+    let scheduledDate = d.dateTime;
+    try {
+        scheduledDate = new Date(d.dateTime).toLocaleString(undefined, { 
+            year: 'numeric', month: 'short', day: 'numeric', 
+            hour: '2-digit', minute: '2-digit', hour12: true 
+        });
+    } catch (e) {
+        // If formatting fails, it will just show the raw string
+    }
+
+    const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
+    
+    let actionHtml = '<span style="color:#888;">None</span>';
+    if (!isStrictlyPatient && d.status === 'Pending') {
+        actionHtml = `
+            <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
+            <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
+        `;
+    }
+    tbody.innerHTML += `
+        <tr>
+            <td>${scheduledDate}</td>
+            <td><strong>${d.patientName}</strong></td>
+            <td>${d.doctor}</td>
+            <td>${d.type}</td>
+            <td><small>${bookedDate}</small></td>
+            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+            <td>${actionHtml}</td>
+        </tr>
+    `;
+});
+                    
                 }, error => {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Database Error: ${error.message}</td></tr>`;
                 });
