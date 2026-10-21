@@ -19,11 +19,16 @@
                 <h3>New Lab Request (Walk-in)</h3>
                 <form id="labForm">
                     <div class="form-grid">
+                        <!-- AUTOCOMPLETE SEARCH -->
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient</label>
-                            <input type="text" id="searchLabPatient" placeholder="Type Name, P ID, or Phone..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
-                            <select id="labPatientSelect" required style="display: none; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></select>
+                            <div class="autocomplete-container">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <div id="autocompleteList" class="autocomplete-list"></div>
+                                <input type="hidden" id="selectedPatientId">
+                            </div>
                         </div>
+                        
                         <div class="form-group">
                             <label>Test Type</label>
                             <select id="testType" required><option value="">Loading tests...</option></select>
@@ -55,34 +60,60 @@
 
     <script>
         enforceAuth(['lab']);
+
         auth.onAuthStateChanged((user) => {
             if (!user) return;
+
+            const searchInput = document.getElementById('patientSearchInput');
+            const autocompleteList = document.getElementById('autocompleteList');
+            const hiddenPatientId = document.getElementById('selectedPatientId');
             const tbody = document.getElementById('labTableBody');
-            const searchLabPatient = document.getElementById('searchLabPatient');
-            const labPatientSelect = document.getElementById('labPatientSelect');
             let allPatients = [];
 
-            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); }).catch(err => console.error(err));
+            // Load Patients for Autocomplete
+            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); });
+            
+            // Load Test Types
             db.collection('labTests').get().then(snap => {
                 const testSelect = document.getElementById('testType');
                 testSelect.innerHTML = '<option value="">Select test...</option>';
                 snap.forEach(doc => testSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
 
-            searchLabPatient.addEventListener('input', (e) => {
+            // Autocomplete Logic
+            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
-                if (term.length < 2) { labPatientSelect.style.display = 'none'; return; }
+                hiddenPatientId.value = "";
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-                labPatientSelect.innerHTML = '<option value="">Select patient...</option>';
-                filtered.forEach(p => labPatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
-                labPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+                renderDropdown(filtered);
             });
 
+            function renderDropdown(patients) {
+                autocompleteList.innerHTML = '';
+                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                patients.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                        hiddenPatientId.value = p.patientId;
+                        autocompleteList.style.display = 'none';
+                    });
+                    autocompleteList.appendChild(div);
+                });
+                autocompleteList.style.display = 'block';
+            }
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
+            });
+
+            // Load Queue
             db.collection('labResults').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No lab requests in the queue.</td></tr>`;
@@ -119,15 +150,22 @@
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
+            // Submit Lab Request
             document.getElementById('labForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!labPatientSelect.value) { alert("Please select a patient."); return; }
+                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                
+                const patientId = hiddenPatientId.value;
+                const patientName = allPatients.find(p => p.patientId === patientId).firstName + " " + allPatients.find(p => p.patientId === patientId).lastName;
+
                 db.collection('labResults').add({
-                    patientId: labPatientSelect.value, patientName: labPatientSelect.options[labPatientSelect.selectedIndex].getAttribute('data-name'),
+                    patientId: patientId, patientName: patientName,
                     testType: document.getElementById('testType').value, requestedBy: document.getElementById('requestedBy').value,
                     status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Lab test requested!'); document.getElementById('labForm').reset(); labPatientSelect.style.display = 'none';
+                    alert('Lab test requested!'); 
+                    document.getElementById('labForm').reset(); 
+                    searchInput.value = ''; hiddenPatientId.value = '';
                 });
             });
 
