@@ -121,7 +121,16 @@
                 });
                 tbody.innerHTML = '';
                 bills.forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                     year: 'numeric', 
+                     month: 'short', 
+                     day: 'numeric', 
+                     hour: '2-digit',
+                     minute: '2-digit',
+                     second: '2-digit',
+                     hour12: true 
+                     }) : 'Just now';
+                    
                     const badgeClass = d.status === 'Paid' ? 'status-complete' : 'status-pending';
                     const actionHtml = d.status === 'Paid' ? `<span style="color:#065f46; font-weight:bold;">Completed</span>` : `<button class="btn btn-primary" onclick="payBill('${d.id}', '${d.patientName}', '${d.amount}')">Mark as Paid</button>`;
                     tbody.innerHTML += `
