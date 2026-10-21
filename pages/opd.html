@@ -191,7 +191,10 @@
                 });
                 historyBody.innerHTML = '';
                 consults.slice(0, 20).forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleDateString() : 'Just now';
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', 
+                    second: '2-digit',  hour12: true   }) : 'Just now';
+                    
                     let badges = '';
                     if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending" style="width:max-content;">💊 ${d.requests.pharmacy}</span>`;
                     if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active" style="width:max-content;">🧪 ${d.requests.lab}</span>`;
