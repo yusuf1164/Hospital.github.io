@@ -19,11 +19,16 @@
                 <h3>New Scan Request (Walk-in)</h3>
                 <form id="radForm">
                     <div class="form-grid">
+                        <!-- AUTOCOMPLETE SEARCH -->
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient</label>
-                            <input type="text" id="searchRadPatient" placeholder="Type Name, P ID, or Phone..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
-                            <select id="radPatientSelect" required style="display: none; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></select>
+                            <div class="autocomplete-container">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <div id="autocompleteList" class="autocomplete-list"></div>
+                                <input type="hidden" id="selectedPatientId">
+                            </div>
                         </div>
+                        
                         <div class="form-group">
                             <label>Scan Type</label>
                             <select id="scanType" required><option value="">Loading scans...</option></select>
@@ -55,34 +60,60 @@
 
     <script>
         enforceAuth(['radiology']);
+
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-            const searchRadPatient = document.getElementById('searchRadPatient');
-            const radPatientSelect = document.getElementById('radPatientSelect');
+
+            const searchInput = document.getElementById('patientSearchInput');
+            const autocompleteList = document.getElementById('autocompleteList');
+            const hiddenPatientId = document.getElementById('selectedPatientId');
             const tbody = document.getElementById('radiologyTableBody');
             let allPatients = [];
 
-            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); }).catch(err => console.error(err));
+            // Load Patients for Autocomplete
+            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); });
+            
+            // Load Scan Types
             db.collection('radiologyScans').get().then(snap => {
                 const scanSelect = document.getElementById('scanType');
                 scanSelect.innerHTML = '<option value="">Select scan...</option>';
                 snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
 
-            searchRadPatient.addEventListener('input', (e) => {
+            // Autocomplete Logic
+            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
-                if (term.length < 2) { radPatientSelect.style.display = 'none'; return; }
+                hiddenPatientId.value = "";
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-                radPatientSelect.innerHTML = '<option value="">Select patient...</option>';
-                filtered.forEach(p => radPatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
-                radPatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+                renderDropdown(filtered);
             });
 
+            function renderDropdown(patients) {
+                autocompleteList.innerHTML = '';
+                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                patients.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                        hiddenPatientId.value = p.patientId;
+                        autocompleteList.style.display = 'none';
+                    });
+                    autocompleteList.appendChild(div);
+                });
+                autocompleteList.style.display = 'block';
+            }
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
+            });
+
+            // Load Queue
             db.collection('radiology').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
@@ -119,15 +150,22 @@
                 tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
+            // Submit Request
             document.getElementById('radForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!radPatientSelect.value) { alert("Please select a patient."); return; }
+                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                
+                const patientId = hiddenPatientId.value;
+                const patientName = allPatients.find(p => p.patientId === patientId).firstName + " " + allPatients.find(p => p.patientId === patientId).lastName;
+
                 db.collection('radiology').add({
-                    patientId: radPatientSelect.value, patientName: radPatientSelect.options[radPatientSelect.selectedIndex].getAttribute('data-name'),
+                    patientId: patientId, patientName: patientName,
                     scanType: document.getElementById('scanType').value, requestedBy: document.getElementById('requestedBy').value,
                     status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Scan requested!'); document.getElementById('radForm').reset(); radPatientSelect.style.display = 'none';
+                    alert('Scan requested!'); 
+                    document.getElementById('radForm').reset(); 
+                    searchInput.value = ''; hiddenPatientId.value = '';
                 });
             });
 
