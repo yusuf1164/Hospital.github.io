@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -20,11 +19,16 @@
                 <h3>Record Vitals</h3>
                 <form id="nursingForm">
                     <div class="form-grid">
+                        <!-- AUTOCOMPLETE SEARCH -->
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient</label>
-                            <input type="text" id="searchNursePatient" placeholder="Type Name, P ID, or Phone..." style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px;">
-                            <select id="nursePatientSelect" required style="display: none; width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;"></select>
+                            <div class="autocomplete-container">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <div id="autocompleteList" class="autocomplete-list"></div>
+                                <input type="hidden" id="selectedPatientId">
+                            </div>
                         </div>
+                        
                         <div class="form-group"><label>BP (mmHg)</label><input type="text" id="bp" required placeholder="120/80"></div>
                         <div class="form-group"><label>Temp (°C)</label><input type="number" step="0.1" id="temp" required placeholder="37.2"></div>
                         <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" id="weight" required placeholder="70.5"></div>
@@ -45,7 +49,6 @@
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -59,29 +62,51 @@
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            const searchNursePatient = document.getElementById('searchNursePatient');
-            const nursePatientSelect = document.getElementById('nursePatientSelect');
+            const searchInput = document.getElementById('patientSearchInput');
+            const autocompleteList = document.getElementById('autocompleteList');
+            const hiddenPatientId = document.getElementById('selectedPatientId');
             const tbody = document.getElementById('vitalsTableBody');
             let allPatients = [];
 
+            // Load Patients for Autocomplete
             db.collection('patients').get().then(snap => {
                 snap.forEach(doc => allPatients.push(doc.data()));
-            }).catch(err => console.error(err));
+            });
 
-            searchNursePatient.addEventListener('input', (e) => {
+            // Autocomplete Logic
+            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.toLowerCase();
-                if (term.length < 2) { nursePatientSelect.style.display = 'none'; return; }
+                hiddenPatientId.value = "";
                 const filtered = allPatients.filter(p => {
                     const name = `${p.firstName} ${p.lastName}`.toLowerCase();
                     const pid = String(p.patientId).toLowerCase();
                     const phone = String(p.phone).toLowerCase();
                     return name.includes(term) || pid.includes(term) || phone.includes(term);
                 });
-                nursePatientSelect.innerHTML = '<option value="">Select patient...</option>';
-                filtered.forEach(p => nursePatientSelect.innerHTML += `<option value="${p.patientId}" data-name="${p.firstName} ${p.lastName}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
-                nursePatientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+                renderDropdown(filtered);
             });
 
+            function renderDropdown(patients) {
+                autocompleteList.innerHTML = '';
+                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                patients.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                        hiddenPatientId.value = p.patientId;
+                        autocompleteList.style.display = 'none';
+                    });
+                    autocompleteList.appendChild(div);
+                });
+                autocompleteList.style.display = 'block';
+            }
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
+            });
+
+            // Load Recent Vitals
             db.collection('vitals').onSnapshot(snapshot => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
@@ -109,11 +134,13 @@
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
 
+            // Submit Vitals
             document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!nursePatientSelect.value) { alert("Please select a patient."); return; }
-                const patientId = nursePatientSelect.value;
-                const patientName = nursePatientSelect.options[nursePatientSelect.selectedIndex].getAttribute('data-name');
+                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                
+                const patientId = hiddenPatientId.value;
+                const patientName = allPatients.find(p => p.patientId === patientId).firstName + " " + allPatients.find(p => p.patientId === patientId).lastName;
 
                 db.collection('vitals').add({
                     patientId: patientId, patientName: patientName,
@@ -123,7 +150,7 @@
                 }).then(() => {
                     alert('Vitals Saved!');
                     document.getElementById('nursingForm').reset();
-                    nursePatientSelect.style.display = 'none';
+                    searchInput.value = ''; hiddenPatientId.value = '';
                 });
             });
         });
