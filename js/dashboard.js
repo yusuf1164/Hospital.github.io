@@ -21,6 +21,7 @@ function renderModules(userRoles) {
         patient: [ 
             { title: '📅 My Appointments', desc: 'Book and view visits', link: 'pages/appointments.html' },
             { title: '📋 My Health Records', desc: 'View linked profiles', link: 'pages/patient-records.html' },
+            { title: '💳 My Bills', desc: 'View invoices and payments', link: 'pages/my-bills.html' },
             { title: '🔗 Link Hospital Record', desc: 'Connect a new Patient ID', link: 'pages/link-record.html' }
         ],
         appointments: [
@@ -29,16 +30,19 @@ function renderModules(userRoles) {
         doctor: [ 
             { title: '🩺 OPD (Consultations)', desc: 'See patients & prescribe', link: 'pages/opd.html' },
             { title: '📅 Appointments', desc: 'View schedule', link: 'pages/appointments.html' },
-            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' }
+            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🚨 Emergency', desc: 'Manage critical cases', link: 'pages/emergency.html' }
         ],
         nurse: [ 
             { title: '🌡️ Vitals Entry', desc: 'Record vitals', link: 'pages/nursing.html' },
-            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' }
+            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🚨 Emergency', desc: 'Manage critical cases', link: 'pages/emergency.html' }
         ],
         reception: [ 
             { title: '🧑‍💼 Register Patient', desc: 'New patient intake', link: 'pages/reception.html' },
             { title: '📅 Appointments', desc: 'Manage bookings', link: 'pages/appointments.html' },
-            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' }
+            { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🚨 Emergency', desc: 'Fast-track intake', link: 'pages/emergency.html' }
         ],
         pharmacy: [ { title: '💊 Pharmacy', desc: 'Dispense drugs', link: 'pages/pharmacy.html' } ],
         lab: [ { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' } ],
@@ -57,7 +61,8 @@ function renderModules(userRoles) {
             { title: '🩻 Radiology', desc: 'X-rays & scans', link: 'pages/radiology.html' },
             { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' },
             { title: '💳 Billing', desc: 'Payments & Invoices', link: 'pages/billing.html' },
-            { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' }
+            { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' },
+            { title: '🚨 Emergency', desc: 'Critical care management', link: 'pages/emergency.html' }
         ]
     };
 
@@ -68,13 +73,28 @@ function renderModules(userRoles) {
 
     if (finalModules.length === 0) finalModules = allModules.patient;
 
+    // Remove duplicates based on link
     const uniqueModules = Array.from(new Set(finalModules.map(m => m.link)))
         .map(link => finalModules.find(m => m.link === link));
 
-    container.innerHTML = uniqueModules.map(m => `
-        <a href="${m.link}" class="dash-card" style="text-decoration:none; color:inherit; display:block;">
-            <h3>${m.title}</h3>
-            <p>${m.desc}</p>
-        </a>
-    `).join('');
+    // Generate the new HTML card structure
+    container.innerHTML = uniqueModules.map(m => {
+        // Split the emoji from the title (e.g., "🩺 OPD" becomes emoji="🩺", text="OPD")
+        const parts = m.title.split(' ');
+        const emoji = parts[0];
+        const text = parts.slice(1).join(' ');
+
+        return `
+            <a href="${m.link}" class="dash-card" style="text-decoration:none; color:inherit;">
+                <div class="dash-card-content">
+                    <div class="dash-icon">${emoji}</div>
+                    <div class="dash-text">
+                        <h3>${text}</h3>
+                        <p>${m.desc}</p>
+                    </div>
+                </div>
+                <div class="dash-arrow">➔</div>
+            </a>
+        `;
+    }).join('');
 }
