@@ -94,3 +94,9 @@ footer { background-color: #111827; color: #9ca3af; padding: 40px 20px 20px; }
 .footer-section p, .footer-section ul { font-size: 13px; line-height: 1.9; list-style: none; }
 .footer-section ul a:hover { color: white; }
 .footer-bottom { text-align: center; border-top: 1px solid #374151; margin-top: 30px; padding-top: 20px; font-size: 13px; }
+/* AUTOCOMPLETE SEARCH BAR */
+.autocomplete-container { position: relative; width: 100%; }
+.autocomplete-container input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; }
+.autocomplete-list { position: absolute; border: 1px solid #d4d4d4; border-top: none; z-index: 99; top: 100%; left: 0; right: 0; background: #fff; max-height: 200px; overflow-y: auto; border-radius: 0 0 5px 5px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+.autocomplete-list div { padding: 10px; cursor: pointer; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+.autocomplete-list div:hover { background-color: #e5e7eb; }
