@@ -59,8 +59,13 @@
                 tbody.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
-                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString() : 'Just now';
-                    
+                    let date = 'Just now';
+                    if (d.timestamp && typeof d.timestamp.toDate === 'function') {
+                    date = d.timestamp.toDate().toLocaleString(undefined, { 
+                    year: 'numeric', month: 'short', day: 'numeric', 
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
+                });
+            }
                     let badgeColor = 'status-active';
                     if (d.action.includes('Registered')) badgeColor = 'status-complete';
                     if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
