@@ -24,12 +24,34 @@
         <div class="table-container">
             <div class="page-header">
                 <h1>👔 Admin / HR Panel</h1>
-                <p>Manage staff access and hospital services.</p>
+                <p>Manage staff, shifts, and hospital services.</p>
             </div>
 
-            <!-- 1. Staff Access Management -->
+            <!-- 1. Shift Management -->
+            <div class="form-card" style="border-left: 4px solid #8b5cf6;">
+                <h3>1. Hospital Shifts & Staff Assignment</h3>
+                
+                <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Global Shift Configuration</h4>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Check the shifts your hospital operates.</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <label><input type="checkbox" class="global-shift" value="Morning"> Morning</label>
+                        <label><input type="checkbox" class="global-shift" value="Afternoon"> Afternoon</label>
+                        <label><input type="checkbox" class="global-shift" value="Night"> Night</label>
+                    </div>
+                    <button id="saveGlobalShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Global Shifts</button>
+                </div>
+
+                <div id="staffShiftSection" style="display: none; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Assign Shifts to <span id="shiftStaffName" style="color: #2563eb;"></span></h4>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;" id="staffShiftCheckboxes"></div>
+                    <button id="saveStaffShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Staff Shifts</button>
+                </div>
+            </div>
+
+            <!-- 2. Staff Access Management -->
             <div class="form-card">
-                <h3>1. Staff Access Management</h3>
+                <h3>2. Staff Access Management</h3>
                 <button id="fixIdsBtn" class="btn btn-outline" style="margin-bottom: 15px; border-color: #1e3a8a; color: #1e3a8a; font-weight: bold; width: 100%;">⚙️ Generate Missing Staff IDs</button>
                 
                 <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
@@ -44,9 +66,9 @@
                 </div>
             </div>
 
-            <!-- 2. Service Management -->
+            <!-- 3. Service Management -->
             <div class="form-card" style="border-left: 4px solid #2563eb;">
-                <h3>2. Manage Lab Tests & Radiology Scans</h3>
+                <h3>3. Manage Lab Tests & Radiology Scans</h3>
                 <form id="serviceForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
                     <div class="form-group" style="flex: 2; min-width: 200px; margin-bottom: 0;">
                         <label>Service Name</label>
@@ -73,9 +95,9 @@
                 </div>
             </div>
 
-            <!-- 3. Appointment Types -->
+            <!-- 4. Appointment Types -->
             <div class="form-card" style="border-left: 4px solid #10b981;">
-                <h3>3. Manage Appointment Types</h3>
+                <h3>4. Manage Appointment Types</h3>
                 <form id="apptTypeForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
                     <div class="form-group" style="flex: 1; min-width: 200px; margin-bottom: 0;">
                         <label>Clinic / Appointment Type</label>
@@ -84,28 +106,6 @@
                     <button type="submit" class="btn-submit" style="width: auto; padding: 10px 20px;">Add Type</button>
                 </form>
                 <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
-            </div>
-
-            <!-- 4. Shift Management -->
-            <div class="form-card" style="border-left: 4px solid #8b5cf6;">
-                <h3>4. Hospital Shifts & Staff Assignment</h3>
-                
-                <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
-                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Global Shift Configuration</h4>
-                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Check the shifts your hospital operates.</p>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <label><input type="checkbox" class="global-shift" value="Morning"> Morning</label>
-                        <label><input type="checkbox" class="global-shift" value="Afternoon"> Afternoon</label>
-                        <label><input type="checkbox" class="global-shift" value="Night"> Night</label>
-                    </div>
-                    <button id="saveGlobalShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Global Shifts</button>
-                </div>
-
-                <div id="staffShiftSection" style="display: none; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
-                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Assign Shifts to <span id="shiftStaffName" style="color: #2563eb;"></span></h4>
-                    <div style="display: flex; gap: 20px; flex-wrap: wrap;" id="staffShiftCheckboxes"></div>
-                    <button id="saveStaffShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Staff Shifts</button>
-                </div>
             </div>
 
         </div>
