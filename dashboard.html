@@ -18,22 +18,42 @@
             <div id="adminStatsContainer" style="display: none; margin-bottom: 30px;">
                 <h3 style="color: #1e3a8a; margin-bottom: 15px;">Hospital Overview</h3>
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">👥</div>
+                    
+                    <a href="pages/patients.html" class="stat-card">
+                        <div class="stat-icon" style="background-color: #dbeafe;">👥</div>
                         <div class="stat-info"><h4>Total Patients</h4><p id="statPatients">0</p></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">👔</div>
+                    </a>
+
+                    <a href="pages/treatment-list.html?status=Ongoing" class="stat-card">
+                        <div class="stat-icon" style="background-color: #fef3c7;">🏥</div>
+                        <div class="stat-info"><h4>Ongoing Treatment</h4><p id="statOngoing">0</p></div>
+                    </a>
+
+                    <a href="pages/treatment-list.html?status=Treated" class="stat-card">
+                        <div class="stat-icon" style="background-color: #d1fae5;">✅</div>
+                        <div class="stat-info"><h4>Treated Patients</h4><p id="statTreated">0</p></div>
+                    </a>
+
+                    <a href="pages/staff-list.html" class="stat-card">
+                        <div class="stat-icon" style="background-color: #e0e7ff;">👔</div>
                         <div class="stat-info"><h4>Total Staff</h4><p id="statStaff">0</p></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🚨</div>
-                        <div class="stat-info"><h4>Active Emergencies</h4><p id="statEmergency">0</p></div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">🛏️</div>
+                    </a>
+
+                    <a href="pages/emergency.html" class="stat-card">
+                        <div class="stat-icon" style="background-color: #fee2e2;">🚨</div>
+                        <div class="stat-info"><h4>Emergencies</h4><p id="statEmergency">0</p></div>
+                    </a>
+
+                    <a href="pages/wards.html" class="stat-card">
+                        <div class="stat-icon" style="background-color: #f3e8ff;">🛏️</div>
                         <div class="stat-info"><h4>Total Rooms</h4><p id="statRooms">0</p></div>
-                    </div>
+                    </a>
+
+                    <a href="pages/billing.html" class="stat-card">
+                        <div class="stat-icon" style="background-color: #dcfce7;">💰</div>
+                        <div class="stat-info"><h4>Total Revenue</h4><p id="statRevenue">₦0</p></div>
+                    </a>
+
                 </div>
             </div>
 
