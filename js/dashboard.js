@@ -1,6 +1,5 @@
-// --- START DASHBOARD LOGIC ---
 auth.onAuthStateChanged((user) => {
-    if (!user) { window.location.href = '../login.html'; return; }
+    if (!user) { window.location.href = 'login.html'; return; }
 
     db.collection('users').doc(user.uid).get().then(doc => {
         if (!doc.exists) return;
@@ -8,33 +7,50 @@ auth.onAuthStateChanged((user) => {
         const data = doc.data();
         let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
         
-        document.getElementById('userName').textContent = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
-        document.getElementById('userRole').textContent = userRoles.join(', ');
+        // Check if elements exist before updating them
+        const nameEl = document.getElementById('userName');
+        const roleEl = document.getElementById('userRole');
+        if (nameEl) nameEl.textContent = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
+        if (roleEl) roleEl.textContent = userRoles.join(', ');
 
-        // 1. Load Admin Stats if they are an Admin
-        if (userRoles.includes('admin')) {
-            document.getElementById('adminStatsContainer').style.display = 'block';
+        // Load Admin Stats if they are an Admin
+        const statsContainer = document.getElementById('adminStatsContainer');
+        if (statsContainer && userRoles.includes('admin')) {
+            statsContainer.style.display = 'block';
             
-            db.collection('patients').get().then(snap => document.getElementById('statPatients').innerText = snap.size);
-            db.collection('emergencies').where('status', '==', 'Active').get().then(snap => document.getElementById('statEmergency').innerText = snap.size);
-            db.collection('rooms').get().then(snap => document.getElementById('statRooms').innerText = snap.size);
+            // Wrap database calls in catch blocks just in case
+            db.collection('patients').get().then(snap => {
+                const el = document.getElementById('statPatients');
+                if (el) el.innerText = snap.size;
+            }).catch(e => console.log(e));
+
+            db.collection('emergencies').where('status', '==', 'Active').get().then(snap => {
+                const el = document.getElementById('statEmergency');
+                if (el) el.innerText = snap.size;
+            }).catch(e => console.log(e));
+
+            db.collection('rooms').get().then(snap => {
+                const el = document.getElementById('statRooms');
+                if (el) el.innerText = snap.size;
+            }).catch(e => console.log(e));
             
             db.collection('users').get().then(snap => {
                 let staffCount = 0;
                 snap.forEach(u => { if(u.data().staffId) staffCount++; });
-                document.getElementById('statStaff').innerText = staffCount;
-            });
+                const el = document.getElementById('statStaff');
+                if (el) el.innerText = staffCount;
+            }).catch(e => console.log(e));
         }
 
-        // 2. Render Modules
+        // Render Modules
         renderModules(userRoles);
     });
 });
 
 function renderModules(userRoles) {
     const container = document.getElementById('moduleCards');
+    if (!container) return; // Prevent crash if container is missing
     
-    // --- Keep your existing allModules object exactly as it is ---
     const allModules = {
         patient: [ 
             { title: '📅 My Appointments', desc: 'Book and view visits', link: 'pages/appointments.html' },
@@ -108,4 +124,3 @@ function renderModules(userRoles) {
         `;
     }).join('');
 }
-// --- END DASHBOARD LOGIC ---
