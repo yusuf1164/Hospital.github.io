@@ -7,49 +7,83 @@ auth.onAuthStateChanged((user) => {
         const data = doc.data();
         let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
         
-        // Check if elements exist before updating them
         const nameEl = document.getElementById('userName');
         const roleEl = document.getElementById('userRole');
         if (nameEl) nameEl.textContent = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
         if (roleEl) roleEl.textContent = userRoles.join(', ');
 
-        // Load Admin Stats if they are an Admin
         const statsContainer = document.getElementById('adminStatsContainer');
         if (statsContainer && userRoles.includes('admin')) {
             statsContainer.style.display = 'block';
             
-            // Wrap database calls in catch blocks just in case
+            // 1. Total Patients
             db.collection('patients').get().then(snap => {
                 const el = document.getElementById('statPatients');
                 if (el) el.innerText = snap.size;
             }).catch(e => console.log(e));
 
+            // 2. Ongoing Treatment (patients where treatmentStatus == 'Ongoing' OR missing)
+            db.collection('patients').get().then(snap => {
+                let ongoingCount = 0;
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    if (d.treatmentStatus !== 'Treated') ongoingCount++;
+                });
+                const el = document.getElementById('statOngoing');
+                if (el) el.innerText = ongoingCount;
+            });
+
+            // 3. Treated Patients
+            db.collection('patients').get().then(snap => {
+                let treatedCount = 0;
+                snap.forEach(doc => {
+                    if (doc.data().treatmentStatus === 'Treated') treatedCount++;
+                });
+                const el = document.getElementById('statTreated');
+                if (el) el.innerText = treatedCount;
+            });
+
+            // 4. Active Emergencies
             db.collection('emergencies').where('status', '==', 'Active').get().then(snap => {
                 const el = document.getElementById('statEmergency');
                 if (el) el.innerText = snap.size;
             }).catch(e => console.log(e));
 
+            // 5. Total Rooms
             db.collection('rooms').get().then(snap => {
                 const el = document.getElementById('statRooms');
                 if (el) el.innerText = snap.size;
             }).catch(e => console.log(e));
             
+            // 6. Total Staff
             db.collection('users').get().then(snap => {
                 let staffCount = 0;
                 snap.forEach(u => { if(u.data().staffId) staffCount++; });
                 const el = document.getElementById('statStaff');
                 if (el) el.innerText = staffCount;
             }).catch(e => console.log(e));
+
+            // 7. Total Revenue
+            db.collection('bills').get().then(snap => {
+                let revenue = 0;
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    if (d.status === 'Paid') {
+                        revenue += Number(d.amount);
+                    }
+                });
+                const el = document.getElementById('statRevenue');
+                if (el) el.innerText = '₦' + revenue.toLocaleString();
+            }).catch(e => console.log(e));
         }
 
-        // Render Modules
         renderModules(userRoles);
     });
 });
 
 function renderModules(userRoles) {
     const container = document.getElementById('moduleCards');
-    if (!container) return; // Prevent crash if container is missing
+    if (!container) return; 
     
     const allModules = {
         patient: [ 
