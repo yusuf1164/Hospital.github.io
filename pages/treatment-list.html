@@ -29,11 +29,12 @@
                         <th>Patient ID</th>
                         <th>Patient Name</th>
                         <th>Status</th>
+                        <th>Date Registered</th>
                         <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="treatmentTableBody">
-                    <tr><td colspan="4" style="text-align:center; color:#888;">Loading patients...</td></tr>
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading patients...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -116,22 +117,29 @@
 
                 tbody.innerHTML = '';
                 filtered.forEach(p => {
-                    const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
-                    const btnText = p.treatmentStatus === 'Treated' ? 'Mark Ongoing' : 'Mark Treated';
-                    const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
-                    const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
+    const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
+    const btnText = p.treatmentStatus === 'Treated' ? 'Mark Ongoing' : 'Mark Treated';
+    const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
+    const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
 
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${p.patientId}</strong></td>
-                            <td><strong>${p.firstName} ${p.lastName}</strong></td>
-                            <td><span class="status-badge ${badgeClass}">${p.treatmentStatus}</span></td>
-                            <td>
-                                <button class="btn ${btnColor}" style="padding: 5px 10px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
-                            </td>
-                        </tr>
-                    `;
-                });
+    // NEW DATE FORMAT
+    const date = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', hour12: true 
+    }) : 'N/A';
+
+    tbody.innerHTML += `
+        <tr>
+            <td><strong style="color:#2563eb;">${p.patientId}</strong></td>
+            <td><strong>${p.firstName} ${p.lastName}</strong></td>
+            <td><span class="status-badge ${badgeClass}">${p.treatmentStatus}</span></td>
+            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
+            <td>
+                <button class="btn ${btnColor}" style="padding: 5px 10px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
+            </td>
+        </tr>
+    `;
+});
             }
 
             window.toggleStatus = function(docId, currentStatus) {
