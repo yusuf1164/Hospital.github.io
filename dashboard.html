@@ -1,16 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - DEEN Hospital</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-    <header id="header-placeholder"></header>
-    <main>
-        <div class="dashboard-container">
-            <!-- Add this right below <div class="dashboard-container"> and before <h1> -->
+<!-- Add this right below <div class="dashboard-container"> and before <h1> -->
 <div id="adminStatsContainer" style="display: none; margin-bottom: 30px;">
     <h3 style="color: #1e3a8a; margin-bottom: 15px;">Hospital Overview</h3>
     <div class="stats-grid">
@@ -32,17 +20,3 @@
         </div>
     </div>
 </div>
-            <h1>Welcome, <span id="userName">Loading...</span></h1>
-            <p>Role: <span id="userRole" style="text-transform:capitalize; font-weight:bold; color:#2563eb;">...</span></p>
-            <h3 style="color:#1e3a8a; margin-top:30px;">Your Modules</h3>
-            <div class="dashboard-cards" id="moduleCards"></div>
-        </div>
-    </main>
-    <footer id="footer-placeholder"></footer>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="script.js"></script>
-    <script src="js/dashboard.js"></script>
-</body>
-</html>
