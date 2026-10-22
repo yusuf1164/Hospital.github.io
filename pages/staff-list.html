@@ -84,19 +84,26 @@
                 }
                 tbody.innerHTML = '';
                 staffList.forEach(u => {
-                    const roles = u.roles && u.roles.length > 0 ? u.roles.join(', ') : '<span style="color:#dc2626;">None Assigned</span>';
-                    const shifts = u.assignedShifts && u.assignedShifts.length > 0 ? u.assignedShifts.join(', ') : 'None';
-                    
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${u.staffId}</strong></td>
-                            <td><strong>${u.firstName} ${u.lastName}</strong></td>
-                            <td>${u.email}</td>
-                            <td style="text-transform: capitalize;">${roles}</td>
-                            <td>${shifts}</td>
-                        </tr>
-                    `;
-                });
+    const roles = u.roles && u.roles.length > 0 ? u.roles.join(', ') : '<span style="color:#dc2626;">None Assigned</span>';
+    const shifts = u.assignedShifts && u.assignedShifts.length > 0 ? u.assignedShifts.join(', ') : 'None';
+    
+    // NEW DATE FORMAT
+    const date = u.createdAt ? u.createdAt.toDate().toLocaleString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', hour12: true 
+    }) : 'N/A';
+    
+    tbody.innerHTML += `
+        <tr>
+            <td><strong style="color:#2563eb;">${u.staffId}</strong></td>
+            <td><strong>${u.firstName} ${u.lastName}</strong></td>
+            <td>${u.email}</td>
+            <td style="text-transform: capitalize;">${roles}</td>
+            <td>${shifts}</td>
+            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
+        </tr>
+    `;
+});
             }
         });
         // --- END STAFF LIST LOGIC ---
