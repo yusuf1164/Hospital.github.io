@@ -1,3 +1,4 @@
+// --- START DASHBOARD LOGIC ---
 auth.onAuthStateChanged((user) => {
     if (!user) { window.location.href = '../login.html'; return; }
 
@@ -10,6 +11,22 @@ auth.onAuthStateChanged((user) => {
         document.getElementById('userName').textContent = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
         document.getElementById('userRole').textContent = userRoles.join(', ');
 
+        // 1. Load Admin Stats if they are an Admin
+        if (userRoles.includes('admin')) {
+            document.getElementById('adminStatsContainer').style.display = 'block';
+            
+            db.collection('patients').get().then(snap => document.getElementById('statPatients').innerText = snap.size);
+            db.collection('emergencies').where('status', '==', 'Active').get().then(snap => document.getElementById('statEmergency').innerText = snap.size);
+            db.collection('rooms').get().then(snap => document.getElementById('statRooms').innerText = snap.size);
+            
+            db.collection('users').get().then(snap => {
+                let staffCount = 0;
+                snap.forEach(u => { if(u.data().staffId) staffCount++; });
+                document.getElementById('statStaff').innerText = staffCount;
+            });
+        }
+
+        // 2. Render Modules
         renderModules(userRoles);
     });
 });
@@ -17,6 +34,7 @@ auth.onAuthStateChanged((user) => {
 function renderModules(userRoles) {
     const container = document.getElementById('moduleCards');
     
+    // --- Keep your existing allModules object exactly as it is ---
     const allModules = {
         patient: [ 
             { title: '📅 My Appointments', desc: 'Book and view visits', link: 'pages/appointments.html' },
@@ -24,9 +42,7 @@ function renderModules(userRoles) {
             { title: '💳 My Bills', desc: 'View invoices and payments', link: 'pages/my-bills.html' },
             { title: '🔗 Link Hospital Record', desc: 'Connect a new Patient ID', link: 'pages/link-record.html' }
         ],
-        appointments: [
-            { title: '📅 Manage Appointments', desc: 'Confirm or cancel patient bookings', link: 'pages/appointments.html' }
-        ],
+        appointments: [ { title: '📅 Manage Appointments', desc: 'Confirm or cancel patient bookings', link: 'pages/appointments.html' } ],
         doctor: [ 
             { title: '🩺 OPD (Consultations)', desc: 'See patients & prescribe', link: 'pages/opd.html' },
             { title: '📅 Appointments', desc: 'View schedule', link: 'pages/appointments.html' },
@@ -73,13 +89,10 @@ function renderModules(userRoles) {
 
     if (finalModules.length === 0) finalModules = allModules.patient;
 
-    // Remove duplicates based on link
     const uniqueModules = Array.from(new Set(finalModules.map(m => m.link)))
         .map(link => finalModules.find(m => m.link === link));
 
-    // Generate the new HTML card structure
     container.innerHTML = uniqueModules.map(m => {
-        // Split the emoji from the title (e.g., "🩺 OPD" becomes emoji="🩺", text="OPD")
         const parts = m.title.split(' ');
         const emoji = parts[0];
         const text = parts.slice(1).join(' ');
@@ -88,13 +101,11 @@ function renderModules(userRoles) {
             <a href="${m.link}" class="dash-card" style="text-decoration:none; color:inherit;">
                 <div class="dash-card-content">
                     <div class="dash-icon">${emoji}</div>
-                    <div class="dash-text">
-                        <h3>${text}</h3>
-                        <p>${m.desc}</p>
-                    </div>
+                    <div class="dash-text"><h3>${text}</h3><p>${m.desc}</p></div>
                 </div>
                 <div class="dash-arrow">➔</div>
             </a>
         `;
     }).join('');
 }
+// --- END DASHBOARD LOGIC ---
