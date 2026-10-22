@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff List - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>👔 Staff Directory</h1>
+                <p>View all hospital staff members and their roles.</p>
+            </div>
+
+            <input type="text" id="searchStaff" placeholder="Search by Name or Staff ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Staff ID</th>
+                        <th>Staff Name</th>
+                        <th>Email</th>
+                        <th>Roles / Departments</th>
+                        <th>Assigned Shifts</th>
+                    </tr>
+                </thead>
+                <tbody id="staffTableBody">
+                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading staff...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        // --- START STAFF LIST LOGIC ---
+        enforceAuth(['admin', 'hr']);
+        let allStaff = [];
+
+        auth.onAuthStateChanged((user) => {
+            if (!user) return;
+
+            const tbody = document.getElementById('staffTableBody');
+            const searchInput = document.getElementById('searchStaff');
+
+            db.collection('users').onSnapshot(snapshot => {
+                allStaff = [];
+                snapshot.forEach(doc => {
+                    const u = doc.data();
+                    if (u.staffId) { // Only staff have a staffId
+                        allStaff.push(u);
+                    }
+                });
+
+                // Sort by Staff ID
+                allStaff.sort((a, b) => String(a.staffId).localeCompare(String(b.staffId)));
+                renderTable(allStaff);
+            });
+
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                const filtered = allStaff.filter(u => {
+                    const name = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
+                    const id = String(u.staffId).toLowerCase();
+                    return name.includes(term) || id.includes(term);
+                });
+                renderTable(filtered);
+            });
+
+            function renderTable(staffList) {
+                if (staffList.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No staff found.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = '';
+                staffList.forEach(u => {
+                    const roles = u.roles && u.roles.length > 0 ? u.roles.join(', ') : '<span style="color:#dc2626;">None Assigned</span>';
+                    const shifts = u.assignedShifts && u.assignedShifts.length > 0 ? u.assignedShifts.join(', ') : 'None';
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong style="color:#2563eb;">${u.staffId}</strong></td>
+                            <td><strong>${u.firstName} ${u.lastName}</strong></td>
+                            <td>${u.email}</td>
+                            <td style="text-transform: capitalize;">${roles}</td>
+                            <td>${shifts}</td>
+                        </tr>
+                    `;
+                });
+            }
+        });
+        // --- END STAFF LIST LOGIC ---
+    </script>
+</body>
+</html>
