@@ -54,8 +54,15 @@
                 </form>
             </div>
 
-            <!-- Active Emergency Queue -->
-            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Active Emergency Cases</h3>
+            <!-- Filter Buttons -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn btn-primary filter-btn" data-filter="Active" style="flex: 1; background-color: #dc2626;">Active Cases</button>
+                <button class="btn btn-outline filter-btn" data-filter="Treated" style="flex: 1; border-color: #065f46; color: #065f46;">Treated Cases</button>
+                <button class="btn btn-outline filter-btn" data-filter="All" style="flex: 1; border-color: #1e3a8a; color: #1e3a8a;">All Cases</button>
+            </div>
+
+            <!-- Emergency Cases Table -->
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Emergency Records</h3>
             <table>
                 <thead>
                     <tr>
@@ -82,8 +89,10 @@
     <script src="../script.js"></script>
 
     <script>
-        // Only authorized staff can access Emergency
+        // --- START EMERGENCY LOGIC ---
         enforceAuth(['admin', 'doctor', 'nurse', 'reception']);
+        let allEmergencies = [];
+        let currentFilter = 'Active'; // Default filter
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
@@ -91,34 +100,76 @@
             const tbody = document.getElementById('emergencyTableBody');
             const form = document.getElementById('emergencyForm');
 
-            // 1. Load Emergency Cases (Filtered to only show "Active" cases)
+            // Load all emergency cases
             db.collection('emergencies').onSnapshot((snapshot) => {
-                let activeCases = [];
+                allEmergencies = [];
                 snapshot.forEach(doc => {
-                    const d = doc.data();
-                    if (d.status === 'Active') {
-                        activeCases.push({ id: doc.id, ...d });
-                    }
+                    allEmergencies.push({ id: doc.id, ...doc.data() });
                 });
 
                 // Sort newest first
-                activeCases.sort((a, b) => {
+                allEmergencies.sort((a, b) => {
                     const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                     const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                     return timeB - timeA;
                 });
 
-                if (activeCases.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No active emergency cases.</td></tr>`;
+                applyFilter(currentFilter);
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+            });
+
+            // Filter Button Logic
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                // Set initial styles
+                if (btn.getAttribute('data-filter') === currentFilter) {
+                    btn.className = 'btn btn-primary filter-btn';
+                    if (currentFilter === 'Active') btn.style.cssText = 'flex: 1; background-color: #dc2626;';
+                }
+
+                btn.addEventListener('click', (e) => {
+                    currentFilter = e.target.getAttribute('data-filter');
+                    
+                    // Reset all buttons
+                    document.querySelectorAll('.filter-btn').forEach(b => {
+                        b.className = 'btn btn-outline filter-btn';
+                        b.style.cssText = 'flex: 1;';
+                        if (b.getAttribute('data-filter') === 'Active') b.style.cssText = 'flex: 1; border-color: #dc2626; color: #dc2626;';
+                        if (b.getAttribute('data-filter') === 'Treated') b.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
+                        if (b.getAttribute('data-filter') === 'All') b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
+                    });
+                    
+                    // Highlight clicked
+                    e.target.className = 'btn btn-primary filter-btn';
+                    e.target.style.cssText = 'flex: 1;';
+                    if (currentFilter === 'Active') e.target.style.backgroundColor = '#dc2626';
+
+                    applyFilter(currentFilter);
+                });
+            });
+
+            function applyFilter(filter) {
+                let filtered = allEmergencies;
+                if (filter !== 'All') {
+                    filtered = allEmergencies.filter(e => e.status === filter);
+                }
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No ${filter} emergency cases found.</td></tr>`;
                     return;
                 }
 
                 tbody.innerHTML = '';
-                activeCases.forEach(d => {
+                filtered.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
                         year: 'numeric', month: 'short', day: 'numeric', 
                         hour: '2-digit', minute: '2-digit', hour12: true 
                     }) : 'Just now';
+
+                    const badgeClass = d.status === 'Treated' ? 'status-complete' : 'status-pending';
+                    const actionHtml = d.status === 'Active' 
+                        ? `<button class="btn btn-primary" onclick="resolveEmergency('${d.id}', '${d.firstName} ${d.lastName}', '${d.patientId}')">Mark Treated</button>`
+                        : `<span style="color:#065f46; font-weight:bold;">Completed</span>`;
 
                     tbody.innerHTML += `
                         <tr>
@@ -127,16 +178,14 @@
                             <td>${d.age} / ${d.gender}</td>
                             <td style="color: #dc2626; font-weight: bold;">${d.triage}</td>
                             <td><small>${date}</small></td>
-                            <td><span class="status-badge status-pending">Active</span></td>
-                            <td><button class="btn btn-primary" onclick="resolveEmergency('${d.id}', '${d.firstName} ${d.lastName}', '${d.patientId}')">Mark Treated</button></td>
+                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                            <td>${actionHtml}</td>
                         </tr>
                     `;
                 });
-            }, error => {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
-            });
+            }
 
-            // 2. Handle Fast-Track Registration
+            // Handle Fast-Track Registration
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('submitBtn');
@@ -150,7 +199,6 @@
                 const triage = document.getElementById('triage').value;
 
                 try {
-                    // Generate Sequential Patient ID (P0001) using the same counter as Reception
                     const counterRef = db.collection('settings').doc('counters');
                     let generatedPatientId = "";
 
@@ -170,6 +218,7 @@
                         firstName: firstName, lastName: lastName, age: age, gender: gender, phone: phone,
                         address: "Emergency Intake",
                         registeredBy: user.uid,
+                        treatmentStatus: 'Ongoing', // Default status
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
@@ -181,7 +230,6 @@
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // 3. Log Activity
                     logActivity(auth.currentUser, "Emergency Intake", `Patient ID: ${generatedPatientId}, Reason: ${triage}`);
 
                     alert(`✅ Emergency Patient Registered!\n\nPatient ID: ${generatedPatientId}\nName: ${firstName} ${lastName}`);
@@ -195,7 +243,7 @@
                 }
             });
 
-            // 3. Mark Emergency as Treated
+            // Mark Emergency as Treated
             window.resolveEmergency = function(docId, patientName, patientId) {
                 if (confirm(`Has ${patientName} (${patientId}) been successfully treated/discharged from Emergency?`)) {
                     db.collection('emergencies').doc(docId).update({ status: 'Treated' })
@@ -207,6 +255,7 @@
                 }
             };
         });
+        // --- END EMERGENCY LOGIC ---
     </script>
 </body>
 </html>
