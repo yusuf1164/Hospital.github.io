@@ -10,6 +10,28 @@
     <header id="header-placeholder"></header>
     <main>
         <div class="dashboard-container">
+            <!-- Add this right below <div class="dashboard-container"> and before <h1> -->
+<div id="adminStatsContainer" style="display: none; margin-bottom: 30px;">
+    <h3 style="color: #1e3a8a; margin-bottom: 15px;">Hospital Overview</h3>
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-info"><h4>Total Patients</h4><p id="statPatients">0</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">👔</div>
+            <div class="stat-info"><h4>Total Staff</h4><p id="statStaff">0</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🚨</div>
+            <div class="stat-info"><h4>Active Emergencies</h4><p id="statEmergency">0</p></div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon">🛏️</div>
+            <div class="stat-info"><h4>Total Rooms</h4><p id="statRooms">0</p></div>
+        </div>
+    </div>
+</div>
             <h1>Welcome, <span id="userName">Loading...</span></h1>
             <p>Role: <span id="userRole" style="text-transform:capitalize; font-weight:bold; color:#2563eb;">...</span></p>
             <h3 style="color:#1e3a8a; margin-top:30px;">Your Modules</h3>
