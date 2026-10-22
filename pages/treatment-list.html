@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Treatment Status - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>🏥 Patient Treatment Status</h1>
+                <p>View and manage ongoing and treated patients.</p>
+            </div>
+
+            <!-- Filter Buttons -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button class="btn btn-primary filter-btn" data-filter="All" style="flex: 1;">All Patients</button>
+                <button class="btn btn-outline filter-btn" data-filter="Ongoing" style="flex: 1; border-color: #1e3a8a; color: #1e3a8a;">Ongoing</button>
+                <button class="btn btn-outline filter-btn" data-filter="Treated" style="flex: 1; border-color: #065f46; color: #065f46;">Treated</button>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Patient Name</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody id="treatmentTableBody">
+                    <tr><td colspan="4" style="text-align:center; color:#888;">Loading patients...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <footer id="footer-placeholder"></footer>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        // --- START TREATMENT LIST LOGIC ---
+        enforceAuth(['admin', 'doctor', 'nurse', 'reception', 'records']);
+        let allPatients = [];
+        let currentFilter = 'All';
+
+        // Check URL parameters (e.g., ?status=Ongoing)
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.has('status')) {
+            currentFilter = urlParams.get('status');
+        }
+
+        auth.onAuthStateChanged((user) => {
+            if (!user) return;
+
+            const tbody = document.getElementById('treatmentTableBody');
+
+            // Load Patients
+            db.collection('patients').onSnapshot(snapshot => {
+                allPatients = [];
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    // If no status exists, assume it's ongoing
+                    if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing'; 
+                    allPatients.push({ id: doc.id, ...d });
+                });
+                applyFilter(currentFilter);
+            });
+
+            // Filter Button Logic
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                // Highlight the active filter button
+                if (btn.getAttribute('data-filter') === currentFilter) {
+                    btn.className = 'btn btn-primary filter-btn';
+                } else {
+                    btn.className = 'btn btn-outline filter-btn';
+                    if (btn.getAttribute('data-filter') === 'Ongoing') btn.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
+                    if (btn.getAttribute('data-filter') === 'Treated') btn.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
+                }
+
+                btn.addEventListener('click', (e) => {
+                    currentFilter = e.target.getAttribute('data-filter');
+                    window.history.pushState({}, '', `?status=${currentFilter}`);
+                    applyFilter(currentFilter);
+                    
+                    // Reset button styles
+                    document.querySelectorAll('.filter-btn').forEach(b => {
+                        b.className = 'btn btn-outline filter-btn';
+                        if (b.getAttribute('data-filter') === 'Ongoing') b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
+                        if (b.getAttribute('data-filter') === 'Treated') b.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
+                    });
+                    // Highlight clicked
+                    e.target.className = 'btn btn-primary filter-btn';
+                    e.target.style.cssText = 'flex: 1;';
+                });
+            });
+
+            function applyFilter(filter) {
+                let filtered = allPatients;
+                if (filter !== 'All') {
+                    filtered = allPatients.filter(p => p.treatmentStatus === filter);
+                }
+
+                if (filtered.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No ${filter} patients found.</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                filtered.forEach(p => {
+                    const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
+                    const btnText = p.treatmentStatus === 'Treated' ? 'Mark Ongoing' : 'Mark Treated';
+                    const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
+                    const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
+
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong style="color:#2563eb;">${p.patientId}</strong></td>
+                            <td><strong>${p.firstName} ${p.lastName}</strong></td>
+                            <td><span class="status-badge ${badgeClass}">${p.treatmentStatus}</span></td>
+                            <td>
+                                <button class="btn ${btnColor}" style="padding: 5px 10px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            }
+
+            window.toggleStatus = function(docId, currentStatus) {
+                const newStatus = currentStatus === 'Treated' ? 'Ongoing' : 'Treated';
+                if(confirm(`Change patient status to ${newStatus}?`)) {
+                    db.collection('patients').doc(docId).update({ treatmentStatus: newStatus })
+                    .then(() => {
+                        logActivity(auth.currentUser, "Updated Treatment Status", `Patient set to ${newStatus}`);
+                    }).catch(err => alert("Error: " + err.message));
+                }
+            };
+        });
+        // --- END TREATMENT LIST LOGIC ---
+    </script>
+</body>
+</html>
