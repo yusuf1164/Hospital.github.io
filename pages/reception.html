@@ -132,6 +132,7 @@
                         email: email,
                         address: address,
                         registeredBy: user.uid,
+                        treatmentStatus: 'Ongoing',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
                 }).then(() => {
