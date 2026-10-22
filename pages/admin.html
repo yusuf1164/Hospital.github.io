@@ -26,19 +26,25 @@
                 <h1>👔 Admin / HR Panel</h1>
                 <p>Manage staff access and hospital services.</p>
             </div>
+
+            <!-- 1. Staff Access Management -->
             <div class="form-card">
                 <h3>1. Staff Access Management</h3>
                 <button id="fixIdsBtn" class="btn btn-outline" style="margin-bottom: 15px; border-color: #1e3a8a; color: #1e3a8a; font-weight: bold; width: 100%;">⚙️ Generate Missing Staff IDs</button>
+                
                 <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
                 <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
                     <option value="">Select a staff member...</option>
                 </select>
+                
                 <div id="rolesSection" style="display: none; margin-top: 20px;">
                     <div class="role-grid" id="roleCheckboxes"></div>
                     <button id="saveRolesBtn" class="btn-submit" style="margin-top: 20px; max-width: 250px;">Save User Access</button>
                     <div id="msgBox" style="margin-top: 15px; font-weight: bold;"></div>
                 </div>
             </div>
+
+            <!-- 2. Service Management -->
             <div class="form-card" style="border-left: 4px solid #2563eb;">
                 <h3>2. Manage Lab Tests & Radiology Scans</h3>
                 <form id="serviceForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
@@ -66,6 +72,8 @@
                     </div>
                 </div>
             </div>
+
+            <!-- 3. Appointment Types -->
             <div class="form-card" style="border-left: 4px solid #10b981;">
                 <h3>3. Manage Appointment Types</h3>
                 <form id="apptTypeForm" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 20px;">
@@ -77,9 +85,33 @@
                 </form>
                 <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
             </div>
+
+            <!-- 4. Shift Management -->
+            <div class="form-card" style="border-left: 4px solid #8b5cf6;">
+                <h3>4. Hospital Shifts & Staff Assignment</h3>
+                
+                <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Global Shift Configuration</h4>
+                    <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Check the shifts your hospital operates.</p>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <label><input type="checkbox" class="global-shift" value="Morning"> Morning</label>
+                        <label><input type="checkbox" class="global-shift" value="Afternoon"> Afternoon</label>
+                        <label><input type="checkbox" class="global-shift" value="Night"> Night</label>
+                    </div>
+                    <button id="saveGlobalShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Global Shifts</button>
+                </div>
+
+                <div id="staffShiftSection" style="display: none; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Assign Shifts to <span id="shiftStaffName" style="color: #2563eb;"></span></h4>
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap;" id="staffShiftCheckboxes"></div>
+                    <button id="saveStaffShiftsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px;">Save Staff Shifts</button>
+                </div>
+            </div>
+
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -89,13 +121,17 @@
         enforceAuth(['admin', 'hr']);
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
+        let activeGlobalShifts = [];
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
+
+            // --- USER MANAGEMENT LOGIC ---
             const searchInput = document.getElementById('searchUser');
             const userSelect = document.getElementById('userSelect');
             const rolesSection = document.getElementById('rolesSection');
             const roleCheckboxes = document.getElementById('roleCheckboxes');
+            const staffShiftSection = document.getElementById('staffShiftSection');
 
             db.collection('users').get().then((snapshot) => {
                 snapshot.forEach(doc => {
@@ -105,31 +141,21 @@
                 populateDropdown(allUsers);
             });
 
-            document.getElementById('fixIdsBtn').addEventListener('click', () => {
-                if(!confirm("This will scan all users and assign a Staff ID to anyone missing one. Proceed?")) return;
-                db.collection('users').get().then(snapshot => {
-                    let usersToFix = [];
-                    snapshot.forEach(doc => {
-                        const u = doc.data();
-                        if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) usersToFix.push(doc.id);
+            // Load Global Shifts
+            db.collection('settings').doc('shifts').get().then(doc => {
+                if (doc.exists) {
+                    activeGlobalShifts = doc.data().activeShifts || [];
+                    activeGlobalShifts.forEach(shift => {
+                        document.querySelector(`.global-shift[value="${shift}"]`).checked = true;
                     });
-                    if (usersToFix.length === 0) { alert("All staff members already have IDs!"); return; }
-                    const counterRef = db.collection('settings').doc('counters');
-                    let promises = usersToFix.map(uid => {
-                        return db.runTransaction(transaction => {
-                            return transaction.get(counterRef).then(doc => {
-                                let nextId = 1002;
-                                if (doc.exists && doc.data().lastStaffId) nextId = doc.data().lastStaffId + 1;
-                                transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
-                                return db.collection('users').doc(uid).update({ staffId: String(nextId) });
-                            });
-                        });
-                    });
-                    Promise.all(promises).then(() => {
-                        alert(`Successfully generated IDs for ${usersToFix.length} staff members! Please refresh.`);
-                        window.location.reload();
-                    }).catch(err => alert("Error: " + err.message));
-                });
+                }
+            });
+
+            document.getElementById('saveGlobalShiftsBtn').addEventListener('click', () => {
+                const checked = [];
+                document.querySelectorAll('.global-shift:checked').forEach(cb => checked.push(cb.value));
+                db.collection('settings').doc('shifts').set({ activeShifts: checked }, { merge: true })
+                .then(() => { alert('Global shifts saved!'); window.location.reload(); });
             });
 
             roleCheckboxes.innerHTML = departments.map(dept => `
@@ -160,10 +186,18 @@
 
             userSelect.addEventListener('change', (e) => {
                 const selectedId = e.target.value;
-                if (!selectedId) { rolesSection.style.display = 'none'; return; }
+                if (!selectedId) { 
+                    rolesSection.style.display = 'none'; 
+                    staffShiftSection.style.display = 'none';
+                    return; 
+                }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
+                
                 const selectedUser = allUsers.find(u => u.id === selectedId);
+                document.getElementById('shiftStaffName').textContent = `${selectedUser.firstName} ${selectedUser.lastName}`;
+                
+                // Load Roles
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
@@ -171,6 +205,17 @@
                         if (box) box.checked = true;
                     });
                 }
+
+                // Load Staff Shifts
+                staffShiftSection.style.display = 'block';
+                const shiftContainer = document.getElementById('staffShiftCheckboxes');
+                shiftContainer.innerHTML = '';
+                const assignedShifts = selectedUser.assignedShifts || [];
+                
+                activeGlobalShifts.forEach(shift => {
+                    const isChecked = assignedShifts.includes(shift) ? 'checked' : '';
+                    shiftContainer.innerHTML += `<label><input type="checkbox" class="staff-shift" value="${shift}" ${isChecked}> ${shift}</label>`;
+                });
             });
 
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
@@ -185,12 +230,22 @@
                     msg.style.color = 'green'; msg.textContent = 'Access updated successfully!';
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].roles = newRoles;
-                }).catch(err => {
-                    const msg = document.getElementById('msgBox');
-                    msg.style.color = 'red'; msg.textContent = 'Error: ' + err.message;
-                });
+                }).catch(err => { document.getElementById('msgBox').textContent = 'Error: ' + err.message; });
             });
 
+            document.getElementById('saveStaffShiftsBtn').addEventListener('click', () => {
+                const selectedId = userSelect.value;
+                if (!selectedId) return;
+                const checkedShifts = [];
+                document.querySelectorAll('.staff-shift:checked').forEach(cb => checkedShifts.push(cb.value));
+                db.collection('users').doc(selectedId).update({ assignedShifts: checkedShifts }).then(() => {
+                    alert('Staff shifts updated successfully!');
+                    const uIndex = allUsers.findIndex(u => u.id === selectedId);
+                    if(uIndex > -1) allUsers[uIndex].assignedShifts = checkedShifts;
+                }).catch(err => alert("Error: " + err.message));
+            });
+
+            // --- SERVICE MANAGEMENT ---
             const labList = document.getElementById('labTestsList');
             const radList = document.getElementById('radiologyScansList');
             const apptList = document.getElementById('apptTypesList');
@@ -213,15 +268,15 @@
                 const name = document.getElementById('serviceName').value;
                 const type = document.getElementById('serviceType').value;
                 db.collection(type).add({ name: name }).then(() => {
-                    alert('Service added successfully!'); document.getElementById('serviceForm').reset();
-                }).catch(err => alert("Error: " + err.message));
+                    alert('Service added!'); document.getElementById('serviceForm').reset();
+                });
             });
             document.getElementById('apptTypeForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = document.getElementById('apptTypeName').value;
                 db.collection('appointmentTypes').add({ name: name }).then(() => {
-                    alert('Appointment type added successfully!'); document.getElementById('apptTypeForm').reset();
-                }).catch(err => alert("Error: " + err.message));
+                    alert('Appointment type added!'); document.getElementById('apptTypeForm').reset();
+                });
             });
             window.deleteService = function(collection, id) {
                 if(confirm("Delete this item?")) db.collection(collection).doc(id).delete();
