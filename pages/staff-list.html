@@ -26,10 +26,11 @@
                         <th>Email</th>
                         <th>Roles / Departments</th>
                         <th>Assigned Shifts</th>
+                        <th>Date Registered</th>
                     </tr>
                 </thead>
                 <tbody id="staffTableBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading staff...</td></tr>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading staff...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -100,7 +101,7 @@
             <td>${u.email}</td>
             <td style="text-transform: capitalize;">${roles}</td>
             <td>${shifts}</td>
-            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
+            <td><small>${date}</small></td>
         </tr>
     `;
 });
