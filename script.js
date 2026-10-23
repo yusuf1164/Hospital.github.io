@@ -157,7 +157,6 @@ function updateAuthUI() {
 // ==========================================
 // --- START FORMS ---
 function initForms() {
-    
     // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
@@ -180,7 +179,7 @@ function initForms() {
         });
     }
 
-    // --- REGISTER FORM ---
+    // --- STAFF REGISTER FORM ---
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
@@ -188,6 +187,8 @@ function initForms() {
             
             const firstName = document.getElementById('firstname').value;
             const lastName = document.getElementById('lastname').value;
+            const gender = document.getElementById('gender').value;
+            const dob = document.getElementById('dob').value;
             const email = document.getElementById('email').value;
             const phone = document.getElementById('phone').value;
             const password = document.getElementById('password').value;
@@ -203,6 +204,12 @@ function initForms() {
             }
             passwordError.style.display = 'none';
             
+            // Calculate Age automatically
+            const birthDate = new Date(dob);
+            const difference = Date.now() - birthDate.getTime();
+            const ageDate = new Date(difference);
+            const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+
             btn.textContent = 'Creating Account...'; btn.disabled = true;
 
             auth.createUserWithEmailAndPassword(email, password)
@@ -222,6 +229,9 @@ function initForms() {
                         return db.collection('users').doc(cred.user.uid).set({
                             firstName: firstName,
                             lastName: lastName,
+                            gender: gender,
+                            dob: dob,
+                            age: calculatedAge,
                             email: email,
                             phone: phone,
                             staffId: generatedStaffId, 
