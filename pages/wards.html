@@ -25,10 +25,7 @@
     <!-- MODAL: Assign Patient -->
     <div id="assignPatientModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Assign Patient to Bed</h3>
-                <button class="close-btn" onclick="closeModal('assignPatientModal')">Close</button>
-            </div>
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Assign Patient to Bed</h3>
             <input type="hidden" id="modalRoomId">
             <input type="hidden" id="modalBedNo">
             <div class="form-group">
@@ -41,7 +38,7 @@
             </div>
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeModal('assignPatientModal')">Cancel</button>
-                <button class="btn btn-primary" style="flex:1;" onclick="confirmAssignPatient()">Assign</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="confirmAssignPatient()">Assign Patient</button>
             </div>
         </div>
     </div>
@@ -49,10 +46,7 @@
     <!-- MODAL: Manage Nurses -->
     <div id="manageNursesModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Manage Nurses: <span id="nurseModalRoomName"></span></h3>
-                <button class="close-btn" onclick="closeModal('manageNursesModal')">Close</button>
-            </div>
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Manage Nurses: <span id="nurseModalRoomName"></span></h3>
             <input type="hidden" id="nurseModalRoomId">
             
             <div class="form-group" style="margin-bottom: 15px;">
@@ -60,16 +54,15 @@
             </div>
 
             <div id="nurseListContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 300px; overflow-y: auto;"></div>
+            
+            <button class="btn btn-outline" style="width: 100%; margin-top: 20px; border-color: #ccc; color: #333;" onclick="closeModal('manageNursesModal')">Close</button>
         </div>
     </div>
 
     <!-- MODAL: Update Patient Status -->
     <div id="updateStatusModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Update Patient Status</h3>
-                <button class="close-btn" onclick="closeModal('updateStatusModal')">Close</button>
-            </div>
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Update Patient Status</h3>
             <p style="margin-bottom: 15px; font-size: 14px;">Patient: <strong id="statusPatientName"></strong></p>
             <input type="hidden" id="statusRoomId">
             <input type="hidden" id="statusBedNo">
