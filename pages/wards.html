@@ -15,6 +15,11 @@
                 <p>Manage patient admissions, beds, and nurse assignments.</p>
             </div>
             
+            <!-- ROOM SEARCH BAR -->
+            <div style="margin-bottom: 25px;">
+                <input type="text" id="roomSearchInput" placeholder="Search Rooms by Number or Name..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;" oninput="filterRooms()">
+            </div>
+
             <div id="roomGridContainer" class="room-grid">
                 <p style="text-align: center; width: 100%; color: #888;">Loading rooms...</p>
             </div>
@@ -105,19 +110,38 @@
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
                 currentRooms = [];
                 snap.forEach(doc => currentRooms.push({ id: doc.id, ...doc.data() }));
-                renderRooms();
+                renderRooms(); // Re-render whenever data changes
             });
         });
 
+        // --- NEW: ROOM SEARCH FILTER ---
+        window.filterRooms = function() {
+            renderRooms();
+        };
+
         function renderRooms() {
             const container = document.getElementById('roomGridContainer');
+            const searchTerm = document.getElementById('roomSearchInput').value.toLowerCase();
+
+            // Filter based on search
+            const filteredRooms = currentRooms.filter(room => {
+                const rNo = String(room.roomNo).toLowerCase();
+                const rName = String(room.roomName).toLowerCase();
+                return rNo.includes(searchTerm) || rName.includes(searchTerm);
+            });
+
             if (currentRooms.length === 0) {
                 container.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No rooms created yet. Go to Admin Panel to create rooms.</p>';
                 return;
             }
 
+            if (filteredRooms.length === 0) {
+                container.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No rooms found matching your search.</p>';
+                return;
+            }
+
             container.innerHTML = '';
-            currentRooms.forEach(room => {
+            filteredRooms.forEach(room => {
                 let roomDateStr = 'Unknown Date';
                 if (room.createdAt) {
                     roomDateStr = room.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
