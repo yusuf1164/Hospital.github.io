@@ -129,6 +129,9 @@
 
                 <div>
                     <h4 style="color: #1e3a8a; margin-bottom: 10px;">Existing Rooms</h4>
+                    <!-- NEW: SEARCH BAR FOR ROOMS -->
+                    <input type="text" id="searchRoomList" class="search-box" placeholder="Search Rooms by Number or Name..." oninput="filterAdminRooms()" style="border-color: #f59e0b;">
+                    
                     <div id="roomListContainer"></div>
                 </div>
             </div>
@@ -167,8 +170,8 @@
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
         let activeGlobalShifts = [];
+        let globalAdminRooms = []; // Stores rooms for search filtering
 
-        // Modal helper
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
         auth.onAuthStateChanged((user) => {
@@ -425,31 +428,43 @@
             });
 
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
-                if (snap.empty) {
-                    roomListContainer.innerHTML = '<p style="color:#888; font-size:14px;">No rooms created yet.</p>';
+                globalAdminRooms = [];
+                snap.forEach(doc => globalAdminRooms.push({ id: doc.id, ...doc.data() }));
+                filterAdminRooms(); // Call the filter function to render
+            }, error => {
+                console.error("Error loading rooms:", error);
+                roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}</p>`;
+            });
+
+            // --- NEW: FILTER ADMIN ROOMS ---
+            window.filterAdminRooms = function() {
+                const searchTerm = document.getElementById('searchRoomList').value.toLowerCase();
+                
+                const filtered = globalAdminRooms.filter(d => {
+                    return String(d.roomNo).includes(searchTerm) || d.roomName.toLowerCase().includes(searchTerm);
+                });
+
+                if (filtered.length === 0) {
+                    roomListContainer.innerHTML = '<p style="color:#888; font-size:14px;">No rooms match your search.</p>';
                     return;
                 }
-                
+
                 roomListContainer.innerHTML = '';
-                snap.forEach(doc => {
-                    const d = doc.data();
+                filtered.forEach(d => {
                     roomListContainer.innerHTML += `
                         <div class="room-list-item">
                             <div>
                                 <strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)
                             </div>
                             <div style="display:flex; gap:5px;">
-                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${doc.id}', '${d.roomName}', ${d.totalBeds})">Beds</button>
-                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #2563eb; color:#2563eb;" onclick="renameRoom('${doc.id}', '${d.roomName}')">Rename</button>
-                                <button class="delete-btn" onclick="deleteRoom('${doc.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${d.id}', '${d.roomName}', ${d.totalBeds})">Beds</button>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #2563eb; color:#2563eb;" onclick="renameRoom('${d.id}', '${d.roomName}')">Rename</button>
+                                <button class="delete-btn" onclick="deleteRoom('${d.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
                             </div>
                         </div>
                     `;
                 });
-            }, error => {
-                console.error("Error loading rooms:", error);
-                roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}</p>`;
-            });
+            };
 
             window.renameRoom = function(roomId, currentName) {
                 const newName = prompt("Enter new name for the room:", currentName);
@@ -460,7 +475,6 @@
                 }
             };
 
-            // --- UPDATED: EDIT BEDS USING MODAL ---
             window.editBeds = function(roomId, roomName, currentTotalBeds) {
                 document.getElementById('editBedsRoomId').value = roomId;
                 document.getElementById('editBedsRoomName').textContent = roomName;
