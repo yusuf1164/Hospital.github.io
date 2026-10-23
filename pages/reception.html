@@ -1,158 +1,168 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reception - DEEN Hospital</title>
-    <link rel="stylesheet" href="../style.css">
-</head>
-<body>
-    <header id="header-placeholder"></header>
-    <main>
-        <div class="table-container">
-            <div class="page-header">
-                <h1>🧑‍💼 Reception / Front Office</h1>
-                <p>Register new patients and manage the hospital intake.</p>
-            </div>
+<!DOCTYPE html> <!-- Declares HTML5 -->
+<html lang="en"> <!-- Sets language -->
+<head> <!-- Opens head -->
+    <meta charset="UTF-8"> <!-- Sets encoding -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile view -->
+    <title>Reception - DEEN Hospital</title> <!-- Title -->
+    <link rel="stylesheet" href="../style.css"> <!-- Links CSS -->
+</head> <!-- Closes head -->
+<body> <!-- Opens body -->
+    <header id="header-placeholder"></header> <!-- Header placeholder -->
+    <main> <!-- Opens main -->
+        <div class="table-container"> <!-- Container -->
+            <div class="page-header"> <!-- Header section -->
+                <h1>🧑‍💼 Reception / Front Office</h1> <!-- Title -->
+                <p>Register new patients and manage the hospital intake.</p> <!-- Subtitle -->
+            </div> <!-- Closes header -->
 
-            <div class="form-card">
-                <h3>Register New Patient</h3>
-                <form id="receptionForm">
-                    <div class="form-grid">
-                        <div class="form-group"><label>First Name</label><input type="text" id="firstName" required placeholder="John"></div>
-                        <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required placeholder="Doe"></div>
+            <div class="form-card"> <!-- Form card -->
+                <h3>Register New Patient</h3> <!-- Form title -->
+                <form id="receptionForm"> <!-- Opens form -->
+                    <div class="form-grid"> <!-- Grid layout -->
+                        <div class="form-group"><label>First Name</label><input type="text" id="firstName" required placeholder="John"></div> <!-- First name -->
+                        <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required placeholder="Doe"></div> <!-- Last name -->
                         
-                        <!-- CHANGED TO DATE OF BIRTH -->
-                        <div class="form-group"><label>Date of Birth</label><input type="date" id="dob" required></div>
+                        <!-- Date of Birth Field -->
+                        <div class="form-group"> <!-- Groups input -->
+                            <label>Date of Birth</label> <!-- Label -->
+                            <input type="date" id="dob" required> <!-- Date input -->
+                            <!-- DISPLAYS CALCULATED AGE HERE -->
+                            <div id="ageDisplay" style="font-size: 14px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div> <!-- Age display -->
+                        </div> <!-- Closes group -->
                         
-                        <div class="form-group">
-                            <label>Gender</label>
-                            <select id="gender" required>
-                                <option value="">Select...</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div class="form-group"><label>Phone Number</label><input type="tel" id="phone" required placeholder="+1 (555) 000-0000"></div>
-                        <div class="form-group"><label>Email Address (or Parent's Email)</label><input type="email" id="email" placeholder="patient@example.com"></div>
-                        <div class="form-group" style="grid-column: 1 / -1;"><label>Address</label><input type="text" id="address" required placeholder="123 Main St"></div>
-                    </div>
-                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Register Patient</button>
-                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
-                </form>
-            </div>
+                        <div class="form-group"> <!-- Groups gender -->
+                            <label>Gender</label> <!-- Label -->
+                            <select id="gender" required> <!-- Dropdown -->
+                                <option value="">Select...</option> <!-- Default -->
+                                <option value="Male">Male</option> <!-- Male -->
+                                <option value="Female">Female</option> <!-- Female -->
+                                <option value="Other">Other</option> <!-- Other -->
+                            </select> <!-- Closes dropdown -->
+                        </div> <!-- Closes group -->
+                        <div class="form-group"><label>Phone Number</label><input type="tel" id="phone" required placeholder="+1 (555) 000-0000"></div> <!-- Phone -->
+                        <div class="form-group"><label>Email Address</label><input type="email" id="email" placeholder="patient@example.com"></div> <!-- Email -->
+                        <div class="form-group" style="grid-column: 1 / -1;"><label>Address</label><input type="text" id="address" required placeholder="123 Main St"></div> <!-- Address -->
+                    </div> <!-- Closes grid -->
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Register Patient</button> <!-- Submit button -->
+                    <div id="formError" class="error-message" style="margin-top: 10px;"></div> <!-- Error div -->
+                </form> <!-- Closes form -->
+            </div> <!-- Closes card -->
 
-            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Registrations</h3>
-            <table>
-                <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>Date</th></tr></thead>
-                <tbody id="receptionTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </main>
-    <footer id="footer-placeholder"></footer>
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Registrations</h3> <!-- Table title -->
+            <table> <!-- Opens table -->
+                <thead> <!-- Header -->
+                    <tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>Date</th></tr> <!-- Columns -->
+                </thead> <!-- Closes header -->
+                <tbody id="receptionTableBody"> <!-- Body -->
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr> <!-- Loading state -->
+                </tbody> <!-- Closes body -->
+            </table> <!-- Closes table -->
+        </div> <!-- Closes container -->
+    </main> <!-- Closes main -->
+    <footer id="footer-placeholder"></footer> <!-- Footer placeholder -->
 
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="../script.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script> <!-- Firebase App -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script> <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> <!-- Firebase Firestore -->
+    <script src="../script.js"></script> <!-- Main Script -->
 
     <script>
-        enforceAuth(['reception', 'admin']);
-        auth.onAuthStateChanged((user) => {
-            if (!user) return;
+        enforceAuth(['reception', 'admin']); // Applies route guard
+        
+        // Adds listener for age calculation on the DOB field
+        document.getElementById('dob').addEventListener('change', function() { // When date changes
+            const age = calculateAge(this.value); // Calculates age using global function
+            document.getElementById('ageDisplay').textContent = age !== "" ? `Calculated Age: ${age} years old` : ""; // Displays age
+        });
 
-            db.collection('patients').orderBy('createdAt', 'desc').limit(5).onSnapshot((snapshot) => {
-                const tbody = document.getElementById('receptionTableBody');
-                if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
-                    return;
+        auth.onAuthStateChanged((user) => { // Listens for login
+            if (!user) return; // If no user, stop
+
+            db.collection('patients').orderBy('createdAt', 'desc').limit(5).onSnapshot((snapshot) => { // Gets recent patients
+                const tbody = document.getElementById('receptionTableBody'); // Gets table body
+                if (snapshot.empty) { // If empty
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`; // Show message
+                    return; // Stop
                 }
-                tbody.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
-                    tbody.innerHTML += `
+                tbody.innerHTML = ''; // Clear table
+                snapshot.forEach(doc => { // Loop through docs
+                    const d = doc.data(); // Get data
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now'; // Format date
+                    tbody.innerHTML += ` <!-- Add row -->
                         <tr>
-                            <td><strong style="color:#2563eb;">${d.patientId || 'N/A'}</strong></td>
-                            <td>${d.firstName} ${d.lastName}</td>
-                            <td>${d.age}</td>
-                            <td>${d.gender}</td>
-                            <td>${d.phone}</td>
-                            <td>${date}</td>
+                            <td><strong style="color:#2563eb;">${d.patientId || 'N/A'}</strong></td> <!-- ID -->
+                            <td>${d.firstName} ${d.lastName}</td> <!-- Name -->
+                            <td>${d.age}</td> <!-- Age -->
+                            <td>${d.gender}</td> <!-- Gender -->
+                            <td>${d.phone}</td> <!-- Phone -->
+                            <td>${date}</td> <!-- Date -->
                         </tr>
                     `;
                 });
             });
 
-            const form = document.getElementById('receptionForm');
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const btn = document.getElementById('submitBtn');
-                const errorDiv = document.getElementById('formError');
-                btn.textContent = 'Registering...'; btn.disabled = true;
-                errorDiv.style.display = 'none';
+            const form = document.getElementById('receptionForm'); // Gets form
+            form.addEventListener('submit', (e) => { // On submit
+                e.preventDefault(); // Prevents reload
+                const btn = document.getElementById('submitBtn'); // Gets button
+                const errorDiv = document.getElementById('formError'); // Gets error div
+                btn.textContent = 'Registering...'; btn.disabled = true; // Disables button
+                errorDiv.style.display = 'none'; // Hides error
 
-                const firstName = document.getElementById('firstName').value;
-                const lastName = document.getElementById('lastName').value;
-                const dob = document.getElementById('dob').value;
-                const gender = document.getElementById('gender').value;
-                const phone = document.getElementById('phone').value;
-                const email = document.getElementById('email').value;
-                const address = document.getElementById('address').value;
+                const firstName = document.getElementById('firstName').value; // First name
+                const lastName = document.getElementById('lastName').value; // Last name
+                const dob = document.getElementById('dob').value; // DOB
+                const gender = document.getElementById('gender').value; // Gender
+                const phone = document.getElementById('phone').value; // Phone
+                const email = document.getElementById('email').value; // Email
+                const address = document.getElementById('address').value; // Address
+                const calculatedAge = calculateAge(dob); // Calculates age
 
-                // Calculate Age automatically
-                const birthDate = new Date(dob);
-                const difference = Date.now() - birthDate.getTime();
-                const ageDate = new Date(difference);
-                const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+                let generatedPatientId = ""; // Variable for ID
+                let generatedPin = ""; // Variable for PIN
 
-                let generatedPatientId = "";
-                let generatedPin = "";
-
-                const counterRef = db.collection('settings').doc('counters');
-                db.runTransaction((transaction) => {
-                    return transaction.get(counterRef).then((doc) => {
-                        let nextId = 1; 
-                        if (doc.exists && doc.data().lastPatientId) {
-                            nextId = doc.data().lastPatientId + 1;
+                const counterRef = db.collection('settings').doc('counters'); // Counter ref
+                db.runTransaction((transaction) => { // Starts transaction
+                    return transaction.get(counterRef).then((doc) => { // Gets count
+                        let nextId = 1; // Default start
+                        if (doc.exists && doc.data().lastPatientId) { // If count exists
+                            nextId = doc.data().lastPatientId + 1; // Increment
                         }
-                        transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
-                        generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
-                        generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
+                        transaction.set(counterRef, { lastPatientId: nextId }, { merge: true }); // Saves count
+                        generatedPatientId = `P${String(nextId).padStart(4, '0')}`; // Formats ID
+                        generatedPin = Math.floor(100000 + Math.random() * 900000).toString(); // Generates PIN
                     });
-                }).then(() => {
-                    return db.collection('patients').add({
-                        patientId: generatedPatientId,
-                        pin: generatedPin, 
-                        firstName: firstName,
-                        lastName: lastName,
-                        dob: dob, // Saving DOB
-                        age: calculatedAge, // Saving calculated Age
-                        gender: gender,
-                        phone: phone,
-                        email: email,
-                        address: address,
-                        registeredBy: user.uid,
-                        treatmentStatus: 'Ongoing',
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => { // After transaction
+                    return db.collection('patients').add({ // Saves patient
+                        patientId: generatedPatientId, // ID
+                        pin: generatedPin, // PIN
+                        firstName: firstName, // First name
+                        lastName: lastName, // Last name
+                        dob: dob, // DOB
+                        age: calculatedAge, // Calculated Age
+                        gender: gender, // Gender
+                        phone: phone, // Phone
+                        email: email, // Email
+                        address: address, // Address
+                        registeredBy: user.uid, // Registered by
+                        treatmentStatus: 'Ongoing', // Default status
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp() // Timestamp
                     });
-                }).then(() => {
-                    logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`);
-                    alert(`✔️ Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient.`);
-                    form.reset(); 
-                    btn.textContent = 'Register Patient'; 
-                    btn.disabled = false; 
-                }).catch((error) => {
-                    errorDiv.style.display = 'block'; 
-                    errorDiv.textContent = "Error: " + error.message; 
-                    btn.textContent = 'Register Patient'; 
-                    btn.disabled = false;
+                }).then(() => { // After save
+                    logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`); // Logs activity
+                    alert(`✅ Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient.`); // Shows success
+                    form.reset(); // Resets form
+                    document.getElementById('ageDisplay').textContent = ''; // Clears age display
+                    btn.textContent = 'Register Patient'; // Resets button
+                    btn.disabled = false; // Enables button
+                }).catch((error) => { // On error
+                    errorDiv.style.display = 'block'; // Shows error
+                    errorDiv.textContent = "Error: " + error.message; // Displays message
+                    btn.textContent = 'Register Patient'; // Resets button
+                    btn.disabled = false; // Enables button
                 });
             });
         });
     </script>
-</body>
-</html>
+</body> <!-- Closes body -->
+</html> <!-- Closes html -->
