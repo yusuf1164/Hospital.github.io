@@ -42,21 +42,30 @@
                     </div>
                 </div>
 
+                <!-- RELIGION FIELD -->
+                <div class="form-group">
+                    <label for="religion">Religion</label>
+                    <select id="religion" required>
+                        <option value="">Select...</option>
+                        <option value="Christianity">Christianity</option>
+                        <option value="Islam">Islam</option>
+                        <option value="Traditional">Traditional</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
                 <div class="form-group">
                     <label for="phone">Phone Number</label>
                     <input type="tel" id="phone" required placeholder="+1 (555) 000-0000">
                 </div>
-
                 <div class="form-group">
                     <label for="address">Address</label>
                     <input type="text" id="address" required placeholder="123 Main St">
                 </div>
-
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" required placeholder="you@example.com">
                 </div>
-
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" required placeholder="••••••••">
@@ -76,13 +85,12 @@
             </div>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="script.js?v=102"></script>
+    <script src="script.js"></script>
 
     <script>
         document.getElementById('patientRegisterForm').addEventListener('submit', async (e) => {
@@ -92,6 +100,7 @@
             const lastName = document.getElementById('lastname').value;
             const age = document.getElementById('age').value;
             const gender = document.getElementById('gender').value;
+            const religion = document.getElementById('religion').value; // NEW
             const phone = document.getElementById('phone').value;
             const address = document.getElementById('address').value;
             const email = document.getElementById('email').value;
@@ -111,25 +120,21 @@
             btn.textContent = 'Creating Account...'; btn.disabled = true;
 
             try {
-                // 1. Create the Auth User
                 const cred = await auth.createUserWithEmailAndPassword(email, password);
-
-                // 2. Generate Sequential Patient ID (P0001) and PIN
                 const counterRef = db.collection('settings').doc('counters');
                 let generatedPatientId = "";
                 let generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
 
                 await db.runTransaction(async (transaction) => {
                     const doc = await transaction.get(counterRef);
-                    let nextId = 1; 
+                    let nextId = 1;
                     if (doc.exists && doc.data().lastPatientId) {
                         nextId = doc.data().lastPatientId + 1;
                     }
                     transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
-                    generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
+                    generatedPatientId = `P${String(nextId).padStart(4, '0')}`;
                 });
 
-                // 3. Save to the HOSPITAL 'patients' collection
                 await db.collection('patients').add({
                     patientId: generatedPatientId,
                     pin: generatedPin,
@@ -137,14 +142,14 @@
                     lastName: lastName,
                     age: age,
                     gender: gender,
+                    religion: religion, // SAVED TO DB
                     phone: phone,
                     email: email,
                     address: address,
-                    registeredBy: cred.user.uid, // This matches the auth rule!
+                    registeredBy: cred.user.uid,
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 4. Save to the 'users' collection and auto-link the P ID
                 await db.collection('users').doc(cred.user.uid).set({
                     firstName: firstName,
                     lastName: lastName,
@@ -155,15 +160,13 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 5. Success!
                 alert(`✅ Patient Account Created Successfully!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease save this ID and PIN. You will need it for your hospital visits.`);
                 window.location.href = 'dashboard.html';
 
             } catch (err) {
-                console.error(err);
                 registerError.style.display = 'block';
                 registerError.textContent = "Error: " + err.message;
-                btn.textContent = 'Create Patient Account'; 
+                btn.textContent = 'Create Patient Account';
                 btn.disabled = false;
             }
         });
