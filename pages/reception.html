@@ -72,7 +72,7 @@
         // Adds listener for age calculation on the DOB field
         document.getElementById('dob').addEventListener('change', function() { // When date changes
             const age = calculateAge(this.value); // Calculates age using global function
-            document.getElementById('ageDisplay').textContent = age !== "" ? `Calculated Age: ${age} years old` : ""; // Displays age
+            document.getElementById('ageDisplay').textContent = age !== "" ? `Age: ${age} years old` : ""; // Displays age
         });
 
         auth.onAuthStateChanged((user) => { // Listens for login
@@ -150,7 +150,7 @@
                     });
                 }).then(() => { // After save
                     logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`); // Logs activity
-                    alert(`✅ Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient.`); // Shows success
+                    alert(`✔️ Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient.`); // Shows success
                     form.reset(); // Resets form
                     document.getElementById('ageDisplay').textContent = ''; // Clears age display
                     btn.textContent = 'Register Patient'; // Resets button
