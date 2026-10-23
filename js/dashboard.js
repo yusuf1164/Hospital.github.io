@@ -145,8 +145,8 @@ function renderModules(userRoles) {
             { title: '💳 Billing', desc: 'Payments & Invoices', link: 'pages/billing.html' },
             { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' },
             { title: '🛏️ Wards & Rooms', desc: 'Manage patient beds', link: 'pages/wards.html' },
-            { title: '🚨 Emergency', desc: 'Critical care management', link: 'pages/emergency.html' }
-            { title: '✏️ Edit Credentials', desc: 'Update patient/staff info', link: 'pages/edit-credentials.html' },
+            { title: '🚨 Emergency', desc: 'Critical care management', link: 'pages/emergency.html' },
+            { title: '✏️ Edit Credentials', desc: 'Update patient/staff info', link: 'pages/edit-credentials.html' }
         ]
     };
 
