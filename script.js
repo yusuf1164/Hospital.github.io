@@ -180,73 +180,76 @@ function initForms() {
     }
 
     // --- STAFF REGISTER FORM ---
-    const registerForm = document.getElementById('registerForm'); // Gets register form
-    if (registerForm) { // If exists
-        registerForm.addEventListener('submit', (e) => { // On submit
-            e.preventDefault(); // Prevents reload
-            
-            const firstName = document.getElementById('firstname').value; // Gets first name
-            const lastName = document.getElementById('lastname').value; // Gets last name
-            const gender = document.getElementById('gender').value; // Gets gender
-            const dob = document.getElementById('dob').value; // Gets DOB
-            const email = document.getElementById('email').value; // Gets email
-            const phone = document.getElementById('phone').value; // Gets phone
-            const password = document.getElementById('password').value; // Gets password
-            const confirm = document.getElementById('confirmPassword').value; // Gets confirm password
-            
-            const passwordError = document.getElementById('passwordError'); // Gets password error div
-            const registerError = document.getElementById('registerError'); // Gets general error div
-            const btn = document.getElementById('registerBtn'); // Gets button
+const registerForm = document.getElementById('registerForm');
+if (registerForm) {
+    registerForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        
+        // 1. Capture all fields including Religion
+        const firstName = document.getElementById('firstname').value;
+        const lastName = document.getElementById('lastname').value;
+        const gender = document.getElementById('gender').value;
+        const religion = document.getElementById('religion').value; // NEW
+        const dob = document.getElementById('dob').value;
+        const email = document.getElementById('email').value;
+        const phone = document.getElementById('phone').value;
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirmPassword').value;
+        
+        const passwordError = document.getElementById('passwordError');
+        const registerError = document.getElementById('registerError');
+        const btn = document.getElementById('registerBtn');
 
-            if (password !== confirm) { // If passwords don't match
-                passwordError.style.display = 'block'; // Show error
-                return; // Stop execution
-            }
-            passwordError.style.display = 'none'; // Hide error if they match
-            
-            const calculatedAge = calculateAge(dob); // Calculates age for saving
+        if (password !== confirm) {
+            passwordError.style.display = 'block';
+            return;
+        }
+        passwordError.style.display = 'none';
+        
+        const calculatedAge = calculateAge(dob);
 
-            btn.textContent = 'Creating Account...'; btn.disabled = true; // Disables button
+        btn.textContent = 'Creating Account...'; btn.disabled = true;
 
-            auth.createUserWithEmailAndPassword(email, password) // Creates auth account
-                .then((cred) => { // On success
-                    const counterRef = db.collection('settings').doc('counters'); // Gets counter ref
-                    
-                    return db.runTransaction((transaction) => { // Starts transaction
-                        return transaction.get(counterRef).then((doc) => { // Gets current count
-                            let nextId = 1002; // Default start
-                            if (doc.exists && doc.data().lastStaffId) { // If count exists
-                                nextId = doc.data().lastStaffId + 1; // Increment
-                            }
-                            transaction.set(counterRef, { lastStaffId: nextId }, { merge: true }); // Save new count
-                            return String(nextId); // Return ID as string
-                        });
-                    }).then((generatedStaffId) => { // On transaction success
-                        return db.collection('users').doc(cred.user.uid).set({ // Save user profile
-                            firstName: firstName, // Save first name
-                            lastName: lastName, // Save last name
-                            gender: gender, // Save gender
-                            dob: dob, // Save DOB
-                            age: calculatedAge, // Save calculated age
-                            email: email, // Save email
-                            phone: phone, // Save phone
-                            staffId: generatedStaffId, // Save generated ID
-                            roles: [], // Empty roles array
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp() // Save timestamp
-                        });
+        auth.createUserWithEmailAndPassword(email, password)
+            .then((cred) => {
+                const counterRef = db.collection('settings').doc('counters');
+                
+                return db.runTransaction((transaction) => {
+                    return transaction.get(counterRef).then((doc) => {
+                        let nextId = 1002; 
+                        if (doc.exists && doc.data().lastStaffId) {
+                            nextId = doc.data().lastStaffId + 1;
+                        }
+                        transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                        return String(nextId); 
                     });
-                })
-                .then(() => { // On everything success
-                    alert('Registration Successful! Your Staff ID has been generated.'); // Show success
-                    window.location.href = 'dashboard.html'; // Redirect
-                })
-                .catch(err => { // On error
-                    registerError.style.display = 'block'; // Show error
-                    registerError.textContent = err.message; // Display message
-                    btn.textContent = 'Create Account'; // Reset button
-                    btn.disabled = false; // Enable button
+                }).then((generatedStaffId) => {
+                    return db.collection('users').doc(cred.user.uid).set({
+                        firstName: firstName,
+                        lastName: lastName,
+                        gender: gender,
+                        religion: religion, // SAVED TO DB
+                        dob: dob,
+                        age: calculatedAge,
+                        email: email,
+                        phone: phone,
+                        staffId: generatedStaffId, 
+                        roles: [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
                 });
-        });
+            })
+            .then(() => {
+                alert('Registration Successful! Your Staff ID has been generated.');
+                window.location.href = 'dashboard.html';
+            })
+            .catch(err => {
+                registerError.style.display = 'block';
+                registerError.textContent = err.message;
+                btn.textContent = 'Create Account'; 
+                btn.disabled = false;
+            });
+       });
     }
 }
 
