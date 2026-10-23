@@ -313,3 +313,59 @@ function enforceAuth(allowedRoles) {
     });
 }
 // --- END ROUTE GUARD ---
+
+
+// ==========================================
+// 9. GLOBAL CUSTOM MODAL ENGINE
+// ==========================================
+// Inject modal HTML into the page
+document.addEventListener('DOMContentLoaded', () => {
+    const modalHTML = `
+        <div id="globalModalOverlay" class="custom-modal-overlay">
+            <div class="custom-modal-box">
+                <div id="globalModalIcon" class="custom-modal-icon">ℹ️</div>
+                <div id="globalModalTitle" class="custom-modal-title">Message</div>
+                <div id="globalModalMessage" class="custom-modal-message">Details...</div>
+                <div class="custom-modal-buttons" id="globalModalButtons">
+                    <!-- Buttons injected by JS -->
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+});
+
+// Function to show a custom alert
+window.showAlert = function(title, message, icon = 'ℹ️') {
+    const overlay = document.getElementById('globalModalOverlay');
+    document.getElementById('globalModalIcon').textContent = icon;
+    document.getElementById('globalModalTitle').textContent = title;
+    document.getElementById('globalModalMessage').innerHTML = message;
+    
+    const btnContainer = document.getElementById('globalModalButtons');
+    btnContainer.innerHTML = `<button class="btn btn-primary" style="flex:1;" onclick="document.getElementById('globalModalOverlay').classList.remove('active')">OK</button>`;
+    
+    overlay.classList.add('active');
+};
+
+// Function to show a custom confirmation (Yes/No)
+window.showConfirm = function(title, message, onConfirm) {
+    const overlay = document.getElementById('globalModalOverlay');
+    document.getElementById('globalModalIcon').textContent = '⚠️';
+    document.getElementById('globalModalTitle').textContent = title;
+    document.getElementById('globalModalMessage').innerHTML = message;
+    
+    const btnContainer = document.getElementById('globalModalButtons');
+    btnContainer.innerHTML = `
+        <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="document.getElementById('globalModalOverlay').classList.remove('active')">Cancel</button>
+        <button class="btn btn-primary" style="flex:1;" id="globalModalConfirmBtn">Confirm</button>
+    `;
+    
+    // Attach the event listener to the confirm button
+    document.getElementById('globalModalConfirmBtn').onclick = () => {
+        overlay.classList.remove('active');
+        onConfirm();
+    };
+    
+    overlay.classList.add('active');
+};
