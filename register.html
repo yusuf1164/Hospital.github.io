@@ -1,94 +1,85 @@
-<!DOCTYPE html> <!-- Declares the document as HTML5 -->
-<html lang="en"> <!-- Sets the language to English -->
-<head> <!-- Opens the head section -->
-    <meta charset="UTF-8"> <!-- Sets character encoding -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Makes it mobile responsive -->
-    <title>Staff Registration - DEEN Hospital</title> <!-- Page title -->
-    <link rel="stylesheet" href="style.css"> <!-- Links to the main CSS file -->
-</head> <!-- Closes the head section -->
-<body> <!-- Opens the body section -->
-    <header id="header-placeholder"></header> <!-- Placeholder for the dynamic header -->
-
-    <main> <!-- Opens the main content area -->
-        <div class="form-container"> <!-- Container for the form -->
-            <h2>Staff Registration</h2> <!-- Form title -->
-            <p>Create an account to access the hospital system.</p> <!-- Form description -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Staff Registration - DEEN Hospital</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+    <main>
+        <div class="form-container">
+            <h2>Staff Registration</h2>
+            <p>Create an account to access the hospital system.</p>
             
-            <form id="registerForm"> <!-- Opens the registration form -->
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="firstname">First Name</label>
+                    <input type="text" id="firstname" required placeholder="John">
+                </div>
+                <div class="form-group">
+                    <label for="lastname">Last Name</label>
+                    <input type="text" id="lastname" required placeholder="Doe">
+                </div>
+                <div class="form-group">
+                    <label for="gender">Gender</label>
+                    <select id="gender" required>
+                        <option value="">Select...</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <!-- RELIGION FIELD -->
+                <div class="form-group">
+                    <label for="religion">Religion</label>
+                    <select id="religion" required>
+                        <option value="">Select...</option>
+                        <option value="Islam">Islam</option>
+                        <option value="Christianity">Christianity</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="dob">Date of Birth</label>
+                    <input type="date" id="dob" required>
+                    <div id="ageDisplay" style="font-size: 14px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input type="email" id="email" required placeholder="you@example.com">
+                </div>
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" required placeholder="+1 (555) 000-0000">
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required placeholder="••••••••">
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <input type="password" id="confirmPassword" required placeholder="••••••••">
+                    <div id="passwordError" class="error-message">Passwords do not match.</div>
+                </div>
                 
-                <!-- First Name Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="firstname">First Name</label> <!-- Label for first name -->
-                    <input type="text" id="firstname" required placeholder="John"> <!-- Text input -->
-                </div> <!-- Closes group -->
+                <button type="submit" class="btn-submit" id="registerBtn">Create Account</button>
+                <div id="registerError" class="error-message" style="text-align:center; margin-top:10px;"></div>
+            </form>
 
-                <!-- Last Name Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="lastname">Last Name</label> <!-- Label for last name -->
-                    <input type="text" id="lastname" required placeholder="Doe"> <!-- Text input -->
-                </div> <!-- Closes group -->
+            <div class="form-footer">
+                Already have an account? <a href="login.html">Sign in</a>
+            </div>
+        </div>
+    </main>
+    <footer id="footer-placeholder"></footer>
 
-                <!-- Gender Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="gender">Gender</label> <!-- Label for gender -->
-                    <select id="gender" required> <!-- Dropdown menu -->
-                        <option value="">Select...</option> <!-- Default empty option -->
-                        <option value="Male">Male</option> <!-- Male option -->
-                        <option value="Female">Female</option> <!-- Female option -->
-                        <option value="Other">Other</option> <!-- Other option -->
-                    </select> <!-- Closes dropdown -->
-                </div> <!-- Closes group -->
-
-                <!-- Date of Birth Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="dob">Date of Birth</label> <!-- Label for DOB -->
-                    <input type="date" id="dob" required> <!-- Date picker input -->
-                    
-                    <!-- DISPLAYS CALCULATED AGE HERE -->
-                    <div id="ageDisplay" style="font-size: 14px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div> <!-- Div to show age -->
-                </div> <!-- Closes group -->
-
-                <!-- Email Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="email">Email Address</label> <!-- Label for email -->
-                    <input type="email" id="email" required placeholder="you@example.com"> <!-- Email input -->
-                </div> <!-- Closes group -->
-
-                <!-- Phone Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="phone">Phone Number</label> <!-- Label for phone -->
-                    <input type="tel" id="phone" required placeholder="+1 (555) 000-0000"> <!-- Phone input -->
-                </div> <!-- Closes group -->
-
-                <!-- Password Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="password">Password</label> <!-- Label for password -->
-                    <input type="password" id="password" required placeholder="••••••••"> <!-- Password input -->
-                </div> <!-- Closes group -->
-
-                <!-- Confirm Password Field -->
-                <div class="form-group"> <!-- Groups label and input -->
-                    <label for="confirmPassword">Confirm Password</label> <!-- Label for confirm password -->
-                    <input type="password" id="confirmPassword" required placeholder="••••••••"> <!-- Password input -->
-                    <div id="passwordError" class="error-message">Passwords do not match.</div> <!-- Error message hidden by default -->
-                </div> <!-- Closes group -->
-                
-                <button type="submit" class="btn-submit" id="registerBtn">Create Account</button> <!-- Submit button -->
-                <div id="registerError" class="error-message" style="text-align:center; margin-top:10px;"></div> <!-- Area for general errors -->
-            </form> <!-- Closes form -->
-
-            <div class="form-footer"> <!-- Footer of the form -->
-                Already have an account? <a href="login.html">Sign in</a> <!-- Link to login -->
-            </div> <!-- Closes footer -->
-        </div> <!-- Closes form container -->
-    </main> <!-- Closes main -->
-
-    <footer id="footer-placeholder"></footer> <!-- Placeholder for dynamic footer -->
-
-    <!-- FIREBASE SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script> <!-- Core Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script> <!-- Firebase Auth -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script> <!-- Firebase Firestore -->
-    <script src="script.js"></script> <!-- Main logic file -->
-</body> <!-- Closes body -->
-</html> <!-- Closes html -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
