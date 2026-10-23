@@ -98,14 +98,24 @@
                 });
             }
 
-            window.dispenseDrug = function(id) {
-                if(confirm("Have you dispensed these drugs?")) {
-                    db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
-                    .then(() => { logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`); alert('Dispensed successfully!'); })
-                    .catch((error) => alert("Error: " + error.message));
-                }
-            };
-        });
+           // window.dispenseDrug = function(id) {
+             //   if(confirm("Have you dispensed these drugs?")) {
+                  //  db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
+                 //   .then(() => { logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`); alert('Dispensed successfully!'); })
+                  //  .catch((error) => alert("Error: " + error.message));
+            //    }
+           // };
+
+            window.dispenseDrug = function(id, patientId, medication) {
+    showConfirm("Confirm Dispense", `Have you dispensed <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
+        db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
+        .then(() => { 
+            logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
+            showAlert("Success", "Drugs dispensed successfully!", "✅"); 
+        })
+        .catch((error) => showAlert("Error", error.message, "❌"));
+    });
+};
     </script>
 </body>
 </html>
