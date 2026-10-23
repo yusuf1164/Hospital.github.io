@@ -97,24 +97,32 @@ function renderModules(userRoles) {
             { title: '🩺 OPD (Consultations)', desc: 'See patients & prescribe', link: 'pages/opd.html' },
             { title: '📅 Appointments', desc: 'View schedule', link: 'pages/appointments.html' },
             { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🛏️ Wards & Rooms', desc: 'Manage patient beds', link: 'pages/wards.html' },
             { title: '🚨 Emergency', desc: 'Manage critical cases', link: 'pages/emergency.html' }
         ],
         nurse: [ 
             { title: '🌡️ Vitals Entry', desc: 'Record vitals', link: 'pages/nursing.html' },
             { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🛏️ Wards & Rooms', desc: 'Manage patient beds', link: 'pages/wards.html' },
             { title: '🚨 Emergency', desc: 'Manage critical cases', link: 'pages/emergency.html' }
         ],
         reception: [ 
             { title: '🧑‍💼 Register Patient', desc: 'New patient intake', link: 'pages/reception.html' },
             { title: '📅 Appointments', desc: 'Manage bookings', link: 'pages/appointments.html' },
             { title: '👥 Patient List', desc: 'Search all patients', link: 'pages/patients.html' },
+            { title: '🛏️ Wards & Rooms', desc: 'Manage patient beds', link: 'pages/wards.html' },
             { title: '🚨 Emergency', desc: 'Fast-track intake', link: 'pages/emergency.html' }
         ],
-        pharmacy: [ { title: '💊 Pharmacy', desc: 'Dispense drugs', link: 'pages/pharmacy.html' } ],
-        lab: [ { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' } ],
-        radiology: [ { title: '🩻 Radiology', desc: 'X-rays & scans', link: 'pages/radiology.html' } ],
-        billing: [ { title: '💳 Billing', desc: 'Manage bills', link: 'pages/billing.html' } ],
-        records: [ { title: '🗂️ Records', desc: 'Access records', link: 'pages/records.html' } ],
+        pharmacy: [
+            { title: '💊 Pharmacy', desc: 'Dispense drugs', link: 'pages/pharmacy.html' } ],
+        lab: [ 
+            { title: '🧪 Laboratory', desc: 'Tests & results', link: 'pages/laboratory.html' } ],
+        radiology: [
+            { title: '🩻 Radiology', desc: 'X-rays & scans', link: 'pages/radiology.html' } ],
+        billing: [ 
+            { title: '💳 Billing', desc: 'Manage bills', link: 'pages/billing.html' } ],
+        records: [ 
+            { title: '🗂️ Records', desc: 'Access records', link: 'pages/records.html' } ],
         admin: [ 
             { title: '📜 Activity Logs', desc: 'View all staff actions', link: 'pages/activity-log.html' },
             { title: '👔 Admin / HR', desc: 'Manage staff roles & access', link: 'pages/admin.html' },
@@ -128,6 +136,7 @@ function renderModules(userRoles) {
             { title: '💊 Pharmacy', desc: 'Drug dispensing', link: 'pages/pharmacy.html' },
             { title: '💳 Billing', desc: 'Payments & Invoices', link: 'pages/billing.html' },
             { title: '🗂️ Records', desc: 'Patient files', link: 'pages/records.html' },
+            { title: '🛏️ Wards & Rooms', desc: 'Manage patient beds', link: 'pages/wards.html' },
             { title: '🚨 Emergency', desc: 'Critical care management', link: 'pages/emergency.html' }
         ]
     };
