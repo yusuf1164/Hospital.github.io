@@ -137,6 +137,26 @@
     </main>
     <footer id="footer-placeholder"></footer>
 
+    <!-- MODAL: Edit Beds -->
+    <div id="editBedsModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Edit Room Beds</h3>
+            <p style="margin-bottom: 15px; font-size: 14px;">Room: <strong id="editBedsRoomName"></strong></p>
+            
+            <input type="hidden" id="editBedsRoomId">
+            
+            <div class="form-group">
+                <label>New Total Beds</label>
+                <input type="number" id="editBedsTotal" min="1" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeModal('editBedsModal')">Cancel</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="saveBeds()">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -147,6 +167,9 @@
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
         let activeGlobalShifts = [];
+
+        // Modal helper
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
@@ -357,7 +380,6 @@
             createRoomsBtn.addEventListener('click', async () => {
                 const numRooms = parseInt(numRoomsInput.value);
                 if (!numRooms) return;
-
                 if (!confirm(`Create ${numRooms} new rooms?`)) return;
 
                 const counterRef = db.collection('settings').doc('counters');
@@ -417,7 +439,7 @@
                                 <strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)
                             </div>
                             <div style="display:flex; gap:5px;">
-                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${doc.id}', ${d.totalBeds})">Beds</button>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${doc.id}', '${d.roomName}', ${d.totalBeds})">Beds</button>
                                 <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #2563eb; color:#2563eb;" onclick="renameRoom('${doc.id}', '${d.roomName}')">Rename</button>
                                 <button class="delete-btn" onclick="deleteRoom('${doc.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
                             </div>
@@ -438,24 +460,36 @@
                 }
             };
 
-            // --- NEW: EDIT BEDS FUNCTION ---
-            window.editBeds = function(roomId, currentTotalBeds) {
-                const newTotal = parseInt(prompt("Enter new total number of beds for this room:", currentTotalBeds));
-                if (!newTotal || newTotal < 1) return;
-                if (newTotal === currentTotalBeds) return;
+            // --- UPDATED: EDIT BEDS USING MODAL ---
+            window.editBeds = function(roomId, roomName, currentTotalBeds) {
+                document.getElementById('editBedsRoomId').value = roomId;
+                document.getElementById('editBedsRoomName').textContent = roomName;
+                document.getElementById('editBedsTotal').value = currentTotalBeds;
+                document.getElementById('editBedsModal').style.display = 'flex';
+            };
+
+            window.saveBeds = function() {
+                const roomId = document.getElementById('editBedsRoomId').value;
+                const newTotal = parseInt(document.getElementById('editBedsTotal').value);
+                
+                if (!newTotal || newTotal < 1) { alert("Please enter a valid number."); return; }
 
                 db.collection('rooms').doc(roomId).get().then(doc => {
                     if (!doc.exists) return;
                     let roomData = doc.data();
                     let currentBeds = roomData.beds || [];
+                    const currentTotalBeds = roomData.totalBeds;
+
+                    if (newTotal === currentTotalBeds) {
+                        closeModal('editBedsModal');
+                        return;
+                    }
 
                     if (newTotal > currentTotalBeds) {
-                        // Add new beds
                         for (let i = currentTotalBeds + 1; i <= newTotal; i++) {
                             currentBeds.push({ bedNo: i, patientId: null, patientName: null, status: 'Empty' });
                         }
                     } else if (newTotal < currentTotalBeds) {
-                        // Removing beds - check if occupied
                         let bedsToRemove = currentBeds.slice(newTotal);
                         let occupiedBeds = bedsToRemove.filter(b => b.patientId !== null);
                         
@@ -472,6 +506,7 @@
                     }).then(() => {
                         alert('Room beds updated successfully!');
                         logActivity(auth.currentUser, "Edited Room Beds", `Room updated to ${newTotal} beds`);
+                        closeModal('editBedsModal');
                     }).catch(err => alert("Error: " + err.message));
                 });
             };
