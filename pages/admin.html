@@ -148,14 +148,11 @@
         <div class="modal-content">
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Edit Room Beds</h3>
             <p style="margin-bottom: 15px; font-size: 14px;">Room: <strong id="editBedsRoomName"></strong></p>
-            
             <input type="hidden" id="editBedsRoomId">
-            
             <div class="form-group">
                 <label>New Total Beds</label>
                 <input type="number" id="editBedsTotal" min="1" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px;">
             </div>
-            
             <div style="display: flex; gap: 10px; margin-top: 20px;">
                 <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeModal('editBedsModal')">Cancel</button>
                 <button class="btn btn-primary" style="flex:1;" onclick="saveBeds()">Save Changes</button>
@@ -196,29 +193,30 @@
             });
 
             document.getElementById('fixIdsBtn').addEventListener('click', () => {
-                if(!confirm("This will scan all users and assign a Staff ID to anyone missing one. Proceed?")) return;
-                db.collection('users').get().then(snapshot => {
-                    let usersToFix = [];
-                    snapshot.forEach(doc => {
-                        const u = doc.data();
-                        if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) usersToFix.push(doc.id);
-                    });
-                    if (usersToFix.length === 0) { alert("All staff members already have IDs!"); return; }
-                    const counterRef = db.collection('settings').doc('counters');
-                    let promises = usersToFix.map(uid => {
-                        return db.runTransaction(transaction => {
-                            return transaction.get(counterRef).then(doc => {
-                                let nextId = 1002;
-                                if (doc.exists && doc.data().lastStaffId) nextId = doc.data().lastStaffId + 1;
-                                transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
-                                return db.collection('users').doc(uid).update({ staffId: String(nextId) });
+                showConfirm("Generate IDs", "This will scan all users and assign a Staff ID to anyone missing one. Proceed?", () => {
+                    db.collection('users').get().then(snapshot => {
+                        let usersToFix = [];
+                        snapshot.forEach(doc => {
+                            const u = doc.data();
+                            if (!u.staffId && (!u.roles || !u.roles.every(r => r === 'patient'))) usersToFix.push(doc.id);
+                        });
+                        if (usersToFix.length === 0) { showAlert("No Missing IDs", "All staff members already have IDs!", "✅"); return; }
+                        
+                        const counterRef = db.collection('settings').doc('counters');
+                        let promises = usersToFix.map(uid => {
+                            return db.runTransaction(transaction => {
+                                return transaction.get(counterRef).then(doc => {
+                                    let nextId = 1002;
+                                    if (doc.exists && doc.data().lastStaffId) nextId = doc.data().lastStaffId + 1;
+                                    transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                                    return db.collection('users').doc(uid).update({ staffId: String(nextId) });
+                                });
                             });
                         });
+                        Promise.all(promises).then(() => {
+                            showAlert("Success", `Successfully generated IDs for ${usersToFix.length} staff members! Please refresh.`, "✅");
+                        }).catch(err => showAlert("Error", err.message, "❌"));
                     });
-                    Promise.all(promises).then(() => {
-                        alert(`Successfully generated IDs for ${usersToFix.length} staff members! Please refresh.`);
-                        window.location.reload();
-                    }).catch(err => alert("Error: " + err.message));
                 });
             });
 
@@ -256,11 +254,8 @@
                 autocompleteList.style.display = 'block';
             }
 
-            // Close dropdown when clicking outside
             document.addEventListener('click', (e) => {
-                if (e.target !== searchInput && e.target !== autocompleteList) {
-                    autocompleteList.style.display = 'none';
-                }
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
 
             roleCheckboxes.innerHTML = departments.map(dept => `
@@ -273,10 +268,8 @@
             function handleStaffSelection(selectedUser) {
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
-                
                 document.getElementById('shiftStaffName').textContent = `${selectedUser.firstName} ${selectedUser.lastName}`;
                 
-                // Load Roles
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
@@ -285,7 +278,6 @@
                     });
                 }
 
-                // Load Staff Shifts
                 staffShiftSection.style.display = 'block';
                 const shiftContainer = document.getElementById('staffShiftCheckboxes');
                 shiftContainer.innerHTML = '';
@@ -299,7 +291,7 @@
 
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
                 const selectedId = hiddenStaffId.value;
-                if (!selectedId) { alert("Please select a staff member."); return; }
+                if (!selectedId) { showAlert("Error", "Please select a staff member.", "❌"); return; }
                 const newRoles = [];
                 departments.forEach(dept => {
                     if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
@@ -326,19 +318,19 @@
                 const checked = [];
                 document.querySelectorAll('.global-shift:checked').forEach(cb => checked.push(cb.value));
                 db.collection('settings').doc('shifts').set({ activeShifts: checked }, { merge: true })
-                .then(() => { alert('Global shifts saved!'); window.location.reload(); });
+                .then(() => { showAlert("Success", "Global shifts saved!", "✅"); setTimeout(() => window.location.reload(), 1500); });
             });
 
             document.getElementById('saveStaffShiftsBtn').addEventListener('click', () => {
                 const selectedId = hiddenStaffId.value;
-                if (!selectedId) { alert("Please select a staff member."); return; }
+                if (!selectedId) { showAlert("Error", "Please select a staff member.", "❌"); return; }
                 const checkedShifts = [];
                 document.querySelectorAll('.staff-shift:checked').forEach(cb => checkedShifts.push(cb.value));
                 db.collection('users').doc(selectedId).update({ assignedShifts: checkedShifts }).then(() => {
-                    alert('Staff shifts updated successfully!');
+                    showAlert("Success", "Staff shifts updated successfully!", "✅");
                     const uIndex = allUsers.findIndex(u => u.id === selectedId);
                     if(uIndex > -1) allUsers[uIndex].assignedShifts = checkedShifts;
-                }).catch(err => alert("Error: " + err.message));
+                }).catch(err => showAlert("Error", err.message, "❌"));
             });
 
             // --- 3 & 4. SERVICE & APPT MANAGEMENT ---
@@ -346,17 +338,20 @@
             const radList = document.getElementById('radiologyScansList');
             const apptList = document.getElementById('apptTypesList');
 
+            // SVG trash icon string to keep code clean
+            const trashIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg>`;
+
             db.collection('labTests').onSnapshot(snap => {
                 labList.innerHTML = snap.empty ? '<li>No tests added.</li>' : '';
-                snap.forEach(doc => labList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('labTests', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
+                snap.forEach(doc => labList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('labTests', '${doc.id}')">${trashIcon}</button></li>`);
             });
             db.collection('radiologyScans').onSnapshot(snap => {
                 radList.innerHTML = snap.empty ? '<li>No scans added.</li>' : '';
-                snap.forEach(doc => radList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('radiologyScans', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
+                snap.forEach(doc => radList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('radiologyScans', '${doc.id}')">${trashIcon}</button></li>`);
             });
             db.collection('appointmentTypes').onSnapshot(snap => {
                 apptList.innerHTML = snap.empty ? '<li>No appointment types added.</li>' : '';
-                snap.forEach(doc => apptList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('appointmentTypes', '${doc.id}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button></li>`);
+                snap.forEach(doc => apptList.innerHTML += `<li style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #eee;">${doc.data().name} <button class="delete-btn" onclick="deleteService('appointmentTypes', '${doc.id}')">${trashIcon}</button></li>`);
             });
 
             document.getElementById('serviceForm').addEventListener('submit', (e) => {
@@ -364,18 +359,20 @@
                 const name = document.getElementById('serviceName').value;
                 const type = document.getElementById('serviceType').value;
                 db.collection(type).add({ name: name }).then(() => {
-                    alert('Service added!'); document.getElementById('serviceForm').reset();
+                    showAlert("Success", "Service added!", "✅"); document.getElementById('serviceForm').reset();
                 });
             });
             document.getElementById('apptTypeForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const name = document.getElementById('apptTypeName').value;
                 db.collection('appointmentTypes').add({ name: name }).then(() => {
-                    alert('Appointment type added!'); document.getElementById('apptTypeForm').reset();
+                    showAlert("Success", "Appointment type added!", "✅"); document.getElementById('apptTypeForm').reset();
                 });
             });
             window.deleteService = function(collection, id) {
-                if(confirm("Delete this item?")) db.collection(collection).doc(id).delete();
+                showConfirm("Delete Item", "Are you sure you want to delete this item?", () => {
+                    db.collection(collection).doc(id).delete().then(() => showAlert("Deleted", "Item removed.", "✅"));
+                });
             };
 
             // --- 5. ROOMS MANAGEMENT ---
@@ -407,48 +404,49 @@
             createRoomsBtn.addEventListener('click', async () => {
                 const numRooms = parseInt(numRoomsInput.value);
                 if (!numRooms) return;
-                if (!confirm(`Create ${numRooms} new rooms?`)) return;
+                
+                showConfirm("Create Rooms", `Create ${numRooms} new rooms?`, async () => {
+                    const counterRef = db.collection('settings').doc('counters');
+                    let startingRoomNo = 1;
 
-                const counterRef = db.collection('settings').doc('counters');
-                let startingRoomNo = 1;
-
-                try {
-                    await db.runTransaction(async (transaction) => {
-                        const doc = await transaction.get(counterRef);
-                        if (doc.exists && doc.data().lastRoomNo) {
-                            startingRoomNo = doc.data().lastRoomNo + 1;
-                        }
-                        transaction.set(counterRef, { lastRoomNo: startingRoomNo + numRooms - 1 }, { merge: true });
-                    });
-
-                    let batch = db.batch();
-                    for (let i = 1; i <= numRooms; i++) {
-                        const rNo = startingRoomNo + i - 1;
-                        const bedsForThisRoom = parseInt(document.getElementById(`beds_${i}`).value);
-                        const newRoomRef = db.collection('rooms').doc();
-                        
-                        let bedsArray = [];
-                        for (let b = 1; b <= bedsForThisRoom; b++) {
-                            bedsArray.push({ bedNo: b, patientId: null, patientName: null, status: 'Empty' });
-                        }
-
-                        batch.set(newRoomRef, {
-                            roomNo: rNo,
-                            roomName: `Room ${rNo}`,
-                            totalBeds: bedsForThisRoom,
-                            nurses: [],
-                            beds: bedsArray,
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    try {
+                        await db.runTransaction(async (transaction) => {
+                            const doc = await transaction.get(counterRef);
+                            if (doc.exists && doc.data().lastRoomNo) {
+                                startingRoomNo = doc.data().lastRoomNo + 1;
+                            }
+                            transaction.set(counterRef, { lastRoomNo: startingRoomNo + numRooms - 1 }, { merge: true });
                         });
+
+                        let batch = db.batch();
+                        for (let i = 1; i <= numRooms; i++) {
+                            const rNo = startingRoomNo + i - 1;
+                            const bedsForThisRoom = parseInt(document.getElementById(`beds_${i}`).value);
+                            const newRoomRef = db.collection('rooms').doc();
+                            
+                            let bedsArray = [];
+                            for (let b = 1; b <= bedsForThisRoom; b++) {
+                                bedsArray.push({ bedNo: b, patientId: null, patientName: null, status: 'Empty' });
+                            }
+
+                            batch.set(newRoomRef, {
+                                roomNo: rNo,
+                                roomName: `Room ${rNo}`,
+                                totalBeds: bedsForThisRoom,
+                                nurses: [],
+                                beds: bedsArray,
+                                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                            });
+                        }
+                        await batch.commit();
+                        showAlert("Success", `${numRooms} rooms created successfully!`, "✅");
+                        numRoomsInput.value = '';
+                        dynamicBedInputs.innerHTML = '';
+                        createRoomsBtn.style.display = 'none';
+                    } catch (error) {
+                        showAlert("Error", error.message, "❌");
                     }
-                    await batch.commit();
-                    alert(`${numRooms} rooms created successfully!`);
-                    numRoomsInput.value = '';
-                    dynamicBedInputs.innerHTML = '';
-                    createRoomsBtn.style.display = 'none';
-                } catch (error) {
-                    alert("Error creating rooms: " + error.message);
-                }
+                });
             });
 
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
@@ -456,16 +454,12 @@
                 snap.forEach(doc => globalAdminRooms.push({ id: doc.id, ...doc.data() }));
                 filterAdminRooms(); 
             }, error => {
-                console.error("Error loading rooms:", error);
                 roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}</p>`;
             });
 
             window.filterAdminRooms = function() {
                 const searchTerm = document.getElementById('searchRoomList').value.toLowerCase();
-                
-                const filtered = globalAdminRooms.filter(d => {
-                    return String(d.roomNo).includes(searchTerm) || d.roomName.toLowerCase().includes(searchTerm);
-                });
+                const filtered = globalAdminRooms.filter(d => String(d.roomNo).includes(searchTerm) || d.roomName.toLowerCase().includes(searchTerm));
 
                 if (filtered.length === 0) {
                     roomListContainer.innerHTML = '<p style="color:#888; font-size:14px;">No rooms match your search.</p>';
@@ -476,13 +470,11 @@
                 filtered.forEach(d => {
                     roomListContainer.innerHTML += `
                         <div class="room-list-item">
-                            <div>
-                                <strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)
-                            </div>
+                            <div><strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)</div>
                             <div style="display:flex; gap:5px;">
                                 <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${d.id}', '${d.roomName}', ${d.totalBeds})">Beds</button>
                                 <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #2563eb; color:#2563eb;" onclick="renameRoom('${d.id}', '${d.roomName}')">Rename</button>
-                                <button class="delete-btn" onclick="deleteRoom('${d.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
+                                <button class="delete-btn" onclick="deleteRoom('${d.id}', 'Room ${d.roomNo}')">${trashIcon}</button>
                             </div>
                         </div>
                     `;
@@ -490,12 +482,12 @@
             };
 
             window.renameRoom = function(roomId, currentName) {
-                const newName = prompt("Enter new name for the room:", currentName);
-                if (newName && newName !== currentName) {
-                    db.collection('rooms').doc(roomId).update({ roomName: newName })
-                    .then(() => alert('Room renamed successfully!'))
-                    .catch(err => alert("Error: " + err.message));
-                }
+                showPrompt("Rename Room", "Enter new name for the room:", currentName, (newName) => {
+                    if (newName && newName !== currentName) {
+                        db.collection('rooms').doc(roomId).update({ roomName: newName })
+                        .then(() => showAlert("Success", "Room renamed successfully!", "✅"));
+                    }
+                });
             };
 
             window.editBeds = function(roomId, roomName, currentTotalBeds) {
@@ -508,8 +500,7 @@
             window.saveBeds = function() {
                 const roomId = document.getElementById('editBedsRoomId').value;
                 const newTotal = parseInt(document.getElementById('editBedsTotal').value);
-                
-                if (!newTotal || newTotal < 1) { alert("Please enter a valid number."); return; }
+                if (!newTotal || newTotal < 1) { showAlert("Error", "Please enter a valid number.", "❌"); return; }
 
                 db.collection('rooms').doc(roomId).get().then(doc => {
                     if (!doc.exists) return;
@@ -531,29 +522,29 @@
                         let occupiedBeds = bedsToRemove.filter(b => b.patientId !== null);
                         
                         if (occupiedBeds.length > 0) {
-                            alert("Cannot remove beds that currently have patients assigned! Please discharge or move patients first.");
+                            showAlert("Action Blocked", "Cannot remove beds that currently have patients assigned! Please discharge or move patients first.", "⚠️");
                             return;
                         }
                         currentBeds = currentBeds.slice(0, newTotal);
                     }
 
-                    db.collection('rooms').doc(roomId).update({
-                        totalBeds: newTotal,
-                        beds: currentBeds
-                    }).then(() => {
-                        alert('Room beds updated successfully!');
+                    db.collection('rooms').doc(roomId).update({ totalBeds: newTotal, beds: currentBeds }).then(() => {
+                        showAlert("Success", "Room beds updated successfully!", "✅");
                         logActivity(auth.currentUser, "Edited Room Beds", `Room updated to ${newTotal} beds`);
                         closeModal('editBedsModal');
-                    }).catch(err => alert("Error: " + err.message));
+                    }).catch(err => showAlert("Error", err.message, "❌"));
                 });
             };
 
             window.deleteRoom = function(roomId, roomLabel) {
-                if(confirm(`Are you sure you want to delete ${roomLabel}? This cannot be undone.`)) {
+                showConfirm("Delete Room", `Are you sure you want to delete ${roomLabel}? This cannot be undone.`, () => {
                     db.collection('rooms').doc(roomId).delete()
-                    .then(() => logActivity(auth.currentUser, "Deleted Room", `Deleted ${roomLabel}`))
-                    .catch(err => alert("Error: " + err.message));
-                }
+                    .then(() => {
+                        showAlert("Deleted", "Room deleted successfully.", "✔️");
+                        logActivity(auth.currentUser, "Deleted Room", `Deleted ${roomLabel}`);
+                    })
+                    .catch(err => showAlert("Error", err.message, "❌"));
+                });
             };
         });
     </script>
