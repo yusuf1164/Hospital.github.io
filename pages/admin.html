@@ -16,6 +16,8 @@
         .delete-btn:hover { transform: scale(1.15); }
         .service-list-col { flex: 1; min-width: 250px; }
         @media (min-width: 600px) { .service-list-col:last-child { border-left: 2px solid #e5e7eb; padding-left: 20px; } }
+        .room-list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #e5e7eb; background: #fff; border-radius: 5px; margin-bottom: 5px; }
+        .room-list-item:last-child { margin-bottom: 0; }
     </style>
 </head>
 <body>
@@ -108,6 +110,31 @@
                 <ul id="apptTypesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
             </div>
 
+            <!-- 5. Wards & Rooms Management -->
+            <div class="form-card" style="border-left: 4px solid #f59e0b;">
+                <h3>5. Wards & Rooms Management</h3>
+                
+                <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Bulk Create Rooms</h4>
+                    <div class="form-grid">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Number of Rooms</label>
+                            <input type="number" id="numRooms" min="1" placeholder="e.g. 10">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>Beds per Room</label>
+                            <input type="number" id="bedsPerRoom" min="1" placeholder="e.g. 4">
+                        </div>
+                    </div>
+                    <button id="createRoomsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px; background-color: #f59e0b; border-color: #f59e0b;">Create Rooms</button>
+                </div>
+
+                <div>
+                    <h4 style="color: #1e3a8a; margin-bottom: 10px;">Existing Rooms</h4>
+                    <div id="roomListContainer"></div>
+                </div>
+            </div>
+
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -186,18 +213,13 @@
 
             userSelect.addEventListener('change', (e) => {
                 const selectedId = e.target.value;
-                if (!selectedId) { 
-                    rolesSection.style.display = 'none'; 
-                    staffShiftSection.style.display = 'none';
-                    return; 
-                }
+                if (!selectedId) { rolesSection.style.display = 'none'; staffShiftSection.style.display = 'none'; return; }
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
                 
                 const selectedUser = allUsers.find(u => u.id === selectedId);
                 document.getElementById('shiftStaffName').textContent = `${selectedUser.firstName} ${selectedUser.lastName}`;
                 
-                // Load Roles
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
@@ -206,7 +228,6 @@
                     });
                 }
 
-                // Load Staff Shifts
                 staffShiftSection.style.display = 'block';
                 const shiftContainer = document.getElementById('staffShiftCheckboxes');
                 shiftContainer.innerHTML = '';
@@ -280,6 +301,102 @@
             });
             window.deleteService = function(collection, id) {
                 if(confirm("Delete this item?")) db.collection(collection).doc(id).delete();
+            };
+
+            // --- ROOMS MANAGEMENT LOGIC ---
+            const roomListContainer = document.getElementById('roomListContainer');
+
+            document.getElementById('createRoomsBtn').addEventListener('click', async () => {
+                const numRooms = parseInt(document.getElementById('numRooms').value);
+                const bedsPerRoom = parseInt(document.getElementById('bedsPerRoom').value);
+
+                if (!numRooms || numRooms < 1 || !bedsPerRoom || bedsPerRoom < 1) {
+                    alert("Please enter a valid number of rooms and beds.");
+                    return;
+                }
+
+                if (!confirm(`Create ${numRooms} rooms with ${bedsPerRoom} beds each?`)) return;
+
+                const counterRef = db.collection('settings').doc('counters');
+                let startingRoomNo = 1;
+
+                try {
+                    await db.runTransaction(async (transaction) => {
+                        const doc = await transaction.get(counterRef);
+                        if (doc.exists && doc.data().lastRoomNo) {
+                            startingRoomNo = doc.data().lastRoomNo + 1;
+                        }
+                        transaction.set(counterRef, { lastRoomNo: startingRoomNo + numRooms - 1 }, { merge: true });
+                    });
+
+                    let batch = db.batch();
+                    for (let i = 0; i < numRooms; i++) {
+                        const rNo = startingRoomNo + i;
+                        const newRoomRef = db.collection('rooms').doc();
+                        
+                        // Generate empty beds array
+                        let bedsArray = [];
+                        for (let b = 1; b <= bedsPerRoom; b++) {
+                            bedsArray.push({ bedNo: b, patientId: null, patientName: null, status: 'Empty' });
+                        }
+
+                        batch.set(newRoomRef, {
+                            roomNo: rNo,
+                            roomName: `Room ${rNo}`,
+                            totalBeds: bedsPerRoom,
+                            nurses: [],
+                            beds: bedsArray,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    await batch.commit();
+                    alert(`${numRooms} rooms created successfully!`);
+                    document.getElementById('numRooms').value = '';
+                    document.getElementById('bedsPerRoom').value = '';
+                } catch (error) {
+                    alert("Error creating rooms: " + error.message);
+                }
+            });
+
+            // Listen to Rooms in Real-Time
+            db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
+                if (snap.empty) {
+                    roomListContainer.innerHTML = '<p style="color:#888; font-size:14px;">No rooms created yet.</p>';
+                    return;
+                }
+                
+                roomListContainer.innerHTML = '';
+                snap.forEach(doc => {
+                    const d = doc.data();
+                    roomListContainer.innerHTML += `
+                        <div class="room-list-item">
+                            <div>
+                                <strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)
+                            </div>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="renameRoom('${doc.id}', '${d.roomName}')">Rename</button>
+                                <button class="delete-btn" onclick="deleteRoom('${doc.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            window.renameRoom = function(roomId, currentName) {
+                const newName = prompt("Enter new name for the room:", currentName);
+                if (newName && newName !== currentName) {
+                    db.collection('rooms').doc(roomId).update({ roomName: newName })
+                    .then(() => alert('Room renamed successfully!'))
+                    .catch(err => alert("Error: " + err.message));
+                }
+            };
+
+            window.deleteRoom = function(roomId, roomLabel) {
+                if(confirm(`Are you sure you want to delete ${roomLabel}? This cannot be undone.`)) {
+                    db.collection('rooms').doc(roomId).delete()
+                    .then(() => logActivity(auth.currentUser, "Deleted Room", `Deleted ${roomLabel}`))
+                    .catch(err => alert("Error: " + err.message));
+                }
             };
         });
     </script>
