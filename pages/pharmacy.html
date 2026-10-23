@@ -72,18 +72,19 @@
                 }
                 tbody.innerHTML = '';
                 prescriptions.forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
-                     year: 'numeric', 
-                     month: 'short', 
-                     day: 'numeric', 
-                     hour: '2-digit',
-                     minute: '2-digit',
-                     second: '2-digit',
-                     hour12: true 
-                     }) : 'Just now';
-                    
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
-                    let actionHtml = d.status === 'Pending' ? `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}')">Dispense</button>` : `<span style="color:#065f46; font-weight:bold;">Done</span>`;
+                    
+                    let actionHtml = '';
+                    if (d.status === 'Pending') {
+                        // FIXED: Now passing d.patientId and d.medication to the function!
+                        // We also escape single quotes in medication just in case.
+                        const safeMed = d.medication ? d.medication.replace(/'/g, "\\'") : '';
+                        actionHtml = `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${safeMed}')">Dispense</button>`;
+                    } else {
+                        actionHtml = `<span style="color:#065f46; font-weight:bold;">Done</span>`;
+                    }
+                    
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
@@ -98,25 +99,17 @@
                 });
             }
 
-           // window.dispenseDrug = function(id) {
-             //   if(confirm("Have you dispensed these drugs?")) {
-                  //  db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
-                 //   .then(() => { logActivity(auth.currentUser, "Dispensed Drugs", `Prescription ID: ${id}`); alert('Dispensed successfully!'); })
-                  //  .catch((error) => alert("Error: " + error.message));
-            //    }
-           // };
-
             window.dispenseDrug = function(id, patientId, medication) {
-    showConfirm("Confirm Dispense", `Are you sure you want to dispense <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
-        db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
-        .then(() => { 
-            logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
-            showAlert("Success", "Drugs dispensed successfully!", "✔️"); 
-        })
-        .catch((error) => showAlert("Error", error.message, "❌"));
-    });
-};
-    });
+                showConfirm("Confirm Dispense", `Have you dispensed <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
+                    db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
+                    .then(() => { 
+                        logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
+                        showAlert("Success", "Drugs dispensed successfully!", "✅"); 
+                    })
+                    .catch((error) => showAlert("Error", error.message, "❌"));
+                });
+            };
+        });
     </script>
 </body>
 </html>
