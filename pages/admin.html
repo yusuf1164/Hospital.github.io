@@ -6,7 +6,7 @@
     <title>Admin - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
     <style>
-        .search-box { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; }
+        .search-box { width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; }
         .role-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-top: 20px; }
         .role-item { display: flex; align-items: center; gap: 10px; background: #fff; padding: 12px; border-radius: 5px; border: 1px solid #e5e7eb; cursor: pointer; }
         .role-item input { width: 20px; height: 20px; cursor: pointer; }
@@ -35,12 +35,17 @@
                 <h3>1. Staff Access Management</h3>
                 <button id="fixIdsBtn" class="btn btn-outline" style="margin-bottom: 15px; border-color: #1e3a8a; color: #1e3a8a; font-weight: bold; width: 100%;">⚙️ Generate Missing Staff IDs</button>
                 
-                <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or Staff ID...">
-                <select id="userSelect" class="form-group" style="width: 100%; padding: 12px; font-size: 16px;">
-                    <option value="">Select a staff member...</option>
-                </select>
+                <div class="form-group">
+                    <label>Search Staff Member</label>
+                    <div class="autocomplete-container">
+                        <input type="text" id="searchUser" class="search-box" placeholder="Type Staff Name or ID..." autocomplete="off" style="margin-bottom: 0;">
+                        <div id="staffAutocompleteList" class="autocomplete-list"></div>
+                        <input type="hidden" id="selectedStaffId">
+                    </div>
+                </div>
                 
-                <div id="rolesSection" style="display: none; margin-top: 20px;">
+                <div id="rolesSection" style="display: none; margin-top: 20px; background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb;">
+                    <h4 style="color: #1e3a8a; margin-bottom: 15px;">Assign Roles to: <span id="selectedStaffNameDisplay" style="color: #2563eb;"></span></h4>
                     <div class="role-grid" id="roleCheckboxes"></div>
                     <button id="saveRolesBtn" class="btn-submit" style="margin-top: 20px; max-width: 250px;">Save User Access</button>
                     <div id="msgBox" style="margin-top: 15px; font-weight: bold;"></div>
@@ -129,9 +134,7 @@
 
                 <div>
                     <h4 style="color: #1e3a8a; margin-bottom: 10px;">Existing Rooms</h4>
-                    <!-- NEW: SEARCH BAR FOR ROOMS -->
-                    <input type="text" id="searchRoomList" class="search-box" placeholder="Search Rooms by Number or Name..." oninput="filterAdminRooms()" style="border-color: #f59e0b;">
-                    
+                    <input type="text" id="searchRoomList" class="search-box" placeholder="Search Rooms by Number or Name..." oninput="filterAdminRooms()" style="border-color: #f59e0b; margin-bottom: 15px;">
                     <div id="roomListContainer"></div>
                 </div>
             </div>
@@ -170,7 +173,7 @@
         const departments = ['admin', 'doctor', 'nurse', 'reception', 'appointments', 'lab', 'radiology', 'pharmacy', 'billing', 'records', 'hr'];
         let allUsers = [];
         let activeGlobalShifts = [];
-        let globalAdminRooms = []; // Stores rooms for search filtering
+        let globalAdminRooms = [];
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
@@ -179,7 +182,8 @@
 
             // --- 1. USER MANAGEMENT LOGIC ---
             const searchInput = document.getElementById('searchUser');
-            const userSelect = document.getElementById('userSelect');
+            const autocompleteList = document.getElementById('staffAutocompleteList');
+            const hiddenStaffId = document.getElementById('selectedStaffId');
             const rolesSection = document.getElementById('rolesSection');
             const roleCheckboxes = document.getElementById('roleCheckboxes');
             const staffShiftSection = document.getElementById('staffShiftSection');
@@ -189,7 +193,6 @@
                     const u = doc.data();
                     if (u.staffId) allUsers.push({ id: doc.id, ...u });
                 });
-                populateDropdown(allUsers);
             });
 
             document.getElementById('fixIdsBtn').addEventListener('click', () => {
@@ -219,6 +222,47 @@
                 });
             });
 
+            // Autocomplete Logic for Staff
+            searchInput.addEventListener('focus', () => renderStaffDropdown(allUsers));
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                hiddenStaffId.value = "";
+                rolesSection.style.display = 'none';
+                staffShiftSection.style.display = 'none';
+                
+                const filtered = allUsers.filter(u => {
+                    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
+                    const staffId = String(u.staffId || '').toLowerCase();
+                    return fullName.includes(term) || staffId.includes(term);
+                });
+                renderStaffDropdown(filtered);
+            });
+
+            function renderStaffDropdown(users) {
+                autocompleteList.innerHTML = '';
+                if (users.length === 0) { autocompleteList.style.display = 'none'; return; }
+                users.forEach(u => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${u.firstName} ${u.lastName}</strong> (ID: ${u.staffId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${u.firstName} ${u.lastName} (ID: ${u.staffId})`;
+                        hiddenStaffId.value = u.id;
+                        document.getElementById('selectedStaffNameDisplay').textContent = `${u.firstName} ${u.lastName}`;
+                        autocompleteList.style.display = 'none';
+                        handleStaffSelection(u);
+                    });
+                    autocompleteList.appendChild(div);
+                });
+                autocompleteList.style.display = 'block';
+            }
+
+            // Close dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) {
+                    autocompleteList.style.display = 'none';
+                }
+            });
+
             roleCheckboxes.innerHTML = departments.map(dept => `
                 <label class="role-item">
                     <input type="checkbox" value="${dept}" id="chk_${dept}">
@@ -226,34 +270,13 @@
                 </label>
             `).join('');
 
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = allUsers.filter(u => {
-                    const fullName = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
-                    const staffId = String(u.staffId || '').toLowerCase();
-                    return fullName.includes(term) || staffId.includes(term);
-                });
-                populateDropdown(filtered);
-            });
-
-            function populateDropdown(users) {
-                userSelect.innerHTML = '<option value="">Select a staff member...</option>';
-                users.forEach(u => {
-                    const fullName = `${u.firstName || 'User'} ${u.lastName || ''}`;
-                    const rolesText = u.roles ? u.roles.join(', ') : 'No roles';
-                    userSelect.innerHTML += `<option value="${u.id}">${fullName} (ID: ${u.staffId}) - [${rolesText}]</option>`;
-                });
-            }
-
-            userSelect.addEventListener('change', (e) => {
-                const selectedId = e.target.value;
-                if (!selectedId) { rolesSection.style.display = 'none'; staffShiftSection.style.display = 'none'; return; }
+            function handleStaffSelection(selectedUser) {
                 rolesSection.style.display = 'block';
                 document.getElementById('msgBox').textContent = '';
                 
-                const selectedUser = allUsers.find(u => u.id === selectedId);
                 document.getElementById('shiftStaffName').textContent = `${selectedUser.firstName} ${selectedUser.lastName}`;
                 
+                // Load Roles
                 departments.forEach(d => document.getElementById(`chk_${d}`).checked = false);
                 if (selectedUser && selectedUser.roles) {
                     selectedUser.roles.forEach(role => {
@@ -262,6 +285,7 @@
                     });
                 }
 
+                // Load Staff Shifts
                 staffShiftSection.style.display = 'block';
                 const shiftContainer = document.getElementById('staffShiftCheckboxes');
                 shiftContainer.innerHTML = '';
@@ -271,11 +295,11 @@
                     const isChecked = assignedShifts.includes(shift) ? 'checked' : '';
                     shiftContainer.innerHTML += `<label><input type="checkbox" class="staff-shift" value="${shift}" ${isChecked}> ${shift}</label>`;
                 });
-            });
+            }
 
             document.getElementById('saveRolesBtn').addEventListener('click', () => {
-                const selectedId = userSelect.value;
-                if (!selectedId) return;
+                const selectedId = hiddenStaffId.value;
+                if (!selectedId) { alert("Please select a staff member."); return; }
                 const newRoles = [];
                 departments.forEach(dept => {
                     if (document.getElementById(`chk_${dept}`).checked) newRoles.push(dept);
@@ -306,8 +330,8 @@
             });
 
             document.getElementById('saveStaffShiftsBtn').addEventListener('click', () => {
-                const selectedId = userSelect.value;
-                if (!selectedId) return;
+                const selectedId = hiddenStaffId.value;
+                if (!selectedId) { alert("Please select a staff member."); return; }
                 const checkedShifts = [];
                 document.querySelectorAll('.staff-shift:checked').forEach(cb => checkedShifts.push(cb.value));
                 db.collection('users').doc(selectedId).update({ assignedShifts: checkedShifts }).then(() => {
@@ -430,13 +454,12 @@
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
                 globalAdminRooms = [];
                 snap.forEach(doc => globalAdminRooms.push({ id: doc.id, ...doc.data() }));
-                filterAdminRooms(); // Call the filter function to render
+                filterAdminRooms(); 
             }, error => {
                 console.error("Error loading rooms:", error);
                 roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}</p>`;
             });
 
-            // --- NEW: FILTER ADMIN ROOMS ---
             window.filterAdminRooms = function() {
                 const searchTerm = document.getElementById('searchRoomList').value.toLowerCase();
                 
