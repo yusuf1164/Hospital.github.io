@@ -73,6 +73,9 @@
                     <label for="email">Email Address</label>
                     <input type="email" id="email" required placeholder="you@example.com">
                 </div>
+
+        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                   
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" required placeholder="••••••••">
@@ -82,6 +85,8 @@
                     <input type="password" id="confirmPassword" required placeholder="••••••••">
                     <div id="passwordError" class="error-message">Passwords do not match.</div>
                 </div>
+        </div>
+
                 
                 <button type="submit" class="btn-submit" id="registerBtn">Create Patient Account</button>
                 <div id="registerError" class="error-message" style="text-align:center; margin-top:10px;"></div>
