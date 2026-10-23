@@ -122,7 +122,6 @@
                         <input type="number" id="numRooms" min="1" placeholder="e.g. 3">
                     </div>
                     
-                    <!-- Dynamic bed inputs will appear here -->
                     <div id="dynamicBedInputs" class="bed-input-grid"></div>
 
                     <button id="createRoomsBtn" class="btn btn-primary" style="margin-top: 15px; padding: 8px 16px; font-size: 13px; background-color: #f59e0b; border-color: #f59e0b; display: none;">Create Rooms</button>
@@ -335,7 +334,6 @@
             const dynamicBedInputs = document.getElementById('dynamicBedInputs');
             const createRoomsBtn = document.getElementById('createRoomsBtn');
 
-            // Generate bed input boxes dynamically when the admin types a number
             numRoomsInput.addEventListener('input', () => {
                 const num = parseInt(numRoomsInput.value);
                 dynamicBedInputs.innerHTML = '';
@@ -404,7 +402,6 @@
                 }
             });
 
-            // Listen to Rooms
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
                 if (snap.empty) {
                     roomListContainer.innerHTML = '<p style="color:#888; font-size:14px;">No rooms created yet.</p>';
@@ -420,7 +417,8 @@
                                 <strong>Room ${d.roomNo}</strong> - ${d.roomName} (${d.totalBeds} beds)
                             </div>
                             <div style="display:flex; gap:5px;">
-                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="renameRoom('${doc.id}', '${d.roomName}')">Rename</button>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="editBeds('${doc.id}', ${d.totalBeds})">Beds</button>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size:12px; border-color: #2563eb; color:#2563eb;" onclick="renameRoom('${doc.id}', '${d.roomName}')">Rename</button>
                                 <button class="delete-btn" onclick="deleteRoom('${doc.id}', 'Room ${d.roomNo}')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
                             </div>
                         </div>
@@ -428,7 +426,7 @@
                 });
             }, error => {
                 console.error("Error loading rooms:", error);
-                roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}. Did you publish the new Firestore Rules?</p>`;
+                roomListContainer.innerHTML = `<p style="color:red; font-size:14px;">Error: ${error.message}</p>`;
             });
 
             window.renameRoom = function(roomId, currentName) {
@@ -438,6 +436,44 @@
                     .then(() => alert('Room renamed successfully!'))
                     .catch(err => alert("Error: " + err.message));
                 }
+            };
+
+            // --- NEW: EDIT BEDS FUNCTION ---
+            window.editBeds = function(roomId, currentTotalBeds) {
+                const newTotal = parseInt(prompt("Enter new total number of beds for this room:", currentTotalBeds));
+                if (!newTotal || newTotal < 1) return;
+                if (newTotal === currentTotalBeds) return;
+
+                db.collection('rooms').doc(roomId).get().then(doc => {
+                    if (!doc.exists) return;
+                    let roomData = doc.data();
+                    let currentBeds = roomData.beds || [];
+
+                    if (newTotal > currentTotalBeds) {
+                        // Add new beds
+                        for (let i = currentTotalBeds + 1; i <= newTotal; i++) {
+                            currentBeds.push({ bedNo: i, patientId: null, patientName: null, status: 'Empty' });
+                        }
+                    } else if (newTotal < currentTotalBeds) {
+                        // Removing beds - check if occupied
+                        let bedsToRemove = currentBeds.slice(newTotal);
+                        let occupiedBeds = bedsToRemove.filter(b => b.patientId !== null);
+                        
+                        if (occupiedBeds.length > 0) {
+                            alert("Cannot remove beds that currently have patients assigned! Please discharge or move patients first.");
+                            return;
+                        }
+                        currentBeds = currentBeds.slice(0, newTotal);
+                    }
+
+                    db.collection('rooms').doc(roomId).update({
+                        totalBeds: newTotal,
+                        beds: currentBeds
+                    }).then(() => {
+                        alert('Room beds updated successfully!');
+                        logActivity(auth.currentUser, "Edited Room Beds", `Room updated to ${newTotal} beds`);
+                    }).catch(err => alert("Error: " + err.message));
+                });
             };
 
             window.deleteRoom = function(roomId, roomLabel) {
