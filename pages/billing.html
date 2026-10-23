@@ -274,40 +274,32 @@
                 document.getElementById('printOptionsModal').style.display = 'flex';
             };
 
-            window.downloadPDF = function() {
-                closeModal('printOptionsModal');
-                setTimeout(() => {
-                    window.print();
-                }, 200);
-            };
-
             window.downloadImage = function() {
-                closeModal('printOptionsModal');
-                
-                const receipt = document.getElementById('printableReceipt');
-                
-                // Temporarily display the receipt off-screen so html2canvas can read it
-                receipt.style.display = 'block';
-                receipt.style.position = 'absolute';
-                receipt.style.left = '-9999px';
+    closeModal('printOptionsModal');
+    
+    const receipt = document.getElementById('printableReceipt');
+    
+    // Temporarily display the receipt off-screen so html2canvas can read it
+    receipt.style.display = 'block';
+    receipt.style.position = 'absolute';
+    receipt.style.left = '-9999px';
 
-                html2canvas(receipt, {
-                    scale: 2, // High resolution
-                    backgroundColor: "#ffffff"
-                }).then(canvas => {
-                    receipt.style.display = 'none'; // Hide it again
-                    
-                    // Create download link
-                    const link = document.createElement('a');
-                    link.download = `Receipt_${document.getElementById('printReceiptNo').innerText}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                }).catch(err => {
-                    alert("Error generating image. Please use PDF instead.");
-                    receipt.style.display = 'none';
-                });
-            };
-        });
+    html2canvas(receipt, {
+        scale: 1, // CHANGED: 1 is normal resolution (scale 2 was high-res)
+        backgroundColor: "#ffffff"
+    }).then(canvas => {
+        receipt.style.display = 'none'; // Hide it again
+        
+        // Create download link for a standard PNG image
+        const link = document.createElement('a');
+        link.download = `Receipt_${document.getElementById('printReceiptNo').innerText}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    }).catch(err => {
+        alert("Error generating image. Please use PDF instead.");
+        receipt.style.display = 'none';
+    });
+};        });
     </script>
 </body>
 </html>
