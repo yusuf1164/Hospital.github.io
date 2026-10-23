@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -16,14 +15,16 @@
                 <p>Register new patients and manage the hospital intake.</p>
             </div>
 
-            <!-- Registration Form -->
             <div class="form-card">
                 <h3>Register New Patient</h3>
                 <form id="receptionForm">
                     <div class="form-grid">
                         <div class="form-group"><label>First Name</label><input type="text" id="firstName" required placeholder="John"></div>
                         <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required placeholder="Doe"></div>
-                        <div class="form-group"><label>Age</label><input type="number" id="age" required placeholder="30"></div>
+                        
+                        <!-- CHANGED TO DATE OF BIRTH -->
+                        <div class="form-group"><label>Date of Birth</label><input type="date" id="dob" required></div>
+                        
                         <div class="form-group">
                             <label>Gender</label>
                             <select id="gender" required>
@@ -42,17 +43,15 @@
                 </form>
             </div>
 
-            <!-- Patient List Preview -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Registrations</h3>
             <table>
-                <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Phone</th></tr></thead>
+                <thead><tr><th>Patient ID</th><th>Name</th><th>Age</th><th>Gender</th><th>Phone</th><th>Date</th></tr></thead>
                 <tbody id="receptionTableBody">
-                    <tr><td colspan="4" style="text-align:center; color:#888;">Loading patients...</td></tr>
+                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr>
                 </tbody>
             </table>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -61,31 +60,33 @@
     <script src="../script.js"></script>
 
     <script>
+        enforceAuth(['reception', 'admin']);
         auth.onAuthStateChanged((user) => {
-            if (!user) { window.location.href = '../login.html'; return; }
+            if (!user) return;
 
-            // Load Recent Patients
             db.collection('patients').orderBy('createdAt', 'desc').limit(5).onSnapshot((snapshot) => {
                 const tbody = document.getElementById('receptionTableBody');
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients registered yet.</td></tr>`;
                     return;
                 }
                 tbody.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     tbody.innerHTML += `
                         <tr>
                             <td><strong style="color:#2563eb;">${d.patientId || 'N/A'}</strong></td>
                             <td>${d.firstName} ${d.lastName}</td>
                             <td>${d.age}</td>
+                            <td>${d.gender}</td>
                             <td>${d.phone}</td>
+                            <td>${date}</td>
                         </tr>
                     `;
                 });
             });
 
-            // Handle Form Submission
             const form = document.getElementById('receptionForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -96,16 +97,21 @@
 
                 const firstName = document.getElementById('firstName').value;
                 const lastName = document.getElementById('lastName').value;
-                const age = document.getElementById('age').value;
+                const dob = document.getElementById('dob').value;
                 const gender = document.getElementById('gender').value;
                 const phone = document.getElementById('phone').value;
                 const email = document.getElementById('email').value;
                 const address = document.getElementById('address').value;
 
+                // Calculate Age automatically
+                const birthDate = new Date(dob);
+                const difference = Date.now() - birthDate.getTime();
+                const ageDate = new Date(difference);
+                const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+
                 let generatedPatientId = "";
                 let generatedPin = "";
 
-                // 1. Generate Sequential Patient ID (P0001) and a 6-digit PIN
                 const counterRef = db.collection('settings').doc('counters');
                 db.runTransaction((transaction) => {
                     return transaction.get(counterRef).then((doc) => {
@@ -114,19 +120,17 @@
                             nextId = doc.data().lastPatientId + 1;
                         }
                         transaction.set(counterRef, { lastPatientId: nextId }, { merge: true });
-                        
                         generatedPatientId = `P${String(nextId).padStart(4, '0')}`; 
-                        // Generate a random 6-digit PIN
                         generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
                     });
                 }).then(() => {
-                    // 2. Save the Patient Data
                     return db.collection('patients').add({
                         patientId: generatedPatientId,
-                        pin: generatedPin, // Save the PIN securely
+                        pin: generatedPin, 
                         firstName: firstName,
                         lastName: lastName,
-                        age: age,
+                        dob: dob, // Saving DOB
+                        age: calculatedAge, // Saving calculated Age
                         gender: gender,
                         phone: phone,
                         email: email,
@@ -137,15 +141,11 @@
                     });
                 }).then(() => {
                     logActivity(auth.currentUser, "Registered Patient", `ID: ${generatedPatientId}, Name: ${firstName} ${lastName}`);
-                    
-                    // 3. Show Success Modal with ID and PIN
-                    alert(`✅ Patient Registered Successfully!\n\nPatient Name: ${firstName} ${lastName}\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient/parent. They will need BOTH to link their online portal.`);
-                    
+                    alert(`✔️ Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease give this ID and PIN to the patient.`);
                     form.reset(); 
                     btn.textContent = 'Register Patient'; 
                     btn.disabled = false; 
                 }).catch((error) => {
-                    console.error("Error adding document: ", error);
                     errorDiv.style.display = 'block'; 
                     errorDiv.textContent = "Error: " + error.message; 
                     btn.textContent = 'Register Patient'; 
