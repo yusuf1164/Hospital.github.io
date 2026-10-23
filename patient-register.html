@@ -27,10 +27,14 @@
                 </div>
 
                 <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
+                    
+                    <!-- DATE OF BIRTH REPLACES AGE -->
                     <div class="form-group">
-                        <label for="age">Age</label>
-                        <input type="number" id="age" required placeholder="30">
+                        <label for="dob">Date of Birth</label>
+                        <input type="date" id="dob" required>
+                        <div id="ageDisplay" style="font-size: 14px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div>
                     </div>
+
                     <div class="form-group">
                         <label for="gender">Gender</label>
                         <select id="gender" required>
@@ -47,9 +51,8 @@
                     <label for="religion">Religion</label>
                     <select id="religion" required>
                         <option value="">Select...</option>
-                        <option value="Christianity">Christianity</option>
                         <option value="Islam">Islam</option>
-                        <option value="Traditional">Traditional</option>
+                        <option value="Christianity">Christianity</option>
                         <option value="Other">Other</option>
                     </select>
                 </div>
@@ -93,14 +96,20 @@
     <script src="script.js"></script>
 
     <script>
+        // --- ADDED: Live age calculation listener ---
+        document.getElementById('dob').addEventListener('change', function() {
+            const age = calculateAge(this.value);
+            document.getElementById('ageDisplay').textContent = age !== "" ? `Calculated Age: ${age} years old` : "";
+        });
+
         document.getElementById('patientRegisterForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const firstName = document.getElementById('firstname').value;
             const lastName = document.getElementById('lastname').value;
-            const age = document.getElementById('age').value;
+            const dob = document.getElementById('dob').value; // CHANGED TO DOB
             const gender = document.getElementById('gender').value;
-            const religion = document.getElementById('religion').value; // NEW
+            const religion = document.getElementById('religion').value;
             const phone = document.getElementById('phone').value;
             const address = document.getElementById('address').value;
             const email = document.getElementById('email').value;
@@ -117,6 +126,10 @@
             }
             passwordError.style.display = 'none';
             registerError.style.display = 'none';
+            
+            // --- ADDED: Calculate age to save in DB ---
+            const calculatedAge = calculateAge(dob);
+
             btn.textContent = 'Creating Account...'; btn.disabled = true;
 
             try {
@@ -140,9 +153,10 @@
                     pin: generatedPin,
                     firstName: firstName,
                     lastName: lastName,
-                    age: age,
+                    dob: dob, // SAVED TO DB
+                    age: calculatedAge, // SAVED CALCULATED AGE TO DB
                     gender: gender,
-                    religion: religion, // SAVED TO DB
+                    religion: religion,
                     phone: phone,
                     email: email,
                     address: address,
@@ -160,7 +174,7 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                alert(`✅ Patient Account Created Successfully!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease save this ID and PIN. You will need it for your hospital visits.`);
+                alert(`✔️ Patient Account Created Successfully!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\n\nPlease save this ID and PIN. You will need it for your hospital visits.`);
                 window.location.href = 'dashboard.html';
 
             } catch (err) {
