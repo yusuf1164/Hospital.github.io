@@ -15,7 +15,6 @@
                 <p>Manage patient admissions, beds, and nurse assignments.</p>
             </div>
             
-            <!-- ROOM SEARCH BAR -->
             <div style="margin-bottom: 25px;">
                 <input type="text" id="roomSearchInput" placeholder="Search Rooms by Number or Name..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;" oninput="filterRooms()">
             </div>
@@ -103,31 +102,23 @@
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            db.collection('patients').get().then(snap => {
-                snap.forEach(doc => allPatients.push(doc.data()));
-            });
+            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); });
 
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
                 currentRooms = [];
                 snap.forEach(doc => currentRooms.push({ id: doc.id, ...doc.data() }));
-                renderRooms(); // Re-render whenever data changes
+                renderRooms(); 
             });
         });
 
-        // --- NEW: ROOM SEARCH FILTER ---
-        window.filterRooms = function() {
-            renderRooms();
-        };
+        window.filterRooms = function() { renderRooms(); };
 
         function renderRooms() {
             const container = document.getElementById('roomGridContainer');
             const searchTerm = document.getElementById('roomSearchInput').value.toLowerCase();
 
-            // Filter based on search
             const filteredRooms = currentRooms.filter(room => {
-                const rNo = String(room.roomNo).toLowerCase();
-                const rName = String(room.roomName).toLowerCase();
-                return rNo.includes(searchTerm) || rName.includes(searchTerm);
+                return String(room.roomNo).includes(searchTerm) || room.roomName.toLowerCase().includes(searchTerm);
             });
 
             if (currentRooms.length === 0) {
@@ -261,7 +252,7 @@
             const patientId = document.getElementById('selectedWardPatientId').value;
             const patientName = document.getElementById('wardPatientSearch').dataset.name;
 
-            if (!patientId) { alert("Please select a patient from the dropdown."); return; }
+            if (!patientId) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
 
             const room = currentRooms.find(r => r.id === roomId);
             const nowISO = new Date().toISOString(); 
@@ -276,7 +267,8 @@
             db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
                 logActivity(auth.currentUser, "Assigned Bed", `Patient ${patientName} to Room ${room.roomNo} Bed ${bedNo}`);
                 closeModal('assignPatientModal');
-            }).catch(err => alert(err.message));
+                showAlert("Success", "Patient assigned successfully!", "✅");
+            }).catch(err => showAlert("Error", err.message, "❌"));
         };
 
         window.openUpdateStatus = function(roomId, bedNo, patientName) {
@@ -307,7 +299,8 @@
             db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
                 logActivity(auth.currentUser, "Updated Bed Status", `${room.beds.find(b=>b.bedNo===bedNo).patientName} marked as ${newStatus}`);
                 closeModal('updateStatusModal');
-            }).catch(err => alert(err.message));
+                showAlert("Success", "Status updated successfully!", "✅");
+            }).catch(err => showAlert("Error", err.message, "❌"));
         };
 
         window.openManageNurses = function(roomId, roomName) {
@@ -324,7 +317,6 @@
                     const u = doc.data();
                     if (u.roles && u.roles.includes('nurse')) globalNursesList.push(u);
                 });
-                
                 filterNursesList(); 
             }).catch(err => {
                 container.innerHTML = `<p style="color: red;">Error: ${err.message}</p>`;
@@ -368,23 +360,23 @@
 
         window.toggleNurse = function(roomId, nurseId, nurseName, isAssigned) {
             const action = isAssigned ? 'unassign' : 'assign';
-            if (!confirm(`Are you sure you want to ${action} Nurse ${nurseName}?`)) return;
+            showConfirm("Manage Nurse", `Are you sure you want to ${action} Nurse ${nurseName}?`, () => {
+                const room = currentRooms.find(r => r.id === roomId);
+                let updatedNurses = room.nurses || [];
 
-            const room = currentRooms.find(r => r.id === roomId);
-            let updatedNurses = room.nurses || [];
+                if (isAssigned) {
+                    updatedNurses = updatedNurses.filter(n => n.id !== nurseId);
+                } else {
+                    updatedNurses.push({ id: nurseId, name: nurseName });
+                }
 
-            if (isAssigned) {
-                updatedNurses = updatedNurses.filter(n => n.id !== nurseId);
-            } else {
-                updatedNurses.push({ id: nurseId, name: nurseName });
-            }
-
-            db.collection('rooms').doc(roomId).update({ nurses: updatedNurses }).then(() => {
-                logActivity(auth.currentUser, "Nurse Assignment", `${nurseName} ${action}ed to Room ${room.roomNo}`);
-                room.nurses = updatedNurses;
-                renderRooms();
-                filterNursesList(); 
-            }).catch(err => alert(err.message));
+                db.collection('rooms').doc(roomId).update({ nurses: updatedNurses }).then(() => {
+                    logActivity(auth.currentUser, "Nurse Assignment", `${nurseName} ${action}ed to Room ${room.roomNo}`);
+                    room.nurses = updatedNurses;
+                    renderRooms();
+                    filterNursesList(); 
+                }).catch(err => showAlert("Error", err.message, "❌"));
+            });
         };
     </script>
 </body>
