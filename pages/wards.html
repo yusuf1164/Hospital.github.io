@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wards & Rooms - DEEN Hospital</title>
+    <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+    <header id="header-placeholder"></header>
+    <main>
+        <div class="table-container">
+            <div class="page-header">
+                <h1>🛏️ Wards & Rooms</h1>
+                <p>Manage patient admissions, beds, and nurse assignments.</p>
+            </div>
+            
+            <div id="roomGridContainer" class="room-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading rooms...</p>
+            </div>
+        </div>
+    </main>
+    <footer id="footer-placeholder"></footer>
+
+    <!-- MODAL: Assign Patient -->
+    <div id="assignPatientModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Assign Patient to Bed</h3>
+            <input type="hidden" id="modalRoomId">
+            <input type="hidden" id="modalBedNo">
+            <div class="form-group">
+                <label>Search Patient</label>
+                <div class="autocomplete-container">
+                    <input type="text" id="wardPatientSearch" placeholder="Type Name or P ID..." autocomplete="off">
+                    <div id="wardAutocompleteList" class="autocomplete-list"></div>
+                    <input type="hidden" id="selectedWardPatientId">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeModal('assignPatientModal')">Cancel</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="confirmAssignPatient()">Assign</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: Manage Nurses -->
+    <div id="manageNursesModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Manage Nurses for <span id="nurseModalRoomName"></span></h3>
+            <input type="hidden" id="nurseModalRoomId">
+            <div id="nurseListContainer" style="display: flex; flex-direction: column; gap: 10px;"></div>
+            <button class="btn btn-outline" style="width: 100%; margin-top: 20px; border-color: #ccc; color: #333;" onclick="closeModal('manageNursesModal')">Close</button>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="../script.js"></script>
+
+    <script>
+        // --- START WARDS LOGIC ---
+        enforceAuth(['admin', 'doctor', 'nurse', 'reception']);
+        let allPatients = [];
+        let allNurses = [];
+        let currentRooms = [];
+
+        auth.onAuthStateChanged((user) => {
+            if (!user) return;
+
+            // Fetch Patients & Nurses once
+            db.collection('patients').get().then(snap => {
+                snap.forEach(doc => allPatients.push(doc.data()));
+            });
+
+            db.collection('users').get().then(snap => {
+                snap.forEach(doc => {
+                    const u = doc.data();
+                    if (u.roles && u.roles.includes('nurse')) allNurses.push(u);
+                });
+            });
+
+            // Load Rooms Real-time
+            db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
+                currentRooms = [];
+                snap.forEach(doc => currentRooms.push({ id: doc.id, ...doc.data() }));
+                renderRooms();
+            });
+        });
+
+        function renderRooms() {
+            const container = document.getElementById('roomGridContainer');
+            if (currentRooms.length === 0) {
+                container.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No rooms created yet. Go to Admin Panel to create rooms.</p>';
+                return;
+            }
+
+            container.innerHTML = '';
+            currentRooms.forEach(room => {
+                let bedsHtml = '';
+                room.beds.forEach(bed => {
+                    const isOccupied = bed.patientId !== null;
+                    const bedClass = isOccupied ? 'bed-occupied' : 'bed-empty';
+                    
+                    let actionHtml = '';
+                    if (isOccupied) {
+                        actionHtml = `
+                            <div style="text-align:right;">
+                                <span class="status-badge ${bed.status === 'Critical' ? 'status-pending' : 'status-active'}" style="margin-bottom:5px;">${bed.status || 'Stable'}</span><br>
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: #1e3a8a; color: #1e3a8a;" onclick="updatePatientStatus('${room.id}', ${bed.bedNo}, '${bed.patientName}')">Update</button>
+                            </div>
+                        `;
+                    } else {
+                        actionHtml = `<button class="btn btn-primary" style="padding: 4px 8px; font-size: 12px;" onclick="openAssignPatient('${room.id}', ${bed.bedNo})">Assign Patient</button>`;
+                    }
+
+                    bedsHtml += `
+                        <div class="bed-item ${bedClass}">
+                            <div class="bed-info">
+                                <strong>Bed ${bed.bedNo}</strong>
+                                ${isOccupied ? `<span>${bed.patientName} (${bed.patientId})</span>` : '<span>Empty</span>'}
+                            </div>
+                            ${actionHtml}
+                        </div>
+                    `;
+                });
+
+                // Nurse List
+                let nursesHtml = 'No nurses assigned.';
+                if (room.nurses && room.nurses.length > 0) {
+                    nursesHtml = 'Nurses: ' + room.nurses.map(n => n.name).join(', ');
+                }
+
+                container.innerHTML += `
+                    <div class="room-card">
+                        <div class="room-header">
+                            <div class="room-title">Room ${room.roomNo} - ${room.roomName}</div>
+                            <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; border-color: #8b5cf6; color: #8b5cf6;" onclick="openManageNurses('${room.id}', '${room.roomName}')">Manage Nurses</button>
+                        </div>
+                        <div class="room-nurses">${nursesHtml}</div>
+                        <div class="beds-container">${bedsHtml}</div>
+                    </div>
+                `;
+            });
+        }
+
+        // --- MODAL LOGIC ---
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
+
+        // 1. ASSIGN PATIENT
+        window.openAssignPatient = function(roomId, bedNo) {
+            document.getElementById('modalRoomId').value = roomId;
+            document.getElementById('modalBedNo').value = bedNo;
+            document.getElementById('wardPatientSearch').value = '';
+            document.getElementById('selectedWardPatientId').value = '';
+            document.getElementById('assignPatientModal').style.display = 'flex';
+        };
+
+        // Autocomplete inside modal
+        const wardSearchInput = document.getElementById('wardPatientSearch');
+        const wardAutocompleteList = document.getElementById('wardAutocompleteList');
+        
+        wardSearchInput.addEventListener('focus', () => renderWardDropdown(allPatients));
+        wardSearchInput.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase();
+            document.getElementById('selectedWardPatientId').value = "";
+            const filtered = allPatients.filter(p => {
+                const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+                const pid = String(p.patientId).toLowerCase();
+                return name.includes(term) || pid.includes(term);
+            });
+            renderWardDropdown(filtered);
+        });
+
+        function renderWardDropdown(patients) {
+            wardAutocompleteList.innerHTML = '';
+            if (patients.length === 0) { wardAutocompleteList.style.display = 'none'; return; }
+            patients.forEach(p => {
+                const div = document.createElement('div');
+                div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                div.addEventListener('click', () => {
+                    wardSearchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                    document.getElementById('selectedWardPatientId').value = p.patientId;
+                    document.getElementById('wardPatientSearch').dataset.name = `${p.firstName} ${p.lastName}`;
+                    wardAutocompleteList.style.display = 'none';
+                });
+                wardAutocompleteList.appendChild(div);
+            });
+            wardAutocompleteList.style.display = 'block';
+        }
+
+        window.confirmAssignPatient = function() {
+            const roomId = document.getElementById('modalRoomId').value;
+            const bedNo = parseInt(document.getElementById('modalBedNo').value);
+            const patientId = document.getElementById('selectedWardPatientId').value;
+            const patientName = document.getElementById('wardPatientSearch').dataset.name;
+
+            if (!patientId) { alert("Please select a patient from the dropdown."); return; }
+
+            const room = currentRooms.find(r => r.id === roomId);
+            let updatedBeds = room.beds.map(b => {
+                if (b.bedNo === bedNo) {
+                    return { bedNo: b.bedNo, patientId: patientId, patientName: patientName, status: 'Stable' };
+                }
+                return b;
+            });
+
+            db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
+                logActivity(auth.currentUser, "Assigned Bed", `Patient ${patientName} to Room ${room.roomNo} Bed ${bedNo}`);
+                closeModal('assignPatientModal');
+            }).catch(err => alert(err.message));
+        };
+
+        // 2. UPDATE PATIENT STATUS
+        window.updatePatientStatus = function(roomId, bedNo, patientName) {
+            const status = prompt(`Update status for ${patientName}:\nEnter 'Stable', 'Critical', 'Discharged', or 'Deceased'`);
+            if (!status) return;
+            
+            const validStatuses = ['Stable', 'Critical', 'Discharged', 'Deceased'];
+            const formattedStatus = status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+            
+            if (!validStatuses.includes(formattedStatus)) {
+                alert("Invalid status. Please enter Stable, Critical, Discharged, or Deceased.");
+                return;
+            }
+
+            const room = currentRooms.find(r => r.id === roomId);
+            let updatedBeds = room.beds.map(b => {
+                if (b.bedNo === bedNo) {
+                    // If discharged or deceased, clear the bed
+                    if (formattedStatus === 'Discharged' || formattedStatus === 'Deceased') {
+                        return { bedNo: b.bedNo, patientId: null, patientName: null, status: 'Empty' };
+                    } else {
+                        return { bedNo: b.bedNo, patientId: b.patientId, patientName: b.patientName, status: formattedStatus };
+                    }
+                }
+                return b;
+            });
+
+            db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
+                logActivity(auth.currentUser, "Updated Bed Status", `${patientName} marked as ${formattedStatus}`);
+            }).catch(err => alert(err.message));
+        };
+
+        // 3. MANAGE NURSES
+        window.openManageNurses = function(roomId, roomName) {
+            document.getElementById('nurseModalRoomId').value = roomId;
+            document.getElementById('nurseModalRoomName').textContent = roomName;
+            const container = document.getElementById('nurseListContainer');
+            const room = currentRooms.find(r => r.id === roomId);
+            
+            container.innerHTML = '';
+            if (allNurses.length === 0) {
+                container.innerHTML = '<p>No nurses found in the system.</p>';
+            }
+
+            allNurses.forEach(nurse => {
+                const isAssigned = room.nurses && room.nurses.some(n => n.id === nurse.staffId);
+                const btnClass = isAssigned ? 'btn-outline' : 'btn-primary';
+                const btnText = isAssigned ? 'Unassign' : 'Assign';
+                const btnStyle = isAssigned ? 'border-color: #dc2626; color: #dc2626;' : '';
+                
+                container.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #e5e7eb; border-radius: 5px;">
+                        <div><strong>${nurse.firstName} ${nurse.lastName}</strong> (ID: ${nurse.staffId})</div>
+                        <button class="btn ${btnClass}" style="padding: 5px 10px; font-size: 12px; ${btnStyle}" onclick="toggleNurse('${roomId}', '${nurse.staffId}', '${nurse.firstName} ${nurse.lastName}', ${isAssigned})">${btnText}</button>
+                    </div>
+                `;
+            });
+
+            document.getElementById('manageNursesModal').style.display = 'flex';
+        };
+
+        window.toggleNurse = function(roomId, nurseId, nurseName, isAssigned) {
+            const action = isAssigned ? 'unassign' : 'assign';
+            if (!confirm(`Are you sure you want to ${action} Nurse ${nurseName}?`)) return;
+
+            const room = currentRooms.find(r => r.id === roomId);
+            let updatedNurses = room.nurses || [];
+
+            if (isAssigned) {
+                updatedNurses = updatedNurses.filter(n => n.id !== nurseId);
+            } else {
+                updatedNurses.push({ id: nurseId, name: nurseName });
+            }
+
+            db.collection('rooms').doc(roomId).update({ nurses: updatedNurses }).then(() => {
+                logActivity(auth.currentUser, "Nurse Assignment", `${nurseName} ${action}ed to Room ${room.roomNo}`);
+                openManageNurses(roomId, room.roomName); // Refresh modal
+            }).catch(err => alert(err.message));
+        };
+        // --- END WARDS LOGIC ---
+    </script>
+</body>
+</html>
