@@ -6,20 +6,12 @@
     <title>Billing - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
     <style>
-        /* PRINT SPECIFIC CSS */
         @media print {
             body * { visibility: hidden; }
             #printableReceipt, #printableReceipt * { visibility: visible; }
-            #printableReceipt { 
-                position: absolute; 
-                left: 0; 
-                top: 0; 
-                width: 100%; 
-                display: block !important; 
-                padding: 20px;
-            }
+            #printableReceipt { position: absolute; left: 0; top: 0; width: 100%; display: block !important; padding: 20px; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -61,15 +53,7 @@
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Invoices</h3>
             <table>
                 <thead>
-                    <tr>
-                        <th>Date</th>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Service</th>
-                        <th>Amount</th>
-                        <th>Status</th>
-                        <th>Action</th>
-                    </tr>
+                    <tr><th>Date</th><th>Patient ID</th><th>Patient Name</th><th>Service</th><th>Amount</th><th>Status</th><th>Action</th></tr>
                 </thead>
                 <tbody id="billingTableBody">
                     <tr><td colspan="7" style="text-align:center; color:#888;">Loading invoices...</td></tr>
@@ -87,12 +71,10 @@
             
             <div style="display: flex; gap: 10px;">
                 <button class="btn btn-outline" style="flex:1; border-color: #1e3a8a; color: #1e3a8a; padding: 15px;" onclick="downloadPDF()">
-                    <span style="font-size: 24px; display: block; margin-bottom: 5px;">📄</span>
-                    Save as PDF
+                    <span style="font-size: 24px; display: block; margin-bottom: 5px;">📄</span> Save as PDF
                 </button>
                 <button class="btn btn-primary" style="flex:1; padding: 15px;" onclick="downloadImage()">
-                    <span style="font-size: 24px; display: block; margin-bottom: 5px;">🖼️</span>
-                    Save as Image
+                    <span style="font-size: 24px; display: block; margin-bottom: 5px;">🖼️</span> Save as Image
                 </button>
             </div>
             
@@ -101,7 +83,6 @@
     </div>
 
     <!-- HIDDEN PRINT RECEIPT CONTAINER -->
-    <!-- Changed width from 800px to 500px to fix spacing -->
     <div id="printableReceipt" style="display: none; background: white; color: black; width: 500px; padding: 30px; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
         <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 20px; margin-bottom: 30px;">
             <h2 style="color: #1e3a8a; margin-bottom: 5px; font-size: 24px;">🏥 DEEN HOSPITAL</h2>
@@ -117,7 +98,6 @@
             <p style="margin: 5px 0;"><strong>Patient Name:</strong> <span id="printPatientName"></span></p>
         </div>
 
-        <!-- Fixed Table Widths -->
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 1px solid #ccc; table-layout: fixed;">
             <thead>
                 <tr style="background-color: #f3f4f6; border-bottom: 2px solid #000;">
@@ -247,7 +227,7 @@
 
             document.getElementById('billingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
                 
                 const patientId = hiddenPatientId.value;
                 const patientName = document.getElementById('patientSearchInput').dataset.name;
@@ -259,21 +239,23 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
                     logActivity(auth.currentUser, "Generated Invoice", `Patient: ${patientName} (${patientId}), Amount: ₦${amount}`);
-                    alert('Invoice generated!'); 
+                    showAlert("Success", "Invoice generated!", "✅"); 
                     document.getElementById('billingForm').reset(); 
                     searchInput.value = ''; hiddenPatientId.value = '';
                 });
             });
 
             window.payBill = function(billId, patientName, amount) {
-                if(confirm(`Confirm payment of ₦${amount} from ${patientName}?`)) {
+                showConfirm("Confirm Payment", `Confirm payment of ₦${amount} from ${patientName}?`, () => {
                     db.collection('bills').doc(billId).update({ status: 'Paid' })
-                    .then(() => logActivity(auth.currentUser, "Processed Payment", `Patient: ${patientName}, Amount: ₦${amount}`))
-                    .catch(err => alert(err.message));
-                }
+                    .then(() => {
+                        logActivity(auth.currentUser, "Processed Payment", `Patient: ${patientName}, Amount: ₦${amount}`);
+                        showAlert("Success", "Payment recorded successfully!", "✅");
+                    })
+                    .catch(err => showAlert("Error", err.message, "❌"));
+                });
             };
 
-            // --- PRINT & EXPORT LOGIC ---
             window.openPrintModal = function(billId) {
                 const bill = allBills.find(b => b.id === billId);
                 if (!bill) return;
@@ -308,17 +290,14 @@
                 receipt.style.position = 'absolute';
                 receipt.style.left = '-9999px';
 
-                html2canvas(receipt, {
-                    scale: 2, // I changed this back to 2 so the image is high quality for the reduced width
-                    backgroundColor: "#ffffff"
-                }).then(canvas => {
+                html2canvas(receipt, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
                     receipt.style.display = 'none'; 
                     const link = document.createElement('a');
                     link.download = `Receipt_${document.getElementById('printReceiptNo').innerText}.png`;
                     link.href = canvas.toDataURL('image/png');
                     link.click();
                 }).catch(err => {
-                    alert("Error generating image. Please use PDF instead.");
+                    showAlert("Error", "Error generating image. Please use PDF instead.", "❌");
                     receipt.style.display = 'none';
                 });
             };
