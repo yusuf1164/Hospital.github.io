@@ -152,7 +152,7 @@ function initForms() {
             const age = calculateAge(this.value); // Calculates age
             const displayDiv = this.nextElementSibling; // Gets the div right below it
             if (displayDiv && displayDiv.id.includes('ageDisplay')) { // Checks if it's the age display div
-                displayDiv.textContent = age !== "" ? `Calculated Age: ${age} years old` : ""; // Shows the age
+                displayDiv.textContent = age !== "" ? `Age: ${age} years old` : ""; // Shows the age
             }
         });
     });
