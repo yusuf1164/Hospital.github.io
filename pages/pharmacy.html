@@ -15,6 +15,9 @@
                 <p>Dispense medications based on doctor consultations.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
 
             <table>
@@ -35,36 +38,95 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF PHARMACY INITIALIZATION ---
         enforceAuth(['pharmacy']);
+        
         auth.onAuthStateChanged((user) => {
             if (!user) return;
+            
             const tbody = document.getElementById('pharmacyTableBody');
             const searchInput = document.getElementById('searchPharmacy');
-            let allPrescriptions = [];
+            let debounceTimer;
+            let unsubscribeSnapshot = null;
 
-            db.collection('prescriptions').onSnapshot((snapshot) => {
-                allPrescriptions = [];
-                snapshot.forEach(doc => allPrescriptions.push({ id: doc.id, ...doc.data() }));
-                allPrescriptions.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA;
-                });
-                renderTable(allPrescriptions);
-            }, error => {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
-            });
+            // --- START OF SCALABLE INITIAL LOAD ---
+            function loadInitialPrescriptions() {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">Loading prescriptions...</td></tr>`;
+                
+                if (unsubscribeSnapshot) unsubscribeSnapshot(); // Clear previous listener
 
+                unsubscribeSnapshot = db.collection('prescriptions')
+                    .orderBy('createdAt', 'desc')
+                    .limit(50) // Only load the latest 50 by default
+                    .onSnapshot((snapshot) => {
+                        let prescriptions = [];
+                        snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
+                        renderTable(prescriptions);
+                    }, error => {
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                    });
+            }
+            // --- END OF SCALABLE INITIAL LOAD ---
+
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = allPrescriptions.filter(p => {
-                    const name = String(p.patientName).toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    return name.includes(term) || pid.includes(term);
-                });
-                renderTable(filtered);
-            });
+                const term = e.target.value.trim().toLowerCase();
+                clearTimeout(debounceTimer);
 
+                if (term === "") {
+                    loadInitialPrescriptions(); // Reload the latest 50 if search is cleared
+                    return;
+                }
+
+                debounceTimer = setTimeout(() => {
+                    if (unsubscribeSnapshot) unsubscribeSnapshot(); // Stop listening to initial stream
+                    
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">Searching...</td></tr>`;
+                    
+                    const upperTerm = term.toUpperCase();
+
+                    // Query the database directly for matches
+                    const idQuery = db.collection('prescriptions').where('patientId', '==', upperTerm).get();
+                    const nameQuery = db.collection('prescriptions')
+                        .orderBy('patientName')
+                        .startAt(term)
+                        .endAt(term + '\uf8ff')
+                        .limit(20)
+                        .get();
+
+                    Promise.all([idQuery, nameQuery]).then(([idSnap, nameSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        idSnap.forEach(doc => {
+                            results.push({ id: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        nameSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ id: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        // Sort combined results by newest first
+                        results.sort((a, b) => {
+                            const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                            const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                            return timeB - timeA;
+                        });
+
+                        renderTable(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Search Error: ${error.message}<br><small>Check console for index link.</small></td></tr>`;
+                    });
+                }, 300);
+            });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
+
+            // --- START OF RENDER TABLE ---
             function renderTable(prescriptions) {
                 if (prescriptions.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No prescriptions found.</td></tr>`;
@@ -77,8 +139,6 @@
                     
                     let actionHtml = '';
                     if (d.status === 'Pending') {
-                        // FIXED: Now passing d.patientId and d.medication to the function!
-                        // We also escape single quotes in medication just in case.
                         const safeMed = d.medication ? d.medication.replace(/'/g, "\\'") : '';
                         actionHtml = `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${safeMed}')">Dispense</button>`;
                     } else {
@@ -98,18 +158,25 @@
                     `;
                 });
             }
+            // --- END OF RENDER TABLE ---
 
+            // --- START OF DISPENSE DRUG ---
             window.dispenseDrug = function(id, patientId, medication) {
                 showConfirm("Confirm Dispense", `Have you dispensed <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
                     db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
                     .then(() => { 
                         logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
-                        showAlert("Success", "Drugs dispensed successfully!", "✅"); 
+                        showAlert("Success", "Drugs dispensed successfully!", "✔️"); 
                     })
                     .catch((error) => showAlert("Error", error.message, "❌"));
                 });
             };
+            // --- END OF DISPENSE DRUG ---
+
+            // Start by loading initial prescriptions
+            loadInitialPrescriptions();
         });
+        // --- END OF PHARMACY INITIALIZATION ---
     </script>
 </body>
 </html>
