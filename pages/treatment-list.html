@@ -16,6 +16,9 @@
                 <p>View and manage ongoing and treated patients.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <!-- Filter Buttons -->
             <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
                 <button class="btn btn-primary filter-btn" data-filter="All" style="flex: 1;">All Patients</button>
@@ -23,20 +26,10 @@
                 <button class="btn btn-outline filter-btn" data-filter="Treated" style="flex: 1; border-color: #065f46; color: #065f46;">Treated</button>
             </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Status</th>
-                        <th>Date Registered</th>
-                        <th>Action</th>
-                    </tr>
-                </thead>
-                <tbody id="treatmentTableBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading patients...</td></tr>
-                </tbody>
-            </table>
+            <!-- TREATMENT CARDS CONTAINER -->
+            <div id="treatmentCardContainer" class="treatment-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading patients...</p>
+            </div>
         </div>
     </main>
 
@@ -48,7 +41,7 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START TREATMENT LIST LOGIC ---
+        // --- START OF TREATMENT LIST INITIALIZATION ---
         enforceAuth(['admin', 'doctor', 'nurse', 'reception', 'records']);
         let allPatients = [];
         let currentFilter = 'All';
@@ -62,10 +55,11 @@
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            const tbody = document.getElementById('treatmentTableBody');
+            const cardContainer = document.getElementById('treatmentCardContainer');
 
-            // Load Patients
-            db.collection('patients').onSnapshot(snapshot => {
+            // --- START OF SCALABLE INITIAL FETCH ---
+            // We only fetch the 50 most recent patients to keep the page fast
+            db.collection('patients').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
                 allPatients = [];
                 snapshot.forEach(doc => {
                     const d = doc.data();
@@ -75,10 +69,11 @@
                 });
                 applyFilter(currentFilter);
             });
+            // --- END OF SCALABLE INITIAL FETCH ---
 
-            // Filter Button Logic
+            // --- START OF FILTER BUTTONS LOGIC ---
             document.querySelectorAll('.filter-btn').forEach(btn => {
-                // Highlight the active filter button
+                // Highlight the active filter button initially
                 if (btn.getAttribute('data-filter') === currentFilter) {
                     btn.className = 'btn btn-primary filter-btn';
                 } else {
@@ -103,7 +98,9 @@
                     e.target.style.cssText = 'flex: 1;';
                 });
             });
+            // --- END OF FILTER BUTTONS LOGIC ---
 
+            // --- START OF APPLY FILTER & RENDER CARDS ---
             function applyFilter(filter) {
                 let filtered = allPatients;
                 if (filter !== 'All') {
@@ -111,48 +108,55 @@
                 }
 
                 if (filtered.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">No ${filter} patients found.</td></tr>`;
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: #888;">No ${filter} patients found.</p>`;
                     return;
                 }
 
-                tbody.innerHTML = '';
+                cardContainer.innerHTML = '';
                 filtered.forEach(p => {
-    const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
-    const btnText = p.treatmentStatus === 'Treated' ? 'Mark Ongoing' : 'Mark Treated';
-    const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
-    const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
+                    const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
+                    const btnText = p.treatmentStatus === 'Treated' ? 'Mark Ongoing' : 'Mark Treated';
+                    const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
+                    const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
 
-    // NEW DATE FORMAT
-    const date = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
-        year: 'numeric', month: 'short', day: 'numeric', 
-        hour: '2-digit', minute: '2-digit', hour12: true 
-    }) : 'N/A';
+                    // Your exact custom date format
+                    const date = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'N/A';
 
-    tbody.innerHTML += `
-        <tr>
-            <td><strong style="color:#2563eb;">${p.patientId}</strong></td>
-            <td><strong>${p.firstName} ${p.lastName}</strong></td>
-            <td><span class="status-badge ${badgeClass}">${p.treatmentStatus}</span></td>
-            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
-            <td>
-                <button class="btn ${btnColor}" style="padding: 5px 10px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
-            </td>
-        </tr>
-    `;
-});
+                    cardContainer.innerHTML += `
+                        <div class="treatment-card">
+                            <div class="treatment-card-header">
+                                <span class="treatment-id">${p.patientId}</span>
+                                <span class="treatment-date">${date}</span>
+                            </div>
+                            <div class="treatment-name">${p.firstName} ${p.lastName}</div>
+                            <div class="treatment-details">
+                                <span class="status-badge ${badgeClass}">${p.treatmentStatus}</span>
+                                <button class="btn ${btnColor}" style="padding: 6px 12px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
+                            </div>
+                        </div>
+                    `;
+                });
             }
+            // --- END OF APPLY FILTER & RENDER CARDS ---
 
+            // --- START OF TOGGLE STATUS ---
             window.toggleStatus = function(docId, currentStatus) {
                 const newStatus = currentStatus === 'Treated' ? 'Ongoing' : 'Treated';
-                if(confirm(`Change patient status to ${newStatus}?`)) {
+                
+                showConfirm("Update Status", `Are you sure you want to change this patient's status to <strong>${newStatus}</strong>?`, () => {
                     db.collection('patients').doc(docId).update({ treatmentStatus: newStatus })
                     .then(() => {
                         logActivity(auth.currentUser, "Updated Treatment Status", `Patient set to ${newStatus}`);
-                    }).catch(err => alert("Error: " + err.message));
-                }
+                        showAlert("Success", `Patient marked as ${newStatus}`, "✔️");
+                    }).catch(err => showAlert("Error", err.message, "❌"));
+                });
             };
+            // --- END OF TOGGLE STATUS ---
         });
-        // --- END TREATMENT LIST LOGIC ---
+        // --- END OF TREATMENT LIST INITIALIZATION ---
     </script>
 </body>
 </html>
