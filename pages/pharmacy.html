@@ -20,14 +20,10 @@
 
             <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
 
-            <table>
-                <thead>
-                    <tr><th>Patient ID</th><th>Patient Name</th><th>Requested By</th><th>Prescription</th><th>Date</th><th>Status</th><th>Action</th></tr>
-                </thead>
-                <tbody id="pharmacyTableBody">
-                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading prescriptions...</td></tr>
-                </tbody>
-            </table>
+            <!-- Pharmacy Cards Container -->
+            <div id="pharmacyCardContainer" class="pharmacy-grid">
+                <p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>
+            </div>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -44,53 +40,53 @@
         auth.onAuthStateChanged((user) => {
             if (!user) return;
             
-            const tbody = document.getElementById('pharmacyTableBody');
+            const cardContainer = document.getElementById('pharmacyCardContainer');
             const searchInput = document.getElementById('searchPharmacy');
             let debounceTimer;
             let unsubscribeSnapshot = null;
 
             // --- START OF SCALABLE INITIAL LOAD ---
             function loadInitialPrescriptions() {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">Loading prescriptions...</td></tr>`;
+                cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>`;
                 
-                if (unsubscribeSnapshot) unsubscribeSnapshot(); // Clear previous listener
+                if (unsubscribeSnapshot) unsubscribeSnapshot(); 
 
                 unsubscribeSnapshot = db.collection('prescriptions')
                     .orderBy('createdAt', 'desc')
-                    .limit(50) // Only load the latest 50 by default
+                    .limit(50) 
                     .onSnapshot((snapshot) => {
                         let prescriptions = [];
                         snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
-                        renderTable(prescriptions);
+                        renderCards(prescriptions);
                     }, error => {
-                        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Error: ${error.message}</p>`;
                     });
             }
             // --- END OF SCALABLE INITIAL LOAD ---
 
             // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.trim().toLowerCase();
+                const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
 
                 if (term === "") {
-                    loadInitialPrescriptions(); // Reload the latest 50 if search is cleared
+                    loadInitialPrescriptions(); 
                     return;
                 }
 
                 debounceTimer = setTimeout(() => {
-                    if (unsubscribeSnapshot) unsubscribeSnapshot(); // Stop listening to initial stream
+                    if (unsubscribeSnapshot) unsubscribeSnapshot(); 
                     
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">Searching...</td></tr>`;
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Searching...</p>`;
                     
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
                     const upperTerm = term.toUpperCase();
 
-                    // Query the database directly for matches
                     const idQuery = db.collection('prescriptions').where('patientId', '==', upperTerm).get();
                     const nameQuery = db.collection('prescriptions')
                         .orderBy('patientName')
-                        .startAt(term)
-                        .endAt(term + '\uf8ff')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
                         .limit(20)
                         .get();
 
@@ -110,29 +106,28 @@
                             }
                         });
 
-                        // Sort combined results by newest first
                         results.sort((a, b) => {
                             const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                             const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                             return timeB - timeA;
                         });
 
-                        renderTable(results);
+                        renderCards(results);
                     }).catch(error => {
                         console.error("Search Error:", error);
-                        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Search Error: ${error.message}<br><small>Check console for index link.</small></td></tr>`;
+                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Search Error: ${error.message}</p>`;
                     });
                 }, 300);
             });
             // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            // --- START OF RENDER TABLE ---
-            function renderTable(prescriptions) {
+            // --- START OF RENDER CARDS ---
+            function renderCards(prescriptions) {
                 if (prescriptions.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No prescriptions found.</td></tr>`;
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">No prescriptions found.</p>`;
                     return;
                 }
-                tbody.innerHTML = '';
+                cardContainer.innerHTML = '';
                 prescriptions.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
@@ -140,25 +135,29 @@
                     let actionHtml = '';
                     if (d.status === 'Pending') {
                         const safeMed = d.medication ? d.medication.replace(/'/g, "\\'") : '';
-                        actionHtml = `<button class="btn btn-primary" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${safeMed}')">Dispense</button>`;
+                        actionHtml = `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${safeMed}')">Dispense</button>`;
                     } else {
-                        actionHtml = `<span style="color:#065f46; font-weight:bold;">Done</span>`;
+                        actionHtml = `<span style="color:#065f46; font-weight:bold;">Dispensed</span>`;
                     }
                     
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.doctorName || 'Doctor'} (ID: ${d.doctorStaffId || 'N/A'})</td>
-                            <td class="allow-wrap" style="color: #2563eb; font-weight: bold;">${d.medication}</td>
-                            <td>${date}</td>
-                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-                            <td>${actionHtml}</td>
-                        </tr>
+                    cardContainer.innerHTML += `
+                        <div class="pharmacy-card">
+                            <div class="pharmacy-card-header">
+                                <span class="pharmacy-id">${d.patientId}</span>
+                                <span class="pharmacy-date">${date}</span>
+                            </div>
+                            <div class="pharmacy-name">${d.patientName}</div>
+                            <div style="font-size:12px; color:#6b7280;">Requested by: ${d.doctorName || 'Doctor'} (ID: ${d.doctorStaffId || 'N/A'})</div>
+                            <div class="pharmacy-med">💊 ${d.medication}</div>
+                            <div class="pharmacy-action">
+                                <span class="status-badge ${badgeClass}">${d.status}</span>
+                                ${actionHtml}
+                            </div>
+                        </div>
                     `;
                 });
             }
-            // --- END OF RENDER TABLE ---
+            // --- END OF RENDER CARDS ---
 
             // --- START OF DISPENSE DRUG ---
             window.dispenseDrug = function(id, patientId, medication) {
@@ -173,7 +172,6 @@
             };
             // --- END OF DISPENSE DRUG ---
 
-            // Start by loading initial prescriptions
             loadInitialPrescriptions();
         });
         // --- END OF PHARMACY INITIALIZATION ---
