@@ -18,7 +18,12 @@
 
             <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
-            
+
+            <!-- SEARCH BAR -->
+            <div style="margin-bottom: 20px;">
+                <input type="text" id="searchTreatment" placeholder="Type 3+ letters to search..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+            </div>
+
             <!-- Filter Buttons -->
             <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
                 <button class="btn btn-primary filter-btn" data-filter="All" style="flex: 1;">All Patients</button>
@@ -27,8 +32,8 @@
             </div>
 
             <!-- TREATMENT CARDS CONTAINER -->
-            <div id="treatmentCardContainer" class="treatment-grid">
-                <p style="text-align: center; width: 100%; color: #888;">Loading patients...</p>
+            <div id="treatmentCardContainer" class="card-grid-layout">
+                <p style="text-align: center; width: 100%; color: #888;">Loading recent patients...</p>
             </div>
         </div>
     </main>
@@ -43,8 +48,11 @@
     <script>
         // --- START OF TREATMENT LIST INITIALIZATION ---
         enforceAuth(['admin', 'doctor', 'nurse', 'reception', 'records']);
-        let allPatients = [];
+        
+        let currentDataList = []; // Holds the patients currently on screen
         let currentFilter = 'All';
+        let currentSearchTerm = "";
+        let debounceTimer;
 
         // Check URL parameters (e.g., ?status=Ongoing)
         const urlParams = new URLSearchParams(window.location.search);
@@ -56,62 +64,135 @@
             if (!user) return;
 
             const cardContainer = document.getElementById('treatmentCardContainer');
+            const searchInput = document.getElementById('searchTreatment');
 
-            // --- START OF SCALABLE INITIAL FETCH ---
-            // We only fetch the 50 most recent patients to keep the page fast
-            db.collection('patients').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
-                allPatients = [];
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    // If no status exists, assume it's ongoing
-                    if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing'; 
-                    allPatients.push({ id: doc.id, ...d });
-                });
-                applyFilter(currentFilter);
-            });
-            // --- END OF SCALABLE INITIAL FETCH ---
-
-            // --- START OF FILTER BUTTONS LOGIC ---
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                // Highlight the active filter button initially
-                if (btn.getAttribute('data-filter') === currentFilter) {
-                    btn.className = 'btn btn-primary filter-btn';
-                } else {
-                    btn.className = 'btn btn-outline filter-btn';
-                    if (btn.getAttribute('data-filter') === 'Ongoing') btn.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
-                    if (btn.getAttribute('data-filter') === 'Treated') btn.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
-                }
-
-                btn.addEventListener('click', (e) => {
-                    currentFilter = e.target.getAttribute('data-filter');
-                    window.history.pushState({}, '', `?status=${currentFilter}`);
-                    applyFilter(currentFilter);
-                    
-                    // Reset button styles
-                    document.querySelectorAll('.filter-btn').forEach(b => {
-                        b.className = 'btn btn-outline filter-btn';
-                        if (b.getAttribute('data-filter') === 'Ongoing') b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
-                        if (b.getAttribute('data-filter') === 'Treated') b.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
+            // --- START OF INITIAL FETCH (ONLY 10 RECENT) ---
+            function loadInitialPatients() {
+                cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Loading recent patients...</p>';
+                
+                db.collection('patients').orderBy('createdAt', 'desc').limit(10).get().then(snapshot => {
+                    currentDataList = [];
+                    snapshot.forEach(doc => {
+                        const d = doc.data();
+                        if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing'; 
+                        currentDataList.push({ id: doc.id, ...d });
                     });
-                    // Highlight clicked
-                    e.target.className = 'btn btn-primary filter-btn';
-                    e.target.style.cssText = 'flex: 1;';
+                    applyFilterAndRender();
                 });
-            });
-            // --- END OF FILTER BUTTONS LOGIC ---
+            }
+            // --- END OF INITIAL FETCH ---
 
-            // --- START OF APPLY FILTER & RENDER CARDS ---
-            function applyFilter(filter) {
-                let filtered = allPatients;
-                if (filter !== 'All') {
-                    filtered = allPatients.filter(p => p.treatmentStatus === filter);
+            // --- START OF SEARCH-ON-TYPE LOGIC ---
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.trim().toLowerCase();
+                currentSearchTerm = term;
+                clearTimeout(debounceTimer);
+
+                // If less than 3 characters, clear results or show initial
+                if (term.length === 0) {
+                    loadInitialPatients();
+                    return;
                 }
-
-                if (filtered.length === 0) {
-                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: #888;">No ${filter} patients found.</p>`;
+                if (term.length < 3) {
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Keep typing to search...</p>';
                     return;
                 }
 
+                // Debounce for 400ms to wait for the user to finish typing
+                debounceTimer = setTimeout(async () => {
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Searching...</p>';
+                    
+                    let results = [];
+                    let seenIds = new Set();
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); 
+                    const upperTerm = term.toUpperCase();
+
+                    // 1. Search by Exact ID
+                    try {
+                        const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).limit(10).get();
+                        idSnap.forEach(doc => { 
+                            const d = doc.data();
+                            if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing';
+                            results.push({ id: doc.id, ...d }); 
+                            seenIds.add(doc.id); 
+                        });
+                    } catch (err) { console.error(err); }
+
+                    // 2. Search by First Name
+                    try {
+                        const firstSnap = await db.collection('patients').orderBy('firstName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(20).get();
+                        firstSnap.forEach(doc => { 
+                            if (!seenIds.has(doc.id)) { 
+                                const d = doc.data();
+                                if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing';
+                                results.push({ id: doc.id, ...d }); 
+                                seenIds.add(doc.id); 
+                            } 
+                        });
+                    } catch (err) { console.error(err); }
+
+                    // 3. Search by Last Name
+                    try {
+                        const lastSnap = await db.collection('patients').orderBy('lastName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(20).get();
+                        lastSnap.forEach(doc => { 
+                            if (!seenIds.has(doc.id)) { 
+                                const d = doc.data();
+                                if (!d.treatmentStatus) d.treatmentStatus = 'Ongoing';
+                                results.push({ id: doc.id, ...d }); 
+                                seenIds.add(doc.id); 
+                            } 
+                        });
+                    } catch (err) { console.error(err); }
+
+                    // Update the data list and render
+                    currentDataList = results;
+                    applyFilterAndRender();
+                }, 400); 
+            });
+            // --- END OF SEARCH-ON-TYPE LOGIC ---
+
+            // --- START OF FILTER BUTTONS LOGIC ---
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    currentFilter = e.target.getAttribute('data-filter');
+                    window.history.pushState({}, '', `?status=${currentFilter}`);
+                    highlightFilterButton(currentFilter);
+                    applyFilterAndRender();
+                });
+            });
+
+            function highlightFilterButton(filter) {
+                document.querySelectorAll('.filter-btn').forEach(b => {
+                    b.className = 'btn btn-outline filter-btn';
+                    b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
+                    
+                    if (b.getAttribute('data-filter') === 'Ongoing') b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
+                    if (b.getAttribute('data-filter') === 'Treated') b.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
+                    
+                    if (b.getAttribute('data-filter') === filter) {
+                        b.className = 'btn btn-primary filter-btn';
+                        b.style.cssText = 'flex: 1;';
+                    }
+                });
+            }
+            // --- END OF FILTER BUTTONS LOGIC ---
+
+            // --- START OF APPLY FILTER & RENDER CARDS ---
+            function applyFilterAndRender() {
+                let filtered = currentDataList;
+
+                // 1. Apply Status Filter (All, Ongoing, Treated)
+                if (currentFilter !== 'All') {
+                    filtered = filtered.filter(p => p.treatmentStatus === currentFilter);
+                }
+
+                // 2. Handle Empty State
+                if (filtered.length === 0) {
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: #888;">No patients found.</p>`;
+                    return;
+                }
+
+                // 3. Render Cards
                 cardContainer.innerHTML = '';
                 filtered.forEach(p => {
                     const badgeClass = p.treatmentStatus === 'Treated' ? 'status-complete' : 'status-pending';
@@ -119,20 +200,22 @@
                     const btnColor = p.treatmentStatus === 'Treated' ? 'btn-outline' : 'btn-primary';
                     const btnStyle = p.treatmentStatus === 'Treated' ? 'border-color: #1e3a8a; color: #1e3a8a;' : '';
 
-                    // Your exact custom date format
-                    const date = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
-                        year: 'numeric', month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit', hour12: true 
-                    }) : 'N/A';
+                    let date = 'N/A';
+                    if (p.createdAt && typeof p.createdAt.toDate === 'function') {
+                        date = p.createdAt.toDate().toLocaleString(undefined, { 
+                            year: 'numeric', month: 'short', day: 'numeric', 
+                            hour: '2-digit', minute: '2-digit', hour12: true 
+                        });
+                    }
 
                     cardContainer.innerHTML += `
-                        <div class="treatment-card">
-                            <div class="treatment-card-header">
-                                <span class="treatment-id">${p.patientId}</span>
-                                <span class="treatment-date">${date}</span>
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${p.patientId}</span>
+                                <span class="data-date">${date}</span>
                             </div>
-                            <div class="treatment-name">${p.firstName} ${p.lastName}</div>
-                            <div class="treatment-details">
+                            <div class="data-name">${p.firstName} ${p.lastName}</div>
+                            <div class="data-action" style="margin-top: 15px;">
                                 <span class="status-badge ${badgeClass}">${p.treatmentStatus}</span>
                                 <button class="btn ${btnColor}" style="padding: 6px 12px; font-size: 12px; ${btnStyle}" onclick="toggleStatus('${p.id}', '${p.treatmentStatus}')">${btnText}</button>
                             </div>
@@ -149,12 +232,23 @@
                 showConfirm("Update Status", `Are you sure you want to change this patient's status to <strong>${newStatus}</strong>?`, () => {
                     db.collection('patients').doc(docId).update({ treatmentStatus: newStatus })
                     .then(() => {
+                        // Update local array so we don't have to re-download data
+                        const pIndex = currentDataList.findIndex(p => p.id === docId);
+                        if (pIndex > -1) currentDataList[pIndex].treatmentStatus = newStatus;
+                        
                         logActivity(auth.currentUser, "Updated Treatment Status", `Patient set to ${newStatus}`);
                         showAlert("Success", `Patient marked as ${newStatus}`, "✔️");
+                        
+                        // Re-render
+                        applyFilterAndRender();
                     }).catch(err => showAlert("Error", err.message, "❌"));
                 });
             };
             // --- END OF TOGGLE STATUS ---
+
+            // Initialize Page
+            highlightFilterButton(currentFilter);
+            loadInitialPatients();
         });
         // --- END OF TREATMENT LIST INITIALIZATION ---
     </script>
