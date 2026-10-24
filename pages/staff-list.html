@@ -16,23 +16,15 @@
                 <p>View all hospital staff members and their roles.</p>
             </div>
 
-            <input type="text" id="searchStaff" placeholder="Search by Name or Staff ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Staff ID</th>
-                        <th>Staff Name</th>
-                        <th>Email</th>
-                        <th>Roles / Departments</th>
-                        <th>Assigned Shifts</th>
-                        <th>Date Registered</th>
-                    </tr>
-                </thead>
-                <tbody id="staffTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading staff...</td></tr>
-                </tbody>
-            </table>
+            <input type="text" id="searchStaff" placeholder="Type to search by Name or Staff ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+
+            <!-- STAFF CARDS CONTAINER -->
+            <div id="staffCardContainer" class="staff-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading staff...</p>
+            </div>
         </div>
     </main>
 
@@ -44,70 +36,149 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START STAFF LIST LOGIC ---
+        // --- START OF STAFF LIST INITIALIZATION ---
         enforceAuth(['admin', 'hr']);
-        let allStaff = [];
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            const tbody = document.getElementById('staffTableBody');
+            const cardContainer = document.getElementById('staffCardContainer');
             const searchInput = document.getElementById('searchStaff');
+            let debounceTimer;
 
-            db.collection('users').onSnapshot(snapshot => {
-                allStaff = [];
-                snapshot.forEach(doc => {
-                    const u = doc.data();
-                    if (u.staffId) { // Only staff have a staffId
-                        allStaff.push(u);
+            // --- START OF INITIAL FETCH (SCALABLE) ---
+            // We order by staffId (which excludes patients who don't have one)
+            // and limit to 20 so the page loads instantly.
+            function loadInitialStaff() {
+                cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Loading staff...</p>';
+                
+                db.collection('users').orderBy('staffId', 'desc').limit(20).get().then(snapshot => {
+                    if (snapshot.empty) {
+                        cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No staff found.</p>';
+                        return;
                     }
+                    
+                    let staffList = [];
+                    snapshot.forEach(doc => {
+                        const u = doc.data();
+                        if (u.staffId) { // Double check they have a staff ID
+                            staffList.push({ id: doc.id, ...u });
+                        }
+                    });
+                    
+                    renderStaffCards(staffList);
+                }).catch(error => {
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Error: ${error.message}</p>`;
                 });
+            }
+            // --- END OF INITIAL FETCH ---
 
-                // Sort by Staff ID
-                allStaff.sort((a, b) => String(a.staffId).localeCompare(String(b.staffId)));
-                renderTable(allStaff);
-            });
-
+            // --- START OF DEBOUNCED SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = allStaff.filter(u => {
-                    const name = `${u.firstName || ''} ${u.lastName || ''}`.toLowerCase();
-                    const id = String(u.staffId).toLowerCase();
-                    return name.includes(term) || id.includes(term);
-                });
-                renderTable(filtered);
-            });
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
 
-            function renderTable(staffList) {
-                if (staffList.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No staff found.</td></tr>`;
+                if (term === "") {
+                    loadInitialStaff(); 
                     return;
                 }
-                tbody.innerHTML = '';
+
+                debounceTimer = setTimeout(() => {
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Searching...</p>';
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    // Query by Name
+                    const nameQuery = db.collection('users')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    // Query by Staff ID
+                    const idQuery = db.collection('users')
+                        .where('staffId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        // Process Name matches (only keep if they are staff)
+                        nameSnap.forEach(doc => {
+                            const u = doc.data();
+                            if (u.staffId) {
+                                results.push({ id: doc.id, ...u });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        // Process ID matches
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ id: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        if (results.length === 0) {
+                            cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No matching staff found.</p>';
+                            return;
+                        }
+
+                        renderStaffCards(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Search Error: ${error.message}</p>`;
+                    });
+                }, 300);
+            });
+            // --- END OF DEBOUNCED SERVER-SIDE SEARCH ---
+
+            // --- START OF RENDER CARDS ---
+            function renderStaffCards(staffList) {
+                if (staffList.length === 0) {
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No staff found.</p>';
+                    return;
+                }
+
+                // Sort by Staff ID just like your original code
+                staffList.sort((a, b) => String(a.staffId).localeCompare(String(b.staffId)));
+
+                cardContainer.innerHTML = '';
                 staffList.forEach(u => {
-    const roles = u.roles && u.roles.length > 0 ? u.roles.join(', ') : '<span style="color:#dc2626;">None Assigned</span>';
-    const shifts = u.assignedShifts && u.assignedShifts.length > 0 ? u.assignedShifts.join(', ') : 'None';
-    
-    // NEW DATE FORMAT
-    const date = u.createdAt ? u.createdAt.toDate().toLocaleString(undefined, { 
-        year: 'numeric', month: 'short', day: 'numeric', 
-        hour: '2-digit', minute: '2-digit', hour12: true 
-    }) : 'N/A';
-    
-    tbody.innerHTML += `
-        <tr>
-            <td><strong style="color:#2563eb;">${u.staffId}</strong></td>
-            <td><strong>${u.firstName} ${u.lastName}</strong></td>
-            <td>${u.email}</td>
-            <td style="text-transform: capitalize;">${roles}</td>
-            <td>${shifts}</td>
-            <td><small>${date}</small></td>
-        </tr>
-    `;
-});
+                    const roles = u.roles && u.roles.length > 0 ? u.roles.join(', ') : '<span style="color:#dc2626;">None Assigned</span>';
+                    const shifts = u.assignedShifts && u.assignedShifts.length > 0 ? u.assignedShifts.join(', ') : 'None';
+                    
+                    // Your exact custom date format
+                    const date = u.createdAt ? u.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'N/A';
+
+                    cardContainer.innerHTML += `
+                        <div class="staff-card">
+                            <div class="staff-card-header">
+                                <span class="staff-id">${u.staffId}</span>
+                                <span class="staff-date">${date}</span>
+                            </div>
+                            <div class="staff-name">${u.firstName} ${u.lastName}</div>
+                            <div class="staff-email">${u.email}</div>
+                            <div class="staff-details">
+                                <div><strong>Roles:</strong> <span style="text-transform: capitalize;">${roles}</span></div>
+                                <div><strong>Shifts:</strong> ${shifts}</div>
+                            </div>
+                        </div>
+                    `;
+                });
             }
+            // --- END OF RENDER CARDS ---
+
+            // Start by loading initial staff
+            loadInitialStaff();
         });
-        // --- END STAFF LIST LOGIC ---
+        // --- END OF STAFF LIST INITIALIZATION ---
     </script>
 </body>
 </html>
