@@ -451,3 +451,48 @@ a.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0
 /* ========================================= */
 /* --- END OF BILLING/NURSING/RECEPTION CARDS --- */
 /* ========================================= */
+
+
+/* ========================================= */
+/* --- START OF PHARMACY TABS & POS --- */
+/* ========================================= */
+.pharmacy-tabs { display: flex; border-bottom: 2px solid #e5e7eb; margin-bottom: 20px; }
+.pharmacy-tab { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #6b7280; cursor: pointer; border: none; background: none; font-size: 15px; }
+.pharmacy-tab.active { color: #1e3a8a; border-bottom: 3px solid #1e3a8a; }
+.pos-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+@media (max-width: 768px) { .pos-grid { grid-template-columns: 1fr; } }
+.pos-cart { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 15px; }
+.pos-cart-item { display: flex; justify-content: space-between; border-bottom: 1px solid #e5e7eb; padding: 8px 0; font-size: 14px; }
+.pos-total { display: flex; justify-content: space-between; font-size: 18px; font-weight: bold; margin-top: 15px; color: #1e3a8a; }
+/* ========================================= */
+/* --- END OF PHARMACY TABS & POS --- */
+/* ========================================= */
+
+
+
+/* ========================================= */
+/* --- START OF MODERN TABS & POS --- */
+/* ========================================= */
+.modern-tabs { display: flex; background: #e5e7eb; padding: 5px; border-radius: 10px; margin-bottom: 25px; }
+.modern-tab { flex: 1; padding: 12px; text-align: center; font-weight: bold; color: #4b5563; cursor: pointer; border: none; background: none; border-radius: 8px; transition: 0.3s; font-size: 14px; }
+.modern-tab.active { background: #ffffff; color: #1e3a8a; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.pos-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+@media (min-width: 768px) { .pos-grid { grid-template-columns: 2fr 1fr; } }
+.pos-cart { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; height: fit-content; }
+.pos-cart-item { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding: 12px 0; font-size: 14px; }
+.pos-total { display: flex; justify-content: space-between; font-size: 20px; font-weight: bold; margin-top: 20px; color: #1e3a8a; border-top: 2px dashed #ccc; padding-top: 15px; }
+/* ========================================= */
+/* --- END OF MODERN TABS & POS --- */
+/* ========================================= */
+
+/* ========================================= */
+/* --- START OF BILLING STAT CARDS --- */
+/* ========================================= */
+.billing-stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 25px; }
+@media (max-width: 600px) { .billing-stats-grid { grid-template-columns: 1fr; } }
+.billing-stat-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 15px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.billing-stat-card h4 { color: #6b7280; font-size: 12px; margin-bottom: 5px; text-transform: uppercase; }
+.billing-stat-card p { color: #1e3a8a; font-size: 18px; font-weight: bold; margin: 0; }
+/* ========================================= */
+/* --- END OF BILLING STAT CARDS --- */
+/* ========================================= */
