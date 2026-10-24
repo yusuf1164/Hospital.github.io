@@ -36,7 +36,7 @@
                         <h3>Add to Cart</h3>
                         <div class="form-grid">
                             <div class="form-group" style="grid-column: 1 / -1;">
-                                <label>Select Drug</label>
+                                <label>Select Drug (Check Expiry)</label>
                                 <select id="posDrugSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;" onchange="updateSellUnitDropdown('pos')">
                                     <option value="">Loading drugs...</option>
                                 </select>
@@ -103,7 +103,7 @@
                     </form>
                 </div>
 
-                <h3 style="color: #1e3a8a; margin-bottom: 15px;">Current Inventory</h3>
+                <h3 style="color: #1e3a8a; margin-bottom: 15px;">Current Inventory (Sorted by Expiry)</h3>
                 <div id="inventoryCardContainer" class="card-grid-layout"></div>
             </div>
         </div>
@@ -120,7 +120,7 @@
 
             <div class="form-grid" style="background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb; margin-bottom: 15px;">
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Select Drug (Fix Typos)</label>
+                    <label>Select Drug (Check Expiry)</label>
                     <select id="opdDrugSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;" onchange="updateSellUnitDropdown('opd')">
                         <option value="">Select from inventory...</option>
                     </select>
@@ -242,7 +242,9 @@
 
                 const cart = context === 'pos' ? posCart : opdCart;
                 cart.push({
-                    id: drug.id, name: drug.name, sellUnit: sellUnit, qty: qty,
+                    id: drug.id, 
+                    name: `${drug.name} (Exp: ${drug.expiryDate})`, // ADDED EXPIRY TO CART NAME
+                    sellUnit: sellUnit, qty: qty,
                     baseUnitsDeducted: totalBaseUnitsNeeded, pricePerBase: drug.price, totalPrice: totalBaseUnitsNeeded * drug.price
                 });
                 renderCart(context);
@@ -273,7 +275,6 @@
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <strong>₦${item.totalPrice.toLocaleString()}</strong>
-                                <!-- UPDATED TO TRASH ICON -->
                                 <button onclick="removeFromCart('${context}', ${index})" style="background:none; border:none; cursor:pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style="fill: #dc2626; width: 18px; height: 18px;"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
                             </div>
                         </div>
@@ -294,7 +295,8 @@
                 const opdDrugSelect = document.getElementById('opdDrugSelect');
                 opdDrugSelect.innerHTML = '<option value="">Select from inventory...</option>';
                 globalInventory.forEach(drug => {
-                    opdDrugSelect.innerHTML += `<option value="${drug.id}">${drug.name}</option>`;
+                    // ADDED EXPIRY AND STOCK TO OPD DROPDOWN
+                    opdDrugSelect.innerHTML += `<option value="${drug.id}">${drug.name} (Exp: ${drug.expiryDate}) [${drug.stock} left]</option>`;
                 });
                 opdCart = [];
                 renderCart('opd');
@@ -382,7 +384,6 @@
                 });
             });
 
-            // --- START OF RESTOCK LOGIC ---
             window.restockDrug = function(id, name, baseUnit) {
                 showPrompt("Restock Drug", `How many <strong>${baseUnit}s</strong> of ${name} are you adding to stock?`, "10", (qty) => {
                     const amount = parseInt(qty);
@@ -398,9 +399,9 @@
                     }).catch(err => showAlert("Error", err.message, "❌"));
                 });
             };
-            // --- END OF RESTOCK LOGIC ---
 
-            db.collection('inventory').orderBy('name').onSnapshot(snapshot => {
+            // Sort Inventory by Expiry Date (Soonest first)
+            db.collection('inventory').orderBy('expiryDate', 'asc').onSnapshot(snapshot => {
                 globalInventory = [];
                 const posDrugSelect = document.getElementById('posDrugSelect');
                 posDrugSelect.innerHTML = '<option value="">Select drug...</option>';
@@ -414,7 +415,9 @@
                 snapshot.forEach(doc => {
                     const d = doc.data();
                     globalInventory.push({ id: doc.id, ...d });
-                    posDrugSelect.innerHTML += `<option value="${doc.id}">${d.name}</option>`;
+                    
+                    // ADDED EXPIRY AND STOCK TO POS DROPDOWN
+                    posDrugSelect.innerHTML += `<option value="${doc.id}">${d.name} (Exp: ${d.expiryDate}) [${d.stock} left]</option>`;
 
                     const fullPackages = Math.floor(d.stock / d.unitsPerPackaging);
                     const looseUnits = d.stock % d.unitsPerPackaging;
@@ -443,7 +446,6 @@
                                 <strong>Stock:</strong> <span class="status-badge ${badgeClass}">${stockDisplay}</span><br>
                                 <small style="${expiryClass}">${expiryHtml}</small>
                             </div>
-                            <!-- ADDED RESTOCK BUTTON -->
                             <div class="data-action" style="margin-top: 10px; justify-content: flex-end;">
                                 <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; border-color: #10b981; color: #10b981;" onclick="restockDrug('${doc.id}', '${d.name.replace(/'/g, "\\'")}', '${d.baseUnit}')">+ Restock</button>
                             </div>
