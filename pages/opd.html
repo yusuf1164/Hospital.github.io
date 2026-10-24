@@ -17,7 +17,7 @@
 
             <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
-            
+
             <div class="form-card">
                 <h3>New Consultation</h3>
                 <form id="opdForm">
@@ -81,14 +81,11 @@
             </div>
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Consultation History</h3>
-            <table>
-                <thead>
-                    <tr><th>Date</th><th>Patient ID</th><th>Patient Name</th><th>Diagnosis</th><th>Routed To</th></tr>
-                </thead>
-                <tbody id="opdHistoryBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading history...</td></tr>
-                </tbody>
-            </table>
+            
+            <!-- HISTORY CARDS CONTAINER -->
+            <div id="opdHistoryCardContainer" class="card-grid-layout">
+                <p style="text-align:center; width:100%; color:#888;">Loading history...</p>
+            </div>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -115,7 +112,7 @@
             const searchInput = document.getElementById('patientSearchInput');
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
-            const historyBody = document.getElementById('opdHistoryBody');
+            const historyContainer = document.getElementById('opdHistoryCardContainer');
             let debounceTimer;
 
             // --- START OF SCALABLE SERVER-SIDE SEARCH ---
@@ -123,18 +120,18 @@
                 const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
+                searchInput.dataset.name = "";
                 autocompleteList.style.display = 'none';
 
-                if (term.length < 2) return; // Don't search until they type at least 2 letters
+                if (term.length < 2) return; 
 
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
                     autocompleteList.style.display = 'block';
 
-                    const searchTerm = term.toLowerCase();
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1);
                     const upperTerm = term.toUpperCase();
 
-                    // Query 1: Search by First Name
                     const nameQuery = db.collection('patients')
                         .orderBy('firstName')
                         .startAt(searchTerm)
@@ -142,7 +139,6 @@
                         .limit(10)
                         .get();
 
-                    // Query 2: Search by Patient ID (e.g., P0001)
                     const idQuery = db.collection('patients')
                         .where('patientId', '==', upperTerm)
                         .get();
@@ -168,7 +164,7 @@
                         console.error("Search Error:", error);
                         autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
                     });
-                }, 300); // 300ms debounce
+                }, 600); 
             });
 
             function renderDropdown(patients) {
@@ -184,7 +180,7 @@
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                         hiddenPatientId.value = p.patientId;
-                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Save name for form submit
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; 
                         autocompleteList.style.display = 'none';
                     });
                     autocompleteList.appendChild(div);
@@ -207,35 +203,42 @@
             });
             // --- END OF LOAD DYNAMIC SERVICES ---
 
-            // --- START OF LOAD CONSULTATION HISTORY ---
-            db.collection('consultations').onSnapshot((snapshot) => {
+            // --- START OF LOAD CONSULTATION HISTORY (CARD FORMAT) ---
+            db.collection('consultations').orderBy('createdAt', 'desc').limit(50).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
+                    historyContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No consultations recorded yet.</p>`;
                     return;
                 }
                 let consults = []; 
-                snapshot.forEach(doc => consults.push(doc.data()));
-                consults.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+                snapshot.forEach(doc => consults.push({ id: doc.id, ...doc.data() }));
                 
-                historyBody.innerHTML = '';
-                consults.slice(0, 20).forEach(d => {
+                historyContainer.innerHTML = '';
+                consults.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     
                     let badges = '';
-                    if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending" style="width:max-content;">💊 ${d.requests.pharmacy}</span>`;
-                    if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active" style="width:max-content;">🧪 ${d.requests.lab}</span>`;
-                    if (d.requests && d.requests.radiology) badges += `<span class="status-badge status-complete" style="width:max-content;">🩻 ${d.requests.radiology}</span>`;
-                    if (d.requests && d.requests.billing) badges += `<span class="status-badge status-pending" style="width:max-content;">💳 ₦${d.requests.billing}</span>`;
-                    if (!badges) badges = "None";
+                    if (d.requests && d.requests.pharmacy) badges += `<span class="status-badge status-pending" style="margin-bottom: 2px;">💊 ${d.requests.pharmacy}</span><br>`;
+                    if (d.requests && d.requests.lab) badges += `<span class="status-badge status-active" style="margin-bottom: 2px;">🧪 ${d.requests.lab}</span><br>`;
+                    if (d.requests && d.requests.radiology) badges += `<span class="status-badge status-complete" style="margin-bottom: 2px;">🩻 ${d.requests.radiology}</span><br>`;
+                    if (d.requests && d.requests.billing) badges += `<span class="status-badge status-pending" style="margin-bottom: 2px;">💳 ₦${d.requests.billing}</span><br>`;
+                    if (!badges) badges = '<span style="color:#888;">None</span>';
 
-                    historyBody.innerHTML += `
-                        <tr>
-                            <td><small>${date}</small></td>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.diagnosis}</td>
-                            <td><div style="display:flex; flex-direction:column; gap:5px;">${badges}</div></td>
-                        </tr>
+                    historyContainer.innerHTML += `
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.patientId}</span>
+                                <span class="data-date">${date}</span>
+                            </div>
+                            <div class="data-name">${d.patientName}</div>
+                            <div class="data-info" style="margin-top:10px; background:#fff;">
+                                <strong>Diagnosis:</strong> ${d.diagnosis}<br>
+                                <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
+                                <div style="margin-top: 10px; border-top: 1px solid #e5e7eb; padding-top: 10px;">
+                                    <strong>Routed To:</strong><br>
+                                    ${badges}
+                                </div>
+                            </div>
+                        </div>
                     `;
                 });
             });
