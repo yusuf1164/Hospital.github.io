@@ -9,7 +9,7 @@
 <body>
     <header id="header-placeholder"></header>
     <main>
-        <div class="table-container" style="max-width: 900px;">
+        <div class="table-container" style="max-width: 1000px;">
             <div class="page-header">
                 <h1>🗂️ Medical Records</h1>
                 <p>View complete patient history across all departments.</p>
@@ -32,11 +32,32 @@
 
             <!-- Patient History Container (Hidden by default) -->
             <div id="historyContainer" style="display: none;">
-                <div class="record-block"><h3>🌡️ Nursing Vitals</h3><div id="vitalsList"></div></div>
-                <div class="record-block"><h3>🩺 OPD Consultations</h3><div id="consultationsList"></div></div>
-                <div class="record-block"><h3>🧪 Laboratory Results</h3><div id="labsList"></div></div>
-                <div class="record-block"><h3>🩻 Radiology Scans</h3><div id="radiologyList"></div></div>
-                <div class="record-block"><h3>💳 Billing History</h3><div id="billingList"></div></div>
+                
+                <div class="record-section">
+                    <h3>🌡️ Nursing Vitals</h3>
+                    <div id="vitalsList" class="record-grid"></div>
+                </div>
+
+                <div class="record-section">
+                    <h3>🩺 OPD Consultations</h3>
+                    <div id="consultationsList" class="record-grid"></div>
+                </div>
+
+                <div class="record-section">
+                    <h3>🧪 Laboratory Results</h3>
+                    <div id="labsList" class="record-grid"></div>
+                </div>
+
+                <div class="record-section">
+                    <h3>🩻 Radiology Scans</h3>
+                    <div id="radiologyList" class="record-grid"></div>
+                </div>
+
+                <div class="record-section">
+                    <h3>💳 Billing History</h3>
+                    <div id="billingList" class="record-grid"></div>
+                </div>
+
             </div>
         </div>
     </main>
@@ -48,192 +69,227 @@
     <script src="../script.js"></script>
 
     <script>
-    // --- START OF RECORDS INITIALIZATION ---
-    enforceAuth(['records', 'doctor', 'admin', 'nurse']);
+        // --- START OF RECORDS INITIALIZATION ---
+        enforceAuth(['records', 'doctor', 'admin', 'nurse']);
 
-    auth.onAuthStateChanged((user) => {
-        if (!user) return;
+        auth.onAuthStateChanged((user) => {
+            if (!user) return;
 
-        const searchInput = document.getElementById('searchPatientInput');
-        const autocompleteList = document.getElementById('autocompleteList');
-        const hiddenPatientId = document.getElementById('selectedPatientId');
-        const historyContainer = document.getElementById('historyContainer');
-        let debounceTimer;
+            const searchInput = document.getElementById('searchPatientInput');
+            const autocompleteList = document.getElementById('autocompleteList');
+            const hiddenPatientId = document.getElementById('selectedPatientId');
+            const historyContainer = document.getElementById('historyContainer');
+            let debounceTimer;
 
-        // --- START OF FOOLPROOF SEARCH (FIRST & LAST NAME) ---
-        searchInput.addEventListener('input', (e) => {
-            const term = e.target.value.trim().toLowerCase();
-            clearTimeout(debounceTimer);
-            hiddenPatientId.value = "";
-            historyContainer.style.display = 'none';
-            autocompleteList.style.display = 'none';
+            // --- START OF FOOLPROOF SEARCH ---
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.trim().toLowerCase();
+                clearTimeout(debounceTimer);
+                hiddenPatientId.value = "";
+                historyContainer.style.display = 'none';
+                autocompleteList.style.display = 'none';
 
-            if (term.length < 2) return; 
+                if (term.length < 2) return; 
 
-            debounceTimer = setTimeout(async () => {
-                autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
-                autocompleteList.style.display = 'block';
+                debounceTimer = setTimeout(async () => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
 
-                let results = [];
-                let seenIds = new Set();
-                const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); // Capitalize for DB
-                const upperTerm = term.toUpperCase();
+                    let results = [];
+                    let seenIds = new Set();
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); 
+                    const upperTerm = term.toUpperCase();
 
-                // 1. SEARCH BY EXACT ID
-                try {
-                    const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).get();
-                    idSnap.forEach(doc => {
-                        results.push({ firestoreId: doc.id, ...doc.data() });
-                        seenIds.add(doc.id);
-                    });
-                } catch (err) { console.error("ID Search Error:", err); }
-
-                // 2. SEARCH BY FIRST NAME
-                try {
-                    const firstSnap = await db.collection('patients')
-                        .orderBy('firstName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(10)
-                        .get();
-                    firstSnap.forEach(doc => {
-                        if (!seenIds.has(doc.id)) {
+                    // 1. SEARCH BY EXACT ID
+                    try {
+                        const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).get();
+                        idSnap.forEach(doc => {
                             results.push({ firestoreId: doc.id, ...doc.data() });
                             seenIds.add(doc.id);
-                        }
+                        });
+                    } catch (err) { console.error("ID Search Error:", err); }
+
+                    // 2. SEARCH BY FIRST NAME
+                    try {
+                        const firstSnap = await db.collection('patients')
+                            .orderBy('firstName')
+                            .startAt(searchTerm)
+                            .endAt(searchTerm + '\uf8ff')
+                            .limit(10)
+                            .get();
+                        firstSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+                    } catch (err) { console.error("First Name Search Error:", err); }
+
+                    // 3. SEARCH BY LAST NAME
+                    try {
+                        const lastSnap = await db.collection('patients')
+                            .orderBy('lastName')
+                            .startAt(searchTerm)
+                            .endAt(searchTerm + '\uf8ff')
+                            .limit(10)
+                            .get();
+                        lastSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+                    } catch (err) { console.error("Last Name Search Error:", err); }
+
+                    // 4. FALLBACK: Recent 50
+                    try {
+                        const recentPatients = await db.collection('patients').orderBy('createdAt', 'desc').limit(50).get();
+                        recentPatients.forEach(doc => {
+                            if (seenIds.has(doc.id)) return; 
+                            const p = doc.data();
+                            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+                            if (fullName.includes(term)) {
+                                results.push({ firestoreId: doc.id, ...p });
+                                seenIds.add(doc.id);
+                            }
+                        });
+                    } catch (err) { console.error("Fallback Search Error:", err); }
+
+                    // 5. RENDER RESULTS
+                    autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matching patients found.</div>' : '';
+                    
+                    results.forEach(p => {
+                        const div = document.createElement('div');
+                        div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                        div.addEventListener('click', () => {
+                            searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                            hiddenPatientId.value = p.patientId; 
+                            autocompleteList.style.display = 'none';
+                            loadPatientHistory(p.patientId);
+                        });
+                        autocompleteList.appendChild(div);
                     });
-                } catch (err) { console.error("First Name Search Error:", err); }
-
-                // 3. SEARCH BY LAST NAME
-                try {
-                    const lastSnap = await db.collection('patients')
-                        .orderBy('lastName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(10)
-                        .get();
-                    lastSnap.forEach(doc => {
-                        if (!seenIds.has(doc.id)) {
-                            results.push({ firestoreId: doc.id, ...doc.data() });
-                            seenIds.add(doc.id);
-                        }
-                    });
-                } catch (err) { console.error("Last Name Search Error:", err); }
-
-                // 4. FALLBACK: Search recent 50 patients by full name (Catches combined names)
-                try {
-                    const recentPatients = await db.collection('patients').orderBy('createdAt', 'desc').limit(50).get();
-                    recentPatients.forEach(doc => {
-                        if (seenIds.has(doc.id)) return; 
-                        
-                        const p = doc.data();
-                        const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-                        
-                        if (fullName.includes(term)) {
-                            results.push({ firestoreId: doc.id, ...p });
-                            seenIds.add(doc.id);
-                        }
-                    });
-                } catch (err) { console.error("Fallback Search Error:", err); }
-
-                // 5. RENDER RESULTS
-                autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matching patients found.</div>' : '';
-                
-                results.forEach(p => {
-                    const div = document.createElement('div');
-                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
-                    div.addEventListener('click', () => {
-                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
-                        hiddenPatientId.value = p.patientId; 
-                        autocompleteList.style.display = 'none';
-                        loadPatientHistory(p.patientId);
-                    });
-                    autocompleteList.appendChild(div);
-                });
-            }, 300); 
-        });
-
-        document.addEventListener('click', (e) => {
-            if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
-        });
-        // --- END OF FOOLPROOF SEARCH ---
-
-        // --- START OF LOAD PATIENT HISTORY ---
-        function loadPatientHistory(patientIdString) {
-            historyContainer.style.display = 'block';
-
-            const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
-            sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
-
-            Promise.all([
-                db.collection('vitals').where('patientId', '==', patientIdString).get(),
-                db.collection('consultations').where('patientId', '==', patientIdString).get(),
-                db.collection('labResults').where('patientId', '==', patientIdString).get(),
-                db.collection('radiology').where('patientId', '==', patientIdString).get(),
-                db.collection('bills').where('patientId', '==', patientIdString).get()
-            ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
-                
-                const formatDate = (ts) => ts ? ts.toDate().toLocaleString(undefined, { 
-                    year: 'numeric', month: 'short', day: 'numeric', 
-                    hour: '2-digit', minute: '2-digit', hour12: true 
-                }) : 'N/A';
-
-                let vitalsHTML = '';
-                if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
-                vitalsSnap.forEach(doc => {
-                    const d = doc.data();
-                    vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg | <strong>Pulse:</strong> ${d.pulse} bpm</div>`;
-                });
-                document.getElementById('vitalsList').innerHTML = vitalsHTML;
-
-                let consultHTML = '';
-                if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
-                consultSnap.forEach(doc => {
-                    const d = doc.data();
-                    consultHTML += `
-                        <div class="record-item">
-                            <span class="record-date">${formatDate(d.createdAt)}</span>
-                            <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
-                            <strong>Symptoms:</strong> ${d.symptoms}<br>
-                            <strong>Diagnosis:</strong> ${d.diagnosis}
-                        </div>`;
-                });
-                document.getElementById('consultationsList').innerHTML = consultHTML;
-
-                let labsHTML = '';
-                if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
-                labsSnap.forEach(doc => {
-                    const d = doc.data();
-                    const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                    labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`;
-                });
-                document.getElementById('labsList').innerHTML = labsHTML;
-
-                let radHTML = '';
-                if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
-                radSnap.forEach(doc => {
-                    const d = doc.data();
-                    const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                    radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`;
-                });
-                document.getElementById('radiologyList').innerHTML = radHTML;
-
-                let billsHTML = '';
-                if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
-                billsSnap.forEach(doc => {
-                    const d = doc.data();
-                    const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
-                    billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`;
-                });
-                document.getElementById('billingList').innerHTML = billsHTML;
-
-            }).catch(err => {
-                showAlert("Error", "Error fetching records: " + err.message, "❌");
+                }, 300); 
             });
-        }
-        // --- END OF LOAD PATIENT HISTORY ---
-    });
-    // --- END OF RECORDS INITIALIZATION ---
-</script>
+
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
+            });
+            // --- END OF FOOLPROOF SEARCH ---
+
+            // --- START OF LOAD PATIENT HISTORY (CARD FORMAT) ---
+            function loadPatientHistory(patientIdString) {
+                historyContainer.style.display = 'block';
+
+                const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
+                sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888; grid-column: 1 / -1;">Loading...</p>');
+
+                Promise.all([
+                    db.collection('vitals').where('patientId', '==', patientIdString).get(),
+                    db.collection('consultations').where('patientId', '==', patientIdString).get(),
+                    db.collection('labResults').where('patientId', '==', patientIdString).get(),
+                    db.collection('radiology').where('patientId', '==', patientIdString).get(),
+                    db.collection('bills').where('patientId', '==', patientIdString).get()
+                ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
+                    
+                    const formatDate = (ts) => ts ? ts.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'N/A';
+
+                    // 1. VITALS CARDS
+                    let vitalsHTML = '';
+                    if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888; grid-column: 1 / -1;">No vitals recorded.</p>';
+                    vitalsSnap.forEach(doc => {
+                        const d = doc.data();
+                        vitalsHTML += `
+                            <div class="record-card">
+                                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                                <div class="record-card-body">
+                                    <strong>BP:</strong> ${d.bp}<br>
+                                    <strong>Temp:</strong> ${d.temp}°C<br>
+                                    <strong>Weight:</strong> ${d.weight}kg<br>
+                                    <strong>Pulse:</strong> ${d.pulse} bpm
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('vitalsList').innerHTML = vitalsHTML;
+
+                    // 2. CONSULTATIONS CARDS
+                    let consultHTML = '';
+                    if (consultSnap.empty) consultHTML = '<p style="color:#888; grid-column: 1 / -1;">No consultations recorded.</p>';
+                    consultSnap.forEach(doc => {
+                        const d = doc.data();
+                        consultHTML += `
+                            <div class="record-card" style="border-left-color: #8b5cf6;">
+                                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                                <div class="record-card-body">
+                                    <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
+                                    <strong>Symptoms:</strong> ${d.symptoms}<br>
+                                    <strong>Diagnosis:</strong> ${d.diagnosis}
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('consultationsList').innerHTML = consultHTML;
+
+                    // 3. LABS CARDS
+                    let labsHTML = '';
+                    if (labsSnap.empty) labsHTML = '<p style="color:#888; grid-column: 1 / -1;">No lab tests recorded.</p>';
+                    labsSnap.forEach(doc => {
+                        const d = doc.data();
+                        const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span class="record-badge-pending">Pending</span>';
+                        labsHTML += `
+                            <div class="record-card" style="border-left-color: #10b981;">
+                                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                                <div class="record-card-body">
+                                    <strong>Test:</strong> ${d.testType}<br>
+                                    ${res}
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('labsList').innerHTML = labsHTML;
+
+                    // 4. RADIOLOGY CARDS
+                    let radHTML = '';
+                    if (radSnap.empty) radHTML = '<p style="color:#888; grid-column: 1 / -1;">No scans recorded.</p>';
+                    radSnap.forEach(doc => {
+                        const d = doc.data();
+                        const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span class="record-badge-pending">Pending</span>';
+                        radHTML += `
+                            <div class="record-card" style="border-left-color: #f59e0b;">
+                                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                                <div class="record-card-body">
+                                    <strong>Scan:</strong> ${d.scanType}<br>
+                                    ${res}
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('radiologyList').innerHTML = radHTML;
+
+                    // 5. BILLING CARDS
+                    let billsHTML = '';
+                    if (billsSnap.empty) billsHTML = '<p style="color:#888; grid-column: 1 / -1;">No bills recorded.</p>';
+                    billsSnap.forEach(doc => {
+                        const d = doc.data();
+                        const badge = d.status === 'Paid' ? '<span class="record-badge-paid">Paid</span>' : '<span class="record-badge-pending">Pending</span>';
+                        billsHTML += `
+                            <div class="record-card" style="border-left-color: #ef4444;">
+                                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                                <div class="record-card-body">
+                                    <strong>Service:</strong> ${d.service}<br>
+                                    <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()} ${badge}
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('billingList').innerHTML = billsHTML;
+
+                }).catch(err => {
+                    showAlert("Error", "Error fetching records: " + err.message, "❌");
+                });
+            }
+            // --- END OF LOAD PATIENT HISTORY ---
+        });
+        // --- END OF RECORDS INITIALIZATION ---
+    </script>
 </body>
 </html>
