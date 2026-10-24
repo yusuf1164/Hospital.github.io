@@ -265,3 +265,21 @@ a.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0
 /* ========================================= */
 /* --- END CUSTOM GLOBAL MODAL --- */
 /* ========================================= */
+
+
+
+/* ========================================= */
+/* --- START OF PATIENT CARD LAYOUT --- */
+/* ========================================= */
+.patient-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+.patient-card { background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+.patient-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: #2563eb; }
+.patient-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 10px; margin-bottom: 5px; }
+.patient-id { color: #2563eb; font-weight: bold; font-size: 16px; }
+.patient-date { font-size: 11px; color: #6b7280; }
+.patient-name { font-size: 18px; font-weight: bold; color: #111827; }
+.patient-details { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px; color: #4b5563; margin-top: 5px; }
+.patient-details strong { color: #374151; }
+/* ========================================= */
+/* --- END OF PATIENT CARD LAYOUT --- */
+/* ========================================= */
