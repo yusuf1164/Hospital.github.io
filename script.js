@@ -15,17 +15,21 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // ==========================================
-// 2. INITIALIZATION
+// 2. PAGE INITIALIZATION
 // ==========================================
+// --- START OF INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     loadHeader();
     loadFooter();
     initForms();
 });
+// --- END OF INITIALIZATION ---
+
 
 // ==========================================
-// 3. DYNAMIC HEADER & FOOTER
+// 3. LOAD HEADER & FOOTER
 // ==========================================
+// --- START OF LOAD HEADER ---
 function loadHeader() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const headerPath = inPagesFolder ? '../header.html' : 'header.html';
@@ -47,7 +51,9 @@ function loadHeader() {
         })
         .catch(err => console.error('Header load error:', err));
 }
+// --- END OF LOAD HEADER ---
 
+// --- START OF LOAD FOOTER ---
 function loadFooter() {
     const inPagesFolder = window.location.pathname.includes('/pages/');
     const footerPath = inPagesFolder ? '../footer.html' : 'footer.html';
@@ -65,10 +71,13 @@ function loadFooter() {
         })
         .catch(err => console.error('Footer load error:', err));
 }
+// --- END OF LOAD FOOTER ---
+
 
 // ==========================================
 // 4. MOBILE MENU TOGGLE
 // ==========================================
+// --- START OF MOBILE MENU ---
 function initMobileMenu() {
     const menuToggle = document.getElementById('menu-toggle');
     const navLinks = document.getElementById('nav-links');
@@ -76,10 +85,13 @@ function initMobileMenu() {
         menuToggle.addEventListener('click', () => navLinks.classList.toggle('active'));
     }
 }
+// --- END OF MOBILE MENU ---
+
 
 // ==========================================
-// 5. AUTHENTICATION UI & LOGOUT
+// 5. DYNAMIC HEADER BUTTONS & LOGOUT
 // ==========================================
+// --- START OF AUTH UI ---
 function updateAuthUI() {
     const authButtons = document.getElementById('auth-buttons');
     const dynamicLinks = document.getElementById('dynamic-dept-links');
@@ -136,10 +148,13 @@ function updateAuthUI() {
         }
     });
 }
+// --- END OF AUTH UI ---
+
 
 // ==========================================
 // 6. HELPER: CALCULATE AGE FROM DOB
 // ==========================================
+// --- START OF CALCULATE AGE HELPER ---
 function calculateAge(dobString) {
     if (!dobString) return "";
     const birthDate = new Date(dobString);
@@ -151,25 +166,30 @@ function calculateAge(dobString) {
     }
     return age;
 }
+// --- END OF CALCULATE AGE HELPER ---
+
 
 // ==========================================
 // 7. FORMS (LOGIN & STAFF REGISTER)
 // ==========================================
+// --- START OF INITFORMS FUNCTION ---
 function initForms() {
     
-    // --- LIVE AGE CALCULATION FOR ALL DOB INPUTS ---
+    // --- START OF LIVE AGE CALCULATION ---
     const dobInputs = document.querySelectorAll('input[type="date"]');
     dobInputs.forEach(input => {
         input.addEventListener('change', function() {
             const age = calculateAge(this.value);
             const displayDiv = this.nextElementSibling;
             if (displayDiv && displayDiv.id.includes('ageDisplay')) {
-                displayDiv.textContent = age !== "" ? `Calculated Age: ${age} years old` : "";
+                // UPDATED: Now only says "Age: X"
+                displayDiv.textContent = age !== "" ? `Age: ${age}` : "";
             }
         });
     });
+    // --- END OF LIVE AGE CALCULATION ---
 
-    // --- LOGIN FORM ---
+    // --- START OF LOGIN FORM LOGIC ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -190,8 +210,9 @@ function initForms() {
                 });
         });
     }
+    // --- END OF LOGIN FORM LOGIC ---
 
-    // --- STAFF REGISTER FORM ---
+    // --- START OF STAFF REGISTER FORM LOGIC ---
     const registerForm = document.getElementById('registerForm');
     if (registerForm) {
         registerForm.addEventListener('submit', (e) => {
@@ -251,7 +272,7 @@ function initForms() {
                     });
                 })
                 .then(() => {
-                    showAlert("Success", "Registration Successful! Your Staff ID has been generated.", "✅");
+                    showAlert("Success", "Registration Successful! Your Staff ID has been generated.", "✔️");
                     setTimeout(() => window.location.href = 'dashboard.html', 1500);
                 })
                 .catch(err => {
@@ -262,11 +283,15 @@ function initForms() {
                 });
         });
     }
+    // --- END OF STAFF REGISTER FORM LOGIC ---
 }
+// --- END OF INITFORMS FUNCTION ---
+
 
 // ==========================================
 // 8. GLOBAL ACTIVITY LOGGER
 // ==========================================
+// --- START OF ACTIVITY LOGGER ---
 function logActivity(user, action, details) {
     if (!user) return;
     db.collection('users').doc(user.uid).get().then(doc => {
@@ -284,10 +309,13 @@ function logActivity(user, action, details) {
         });
     });
 }
+// --- END OF ACTIVITY LOGGER ---
+
 
 // ==========================================
 // 9. FRONT DOOR ROUTE GUARD (Security)
 // ==========================================
+// --- START OF ROUTE GUARD ---
 function enforceAuth(allowedRoles) {
     auth.onAuthStateChanged((user) => {
         if (!user) {
@@ -309,11 +337,54 @@ function enforceAuth(allowedRoles) {
         }).catch(() => window.location.href = '../login.html');
     });
 }
+// --- END OF ROUTE GUARD ---
+
 
 // ==========================================
-// 10. GLOBAL CUSTOM MODAL ENGINE
+// 10. AUTO-LOGOUT (SHARED TERMINAL SECURITY)
 // ==========================================
-// Inject modal HTML into the page on load
+// --- START OF AUTO-LOGOUT LOGIC ---
+let inactivityTimer;
+
+function resetInactivityTimer() {
+    clearTimeout(inactivityTimer); 
+    
+    if (auth.currentUser) {
+        inactivityTimer = setTimeout(() => {
+            auth.signOut().then(() => {
+                if (typeof showAlert === 'function') {
+                    showAlert("Session Expired", "You have been logged out due to 10 minutes of inactivity to protect patient data.", "⏰");
+                }
+                setTimeout(() => {
+                    const isPages = window.location.pathname.includes('/pages/');
+                    window.location.href = isPages ? '../login.html' : 'login.html';
+                }, 2500);
+            }).catch((error) => {
+                console.error("Auto-logout error:", error);
+                window.location.reload();
+            });
+        }, 10 * 60 * 1000); 
+    }
+}
+
+['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
+    document.addEventListener(event, resetInactivityTimer);
+});
+
+auth.onAuthStateChanged((user) => {
+    if (user) {
+        resetInactivityTimer(); 
+    } else {
+        clearTimeout(inactivityTimer); 
+    }
+});
+// --- END OF AUTO-LOGOUT LOGIC ---
+
+
+// ==========================================
+// 11. GLOBAL CUSTOM MODAL ENGINE
+// ==========================================
+// --- START OF MODAL HTML INJECTION ---
 document.addEventListener('DOMContentLoaded', () => {
     const modalHTML = `
         <div id="globalModalOverlay" class="custom-modal-overlay">
@@ -321,22 +392,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div id="globalModalIcon" class="custom-modal-icon">ℹ️</div>
                 <div id="globalModalTitle" class="custom-modal-title">Message</div>
                 <div id="globalModalMessage" class="custom-modal-message">Details...</div>
-                
-                <!-- Text input for prompts (hidden by default) -->
                 <input type="text" id="globalModalInput" style="display: none; width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 20px; font-size: 14px;">
-                
                 <div class="custom-modal-buttons" id="globalModalButtons"></div>
             </div>
         </div>
     `;
     document.body.insertAdjacentHTML('beforeend', modalHTML);
 });
+// --- END OF MODAL HTML INJECTION ---
 
+// --- START OF SHOW ALERT ---
 window.closeGlobalModal = function() {
     document.getElementById('globalModalOverlay').classList.remove('active');
 };
 
-// Function to show a custom alert
 window.showAlert = function(title, message, icon = 'ℹ️') {
     const overlay = document.getElementById('globalModalOverlay');
     const input = document.getElementById('globalModalInput');
@@ -351,8 +420,9 @@ window.showAlert = function(title, message, icon = 'ℹ️') {
     
     overlay.classList.add('active');
 };
+// --- END OF SHOW ALERT ---
 
-// Function to show a custom confirmation (Yes/No)
+// --- START OF SHOW CONFIRM ---
 window.showConfirm = function(title, message, onConfirm) {
     const overlay = document.getElementById('globalModalOverlay');
     const input = document.getElementById('globalModalInput');
@@ -375,8 +445,9 @@ window.showConfirm = function(title, message, onConfirm) {
     
     overlay.classList.add('active');
 };
+// --- END OF SHOW CONFIRM ---
 
-// Function to show a custom prompt (Text Input)
+// --- START OF SHOW PROMPT ---
 window.showPrompt = function(title, message, defaultValue, onConfirm) {
     const overlay = document.getElementById('globalModalOverlay');
     const input = document.getElementById('globalModalInput');
@@ -402,3 +473,4 @@ window.showPrompt = function(title, message, defaultValue, onConfirm) {
     overlay.classList.add('active');
     setTimeout(() => input.focus(), 300);
 };
+// --- END OF SHOW PROMPT ---
