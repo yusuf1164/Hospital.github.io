@@ -15,6 +15,9 @@
                 <p>Record patient vitals.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <div class="form-card">
                 <h3>Record Vitals</h3>
                 <form id="nursingForm">
@@ -57,6 +60,7 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF NURSING INITIALIZATION ---
         enforceAuth(['nurse']);
 
         auth.onAuthStateChanged((user) => {
@@ -66,47 +70,88 @@
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
             const tbody = document.getElementById('vitalsTableBody');
-            let allPatients = [];
+            let debounceTimer;
 
-            // Load Patients for Autocomplete
-            db.collection('patients').get().then(snap => {
-                snap.forEach(doc => allPatients.push(doc.data()));
-            });
-
-            // Autocomplete Logic
-            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
-                const filtered = allPatients.filter(p => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    const phone = String(p.phone).toLowerCase();
-                    return name.includes(term) || pid.includes(term) || phone.includes(term);
-                });
-                renderDropdown(filtered);
+                searchInput.dataset.name = ""; // Clear stored name
+                autocompleteList.style.display = 'none';
+
+                if (term.length < 2) return; // Don't search until they type 2 letters
+
+                debounceTimer = setTimeout(() => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
+
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    // Query 1: Search by First Name
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    // Query 2: Search by Patient ID
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        renderDropdown(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    });
+                }, 300); 
             });
 
             function renderDropdown(patients) {
                 autocompleteList.innerHTML = '';
-                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                if (patients.length === 0) { 
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                    return; 
+                }
+                
                 patients.forEach(p => {
                     const div = document.createElement('div');
                     div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                         hiddenPatientId.value = p.patientId;
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form submit
                         autocompleteList.style.display = 'none';
                     });
                     autocompleteList.appendChild(div);
                 });
-                autocompleteList.style.display = 'block';
             }
+
             document.addEventListener('click', (e) => {
                 if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            // Load Recent Vitals
+            // --- START OF LOAD RECENT VITALS ---
             db.collection('vitals').onSnapshot(snapshot => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
@@ -121,6 +166,7 @@
                 });
                 tbody.innerHTML = '';
                 vitals.slice(0, 20).forEach(d => {
+                    // User's exact custom date format preserved
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
                      year: 'numeric', 
                      month: 'short',
@@ -142,14 +188,15 @@
             }, error => {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
+            // --- END OF LOAD RECENT VITALS ---
 
-            // Submit Vitals
+            // --- START OF SUBMIT VITALS ---
             document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
                 
                 const patientId = hiddenPatientId.value;
-                const patientName = allPatients.find(p => p.patientId === patientId).firstName + " " + allPatients.find(p => p.patientId === patientId).lastName;
+                const patientName = searchInput.dataset.name; // Retrieve from stored dataset
 
                 db.collection('vitals').add({
                     patientId: patientId, patientName: patientName,
@@ -157,12 +204,14 @@
                     weight: document.getElementById('weight').value, pulse: document.getElementById('pulse').value,
                     recordedBy: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Vitals Saved!');
+                    showAlert("Success", "Vitals Saved successfully!", "✔️");
                     document.getElementById('nursingForm').reset();
-                    searchInput.value = ''; hiddenPatientId.value = '';
-                });
+                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
+                }).catch(err => showAlert("Error", err.message, "❌"));
             });
+            // --- END OF SUBMIT VITALS ---
         });
+        // --- END OF NURSING INITIALIZATION ---
     </script>
 </body>
 </html>
