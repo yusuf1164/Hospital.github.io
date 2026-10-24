@@ -17,14 +17,12 @@
 
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
-            <!-- MODERN TABS -->
             <div class="modern-tabs">
                 <button class="modern-tab active" onclick="switchTab('queue', this)" id="tab-queue">OPD Queue</button>
                 <button class="modern-tab" onclick="switchTab('walkin', this)" id="tab-walkin">Walk-in POS</button>
                 <button class="modern-tab" onclick="switchTab('inventory', this)" id="tab-inventory">Inventory</button>
             </div>
 
-            <!-- TAB 1: OPD QUEUE -->
             <div id="section-queue">
                 <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
                 <div id="pharmacyCardContainer" class="card-grid-layout">
@@ -32,7 +30,6 @@
                 </div>
             </div>
 
-            <!-- TAB 2: WALK-IN POS -->
             <div id="section-walkin" style="display: none;">
                 <div class="pos-grid">
                     <div class="form-card">
@@ -72,7 +69,6 @@
                 </div>
             </div>
 
-            <!-- TAB 3: INVENTORY MANAGEMENT -->
             <div id="section-inventory" style="display: none;">
                 <div class="form-card" style="border-left: 4px solid #10b981;">
                     <h3>Add New Drug to Inventory</h3>
@@ -114,7 +110,6 @@
     </main>
     <footer id="footer-placeholder"></footer>
 
-    <!-- MODAL: Process OPD Prescription -->
     <div id="processOpdModal" class="modal">
         <div class="modal-content" style="max-width: 600px;">
             <h3 style="color: #1e3a8a; margin-bottom: 10px;">Process Prescription</h3>
@@ -164,12 +159,11 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START OF PHARMACY INITIALIZATION ---
         enforceAuth(['pharmacy', 'admin']);
         let globalInventory = [];
         let posCart = [];
         let opdCart = [];
-        let currentOpdRequest = null; // Holds the prescription being processed
+        let currentOpdRequest = null;
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
@@ -190,11 +184,9 @@
             let debounceTimer;
             let unsubscribeSnapshot = null;
 
-            // --- START OF OPD QUEUE LOGIC ---
             function loadInitialPrescriptions() {
                 cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Loading...</p>`;
                 if (unsubscribeSnapshot) unsubscribeSnapshot(); 
-
                 unsubscribeSnapshot = db.collection('prescriptions').orderBy('createdAt', 'desc').limit(50).onSnapshot((snapshot) => {
                     let prescriptions = [];
                     snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
@@ -211,7 +203,6 @@
                     let actionHtml = d.status === 'Pending' 
                         ? `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick='openProcessModal(${JSON.stringify(d).replace(/'/g, "&#39;")})'>Process</button>`
                         : `<span style="color:#065f46; font-weight:bold;">Dispensed</span>`;
-                    
                     cardContainer.innerHTML += `
                         <div class="data-card">
                             <div class="data-card-header"><span class="data-id">${d.patientId}</span><span class="data-date">${date}</span></div>
@@ -223,21 +214,15 @@
                     `;
                 });
             }
-            // --- END OF OPD QUEUE LOGIC ---
 
-            // --- START OF MODAL CART LOGIC (OPD & POS) ---
             window.updateSellUnitDropdown = function(context) {
                 const drugId = document.getElementById(context + 'DrugSelect').value;
                 const sellUnitDropdown = document.getElementById(context + 'SellUnit');
                 sellUnitDropdown.innerHTML = '<option value="">Select unit...</option>';
-
                 if (!drugId) return;
                 const drug = globalInventory.find(d => d.id === drugId);
                 if (!drug) return;
-
-                // Always add Base Unit
                 sellUnitDropdown.innerHTML += `<option value="${drug.baseUnit}">${drug.baseUnit}</option>`;
-                // Add Packaging Unit if it exists and is not 'None'
                 if (drug.packagingUnit !== 'None') {
                     sellUnitDropdown.innerHTML += `<option value="${drug.packagingUnit}">${drug.packagingUnit}</option>`;
                 }
@@ -247,40 +232,19 @@
                 const drugId = document.getElementById(context + 'DrugSelect').value;
                 const sellUnit = document.getElementById(context + 'SellUnit').value;
                 const qty = parseInt(document.getElementById(context + 'Qty').value);
-
                 if (!drugId || !sellUnit || qty < 1) { showAlert("Error", "Please select drug, unit, and quantity.", "❌"); return; }
-
                 const drug = globalInventory.find(d => d.id === drugId);
                 if (!drug) return;
-
-                // Calculate how many BASE UNITS this sale requires
                 let multiplier = 1;
-                if (sellUnit === drug.packagingUnit) {
-                    multiplier = drug.unitsPerPackaging;
-                }
-
+                if (sellUnit === drug.packagingUnit) multiplier = drug.unitsPerPackaging;
                 const totalBaseUnitsNeeded = qty * multiplier;
-
-                if (drug.stock < totalBaseUnitsNeeded) { 
-                    showAlert("Error", `Not enough stock. Only ${drug.stock} ${drug.baseUnit}s left.`, "❌"); 
-                    return; 
-                }
+                if (drug.stock < totalBaseUnitsNeeded) { showAlert("Error", `Not enough stock. Only ${drug.stock} ${drug.baseUnit}s left.`, "❌"); return; }
 
                 const cart = context === 'pos' ? posCart : opdCart;
-                const cartId = context === 'pos' ? 'cartItems' : 'opdCartItems';
-                const totalId = context === 'pos' ? 'cartTotal' : 'opdCartTotal';
-
-                // Add to cart array
                 cart.push({
-                    id: drug.id,
-                    name: drug.name,
-                    sellUnit: sellUnit,
-                    qty: qty,
-                    baseUnitsDeducted: totalBaseUnitsNeeded,
-                    pricePerBase: drug.price,
-                    totalPrice: totalBaseUnitsNeeded * drug.price
+                    id: drug.id, name: drug.name, sellUnit: sellUnit, qty: qty,
+                    baseUnitsDeducted: totalBaseUnitsNeeded, pricePerBase: drug.price, totalPrice: totalBaseUnitsNeeded * drug.price
                 });
-
                 renderCart(context);
                 document.getElementById(context + 'Qty').value = 1;
             };
@@ -297,10 +261,8 @@
                     totalEl.textContent = '₦0';
                     return;
                 }
-
                 container.innerHTML = '';
                 let total = 0;
-
                 cart.forEach((item, index) => {
                     total += item.totalPrice;
                     container.innerHTML += `
@@ -311,12 +273,12 @@
                             </div>
                             <div style="display:flex; align-items:center; gap:10px;">
                                 <strong>₦${item.totalPrice.toLocaleString()}</strong>
-                                <button onclick="removeFromCart('${context}', ${index})" style="background:none; border:none; color:#dc2626; cursor:pointer; font-size:16px;">✖</button>
+                                <!-- UPDATED TO TRASH ICON -->
+                                <button onclick="removeFromCart('${context}', ${index})" style="background:none; border:none; cursor:pointer;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" style="fill: #dc2626; width: 18px; height: 18px;"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/><path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/></svg></button>
                             </div>
                         </div>
                     `;
                 });
-
                 totalEl.textContent = `₦${total.toLocaleString()}`;
             }
 
@@ -325,50 +287,38 @@
                 cart.splice(index, 1);
                 renderCart(context);
             };
-            // --- END OF MODAL CART LOGIC ---
 
-            // --- START OF OPD PROCESSING ---
             window.openProcessModal = function(prescriptionData) {
                 currentOpdRequest = prescriptionData;
                 document.getElementById('doctorNote').textContent = prescriptionData.medication;
-                
-                // Populate OPD Dropdown
                 const opdDrugSelect = document.getElementById('opdDrugSelect');
                 opdDrugSelect.innerHTML = '<option value="">Select from inventory...</option>';
                 globalInventory.forEach(drug => {
                     opdDrugSelect.innerHTML += `<option value="${drug.id}">${drug.name}</option>`;
                 });
-
-                opdCart = []; // Reset cart
+                opdCart = [];
                 renderCart('opd');
                 document.getElementById('processOpdModal').style.display = 'flex';
             };
 
             window.finalizeOpd = function() {
-                if (opdCart.length === 0) { showAlert("Error", "Cart is empty. Add drugs first.", "❌"); return; }
+                if (opdCart.length === 0) { showAlert("Error", "Cart is empty.", "❌"); return; }
                 if (!currentOpdRequest) return;
-
                 const totalAmount = opdCart.reduce((sum, item) => sum + item.totalPrice, 0);
                 const batch = db.batch();
 
-                // 1. Deduct Stock
                 opdCart.forEach(item => {
                     const invRef = db.collection('inventory').doc(item.id);
                     batch.update(invRef, { stock: firebase.firestore.FieldValue.increment(-item.baseUnitsDeducted) });
                 });
 
-                // 2. Create Bill (Pending)
                 const billRef = db.collection('bills').doc();
                 batch.set(billRef, {
-                    patientId: currentOpdRequest.patientId,
-                    patientName: currentOpdRequest.patientName,
-                    service: `Pharmacy (OPD) - ${opdCart.length} item(s)`,
-                    amount: totalAmount,
-                    status: 'Pending',
+                    patientId: currentOpdRequest.patientId, patientName: currentOpdRequest.patientName,
+                    service: `Pharmacy (OPD) - ${opdCart.length} item(s)`, amount: totalAmount, status: 'Pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
-                // 3. Mark Prescription as Dispensed
                 const prescRef = db.collection('prescriptions').doc(currentOpdRequest.id);
                 batch.update(prescRef, { status: 'Dispensed' });
 
@@ -379,29 +329,21 @@
                     currentOpdRequest = null;
                 }).catch(err => showAlert("Error", err.message, "❌"));
             };
-            // --- END OF OPD PROCESSING ---
 
-            // --- START OF POS CHECKOUT ---
             window.checkoutCart = function(customerName) {
                 if (posCart.length === 0) { showAlert("Error", "Cart is empty.", "❌"); return; }
-
                 const totalAmount = posCart.reduce((sum, item) => sum + item.totalPrice, 0);
                 const batch = db.batch();
 
-                // 1. Deduct Stock
                 posCart.forEach(item => {
                     const invRef = db.collection('inventory').doc(item.id);
                     batch.update(invRef, { stock: firebase.firestore.FieldValue.increment(-item.baseUnitsDeducted) });
                 });
 
-                // 2. Create Bill (Pending)
                 const billRef = db.collection('bills').doc();
                 batch.set(billRef, {
-                    patientId: "WALK-IN",
-                    patientName: customerName,
-                    service: `Pharmacy Walk-in - ${posCart.length} item(s)`,
-                    amount: totalAmount,
-                    status: 'Pending',
+                    patientId: "WALK-IN", patientName: customerName,
+                    service: `Pharmacy Walk-in - ${posCart.length} item(s)`, amount: totalAmount, status: 'Pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -412,14 +354,11 @@
                     renderCart('pos');
                 }).catch(err => showAlert("Error", err.message, "❌"));
             };
-            // --- END OF POS CHECKOUT ---
 
-            // --- START OF INVENTORY MANAGEMENT ---
             document.getElementById('inventoryForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('addDrugBtn');
                 btn.textContent = 'Adding...'; btn.disabled = true;
-
                 const qtyReceived = Number(document.getElementById('quantityReceived').value);
                 const unitsPerPackaging = Number(document.getElementById('unitsPerPackaging').value) || 1;
                 const totalBaseUnits = qtyReceived * unitsPerPackaging;
@@ -443,6 +382,24 @@
                 });
             });
 
+            // --- START OF RESTOCK LOGIC ---
+            window.restockDrug = function(id, name, baseUnit) {
+                showPrompt("Restock Drug", `How many <strong>${baseUnit}s</strong> of ${name} are you adding to stock?`, "10", (qty) => {
+                    const amount = parseInt(qty);
+                    if (isNaN(amount) || amount <= 0) {
+                        showAlert("Error", "Please enter a valid number.", "❌");
+                        return;
+                    }
+                    db.collection('inventory').doc(id).update({
+                        stock: firebase.firestore.FieldValue.increment(amount)
+                    }).then(() => {
+                        logActivity(auth.currentUser, "Restocked", `Added ${amount} ${baseUnit}s to ${name}`);
+                        showAlert("Success", `Successfully added ${amount} ${baseUnit}s to stock!`, "✔️");
+                    }).catch(err => showAlert("Error", err.message, "❌"));
+                });
+            };
+            // --- END OF RESTOCK LOGIC ---
+
             db.collection('inventory').orderBy('name').onSnapshot(snapshot => {
                 globalInventory = [];
                 const posDrugSelect = document.getElementById('posDrugSelect');
@@ -457,13 +414,10 @@
                 snapshot.forEach(doc => {
                     const d = doc.data();
                     globalInventory.push({ id: doc.id, ...d });
-                    
                     posDrugSelect.innerHTML += `<option value="${doc.id}">${d.name}</option>`;
 
-                    // Calculate how many full packages exist
                     const fullPackages = Math.floor(d.stock / d.unitsPerPackaging);
                     const looseUnits = d.stock % d.unitsPerPackaging;
-                    
                     let stockDisplay = `${d.stock} ${d.baseUnit}(s)`;
                     if (d.packagingUnit !== 'None' && d.unitsPerPackaging > 1) {
                         stockDisplay += ` (${fullPackages} ${d.packagingUnit}(s)`;
@@ -471,14 +425,12 @@
                         stockDisplay += `)`;
                     }
 
-                    // Expiry warning
                     const today = new Date();
                     const expiry = new Date(d.expiryDate);
                     const daysToExpiry = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
                     let expiryHtml = `Expires: ${d.expiryDate}`;
                     let expiryClass = '';
                     if (daysToExpiry <= 30) { expiryHtml = `⚠️ EXPIRING SOON: ${d.expiryDate}`; expiryClass = 'color: #dc2626; font-weight: bold;'; }
-
                     const badgeClass = d.stock > 10 ? 'status-complete' : 'status-pending';
 
                     inventoryContainer.innerHTML += `
@@ -491,15 +443,17 @@
                                 <strong>Stock:</strong> <span class="status-badge ${badgeClass}">${stockDisplay}</span><br>
                                 <small style="${expiryClass}">${expiryHtml}</small>
                             </div>
+                            <!-- ADDED RESTOCK BUTTON -->
+                            <div class="data-action" style="margin-top: 10px; justify-content: flex-end;">
+                                <button class="btn btn-outline" style="padding: 4px 8px; font-size: 12px; border-color: #10b981; color: #10b981;" onclick="restockDrug('${doc.id}', '${d.name.replace(/'/g, "\\'")}', '${d.baseUnit}')">+ Restock</button>
+                            </div>
                         </div>
                     `;
                 });
             });
-            // --- END OF INVENTORY MANAGEMENT ---
 
             loadInitialPrescriptions();
         });
-        // --- END OF PHARMACY INITIALIZATION ---
     </script>
 </body>
 </html>
