@@ -19,8 +19,8 @@
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
             <!-- Logs Container -->
-            <div id="logContainer">
-                <p style="text-align: center; color:#888;">Loading logs...</p>
+            <div id="logContainer" class="card-grid-layout">
+                <p style="text-align: center; width: 100%; color:#888;">Loading logs...</p>
             </div>
         </div>
     </main>
@@ -33,17 +33,17 @@
 
     <script>
         // --- START OF ACTIVITY LOG INITIALIZATION ---
-        enforceAuth(['admin']);
+        enforceAuth(['admin', 'hr']);
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
             const logContainer = document.getElementById('logContainer');
 
-            // Load latest 100 logs to keep it scalable
-            db.collection('auditLogs').orderBy('timestamp', 'desc').limit(100).onSnapshot((snapshot) => {
+            // Load latest 50 logs to keep it scalable
+            db.collection('auditLogs').orderBy('timestamp', 'desc').limit(50).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    logContainer.innerHTML = `<p style="text-align:center; color:#888;">No activity recorded yet.</p>`;
+                    logContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No activity recorded yet.</p>`;
                     return;
                 }
                 
@@ -55,23 +55,30 @@
                         hour: '2-digit', minute: '2-digit', hour12: true 
                     }) : 'Just now';
 
+                    // COLOR BADGES BASED ON ACTION
                     let badgeColor = 'status-active';
                     if (d.action.includes('Registered')) badgeColor = 'status-complete';
                     if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
 
+                    // FIX: Prevent long random Firebase UIDs from showing as IDs
+                    let displayId = d.staffId || 'N/A';
+                    if (displayId.length > 10) displayId = 'N/A'; // Firebase UIDs are ~28 characters
+
                     logContainer.innerHTML += `
-                        <div class="log-card">
-                            <div class="log-header">
-                                <span class="log-staff">${d.staffName || 'Staff Member'} (ID: ${d.staffId || 'N/A'})</span>
-                                <span class="log-date">${date}</span>
+                        <div class="data-card" style="border-left: 4px solid #2563eb;">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.staffName || 'Staff Member'} <small style="color:#6b7280; font-weight:normal;">(ID: ${displayId})</small></span>
+                                <span class="data-date">${date}</span>
                             </div>
-                            <div class="log-action"><span class="status-badge ${badgeColor}">${d.action}</span></div>
-                            <div class="log-details">${d.details}</div>
+                            <div class="data-info">
+                                <strong>Action:</strong> <span class="status-badge ${badgeColor}">${d.action}</span><br>
+                                <strong>Details:</strong> ${d.details}
+                            </div>
                         </div>
                     `;
                 });
             }, error => {
-                logContainer.innerHTML = `<p style="text-align:center; color:red;">Error: ${error.message}</p>`;
+                logContainer.innerHTML = `<p style="text-align:center; width:100%; color:red;">Error: ${error.message}</p>`;
             });
         });
         // --- END OF ACTIVITY LOG INITIALIZATION ---
