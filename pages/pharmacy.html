@@ -15,14 +15,17 @@
                 <p>Dispense medications and manage inventory.</p>
             </div>
 
+            <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
+            <!-- MODERN TABS -->
             <div class="modern-tabs">
                 <button class="modern-tab active" onclick="switchTab('queue', this)" id="tab-queue">OPD Queue</button>
                 <button class="modern-tab" onclick="switchTab('walkin', this)" id="tab-walkin">Walk-in POS</button>
                 <button class="modern-tab" onclick="switchTab('inventory', this)" id="tab-inventory">Inventory</button>
             </div>
 
+            <!-- TAB 1: OPD QUEUE -->
             <div id="section-queue">
                 <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
                 <div id="pharmacyCardContainer" class="card-grid-layout">
@@ -30,6 +33,7 @@
                 </div>
             </div>
 
+            <!-- TAB 2: WALK-IN POS -->
             <div id="section-walkin" style="display: none;">
                 <div class="pos-grid">
                     <div class="form-card">
@@ -69,6 +73,7 @@
                 </div>
             </div>
 
+            <!-- TAB 3: INVENTORY MANAGEMENT -->
             <div id="section-inventory" style="display: none;">
                 <div class="form-card" style="border-left: 4px solid #10b981;">
                     <h3>Add New Drug to Inventory</h3>
@@ -110,6 +115,7 @@
     </main>
     <footer id="footer-placeholder"></footer>
 
+    <!-- MODAL: Process OPD Prescription -->
     <div id="processOpdModal" class="modal">
         <div class="modal-content" style="max-width: 600px;">
             <h3 style="color: #1e3a8a; margin-bottom: 10px;">Process Prescription</h3>
@@ -120,7 +126,7 @@
 
             <div class="form-grid" style="background:#f9fafb; padding:15px; border-radius:8px; border:1px solid #e5e7eb; margin-bottom: 15px;">
                 <div class="form-group" style="grid-column: 1 / -1;">
-                    <label>Select Drug (Check Expiry)</label>
+                    <label>Select Drug (Fix Typos)</label>
                     <select id="opdDrugSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;" onchange="updateSellUnitDropdown('opd')">
                         <option value="">Select from inventory...</option>
                     </select>
@@ -159,6 +165,7 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF PHARMACY INITIALIZATION ---
         enforceAuth(['pharmacy', 'admin']);
         let globalInventory = [];
         let posCart = [];
@@ -184,6 +191,7 @@
             let debounceTimer;
             let unsubscribeSnapshot = null;
 
+            // --- START OF OPD QUEUE LOGIC ---
             function loadInitialPrescriptions() {
                 cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Loading...</p>`;
                 if (unsubscribeSnapshot) unsubscribeSnapshot(); 
@@ -214,7 +222,9 @@
                     `;
                 });
             }
+            // --- END OF OPD QUEUE LOGIC ---
 
+            // --- START OF MODAL CART LOGIC ---
             window.updateSellUnitDropdown = function(context) {
                 const drugId = document.getElementById(context + 'DrugSelect').value;
                 const sellUnitDropdown = document.getElementById(context + 'SellUnit');
@@ -243,7 +253,7 @@
                 const cart = context === 'pos' ? posCart : opdCart;
                 cart.push({
                     id: drug.id, 
-                    name: `${drug.name} (Exp: ${drug.expiryDate})`, // ADDED EXPIRY TO CART NAME
+                    name: `${drug.name}`, // Clean name for the bill
                     sellUnit: sellUnit, qty: qty,
                     baseUnitsDeducted: totalBaseUnitsNeeded, pricePerBase: drug.price, totalPrice: totalBaseUnitsNeeded * drug.price
                 });
@@ -288,14 +298,15 @@
                 cart.splice(index, 1);
                 renderCart(context);
             };
+            // --- END OF MODAL CART LOGIC ---
 
+            // --- START OF OPD PROCESSING (UPDATED TO SHOW DRUG NAMES) ---
             window.openProcessModal = function(prescriptionData) {
                 currentOpdRequest = prescriptionData;
                 document.getElementById('doctorNote').textContent = prescriptionData.medication;
                 const opdDrugSelect = document.getElementById('opdDrugSelect');
                 opdDrugSelect.innerHTML = '<option value="">Select from inventory...</option>';
                 globalInventory.forEach(drug => {
-                    // ADDED EXPIRY AND STOCK TO OPD DROPDOWN
                     opdDrugSelect.innerHTML += `<option value="${drug.id}">${drug.name} (Exp: ${drug.expiryDate}) [${drug.stock} left]</option>`;
                 });
                 opdCart = [];
@@ -307,6 +318,10 @@
                 if (opdCart.length === 0) { showAlert("Error", "Cart is empty.", "❌"); return; }
                 if (!currentOpdRequest) return;
                 const totalAmount = opdCart.reduce((sum, item) => sum + item.totalPrice, 0);
+                
+                // Create a comma-separated string of drug names for the bill
+                const drugNames = opdCart.map(item => item.name).join(', ');
+                
                 const batch = db.batch();
 
                 opdCart.forEach(item => {
@@ -316,8 +331,12 @@
 
                 const billRef = db.collection('bills').doc();
                 batch.set(billRef, {
-                    patientId: currentOpdRequest.patientId, patientName: currentOpdRequest.patientName,
-                    service: `Pharmacy (OPD) - ${opdCart.length} item(s)`, amount: totalAmount, status: 'Pending',
+                    patientId: currentOpdRequest.patientId, 
+                    patientName: currentOpdRequest.patientName,
+                    service: `Pharmacy: ${drugNames}`, // SHOWS DRUG NAMES
+                    items: opdCart, 
+                    amount: totalAmount, 
+                    status: 'Pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -331,10 +350,16 @@
                     currentOpdRequest = null;
                 }).catch(err => showAlert("Error", err.message, "❌"));
             };
+            // --- END OF OPD PROCESSING ---
 
+            // --- START OF POS CHECKOUT (UPDATED TO SHOW DRUG NAMES) ---
             window.checkoutCart = function(customerName) {
                 if (posCart.length === 0) { showAlert("Error", "Cart is empty.", "❌"); return; }
                 const totalAmount = posCart.reduce((sum, item) => sum + item.totalPrice, 0);
+                
+                // Create a comma-separated string of drug names for the bill
+                const drugNames = posCart.map(item => item.name).join(', ');
+
                 const batch = db.batch();
 
                 posCart.forEach(item => {
@@ -344,8 +369,12 @@
 
                 const billRef = db.collection('bills').doc();
                 batch.set(billRef, {
-                    patientId: "WALK-IN", patientName: customerName,
-                    service: `Pharmacy Walk-in - ${posCart.length} item(s)`, amount: totalAmount, status: 'Pending',
+                    patientId: "WALK-IN", 
+                    patientName: customerName,
+                    service: `Walk-in Pharmacy: ${drugNames}`, // SHOWS DRUG NAMES
+                    items: posCart, 
+                    amount: totalAmount, 
+                    status: 'Pending',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
 
@@ -356,7 +385,9 @@
                     renderCart('pos');
                 }).catch(err => showAlert("Error", err.message, "❌"));
             };
+            // --- END OF POS CHECKOUT ---
 
+            // --- START OF INVENTORY MANAGEMENT ---
             document.getElementById('inventoryForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('addDrugBtn');
@@ -416,7 +447,6 @@
                     const d = doc.data();
                     globalInventory.push({ id: doc.id, ...d });
                     
-                    // ADDED EXPIRY AND STOCK TO POS DROPDOWN
                     posDrugSelect.innerHTML += `<option value="${doc.id}">${d.name} (Exp: ${d.expiryDate}) [${d.stock} left]</option>`;
 
                     const fullPackages = Math.floor(d.stock / d.unitsPerPackaging);
@@ -453,9 +483,11 @@
                     `;
                 });
             });
+            // --- END OF INVENTORY MANAGEMENT ---
 
             loadInitialPrescriptions();
         });
+        // --- END OF PHARMACY INITIALIZATION ---
     </script>
 </body>
 </html>
