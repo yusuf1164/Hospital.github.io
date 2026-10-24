@@ -60,9 +60,9 @@
         const historyContainer = document.getElementById('historyContainer');
         let debounceTimer;
 
-        // --- START OF SCALABLE SERVER-SIDE SEARCH ---
+        // --- START OF FOOLPROOF SEARCH (FIRST & LAST NAME) ---
         searchInput.addEventListener('input', (e) => {
-            const term = e.target.value.trim();
+            const term = e.target.value.trim().toLowerCase();
             clearTimeout(debounceTimer);
             hiddenPatientId.value = "";
             historyContainer.style.display = 'none';
@@ -76,68 +76,87 @@
 
                 let results = [];
                 let seenIds = new Set();
+                const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); // Capitalize for DB
                 const upperTerm = term.toUpperCase();
 
-                // 1. SEARCH BY EXACT ID (This will almost always succeed)
+                // 1. SEARCH BY EXACT ID
                 try {
-                    const idQuery = await db.collection('patients').where('patientId', '==', upperTerm).get();
-                    idQuery.forEach(doc => {
+                    const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).get();
+                    idSnap.forEach(doc => {
                         results.push({ firestoreId: doc.id, ...doc.data() });
                         seenIds.add(doc.id);
                     });
-                } catch (err) {
-                    console.error("ID Search Error:", err);
-                }
+                } catch (err) { console.error("ID Search Error:", err); }
 
-                // 2. SEARCH BY NAME (This might fail if you haven't created an index yet)
+                // 2. SEARCH BY FIRST NAME
                 try {
-                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
-                    const nameQuery = await db.collection('patients')
+                    const firstSnap = await db.collection('patients')
                         .orderBy('firstName')
                         .startAt(searchTerm)
                         .endAt(searchTerm + '\uf8ff')
                         .limit(10)
                         .get();
-                        
-                    nameQuery.forEach(doc => {
+                    firstSnap.forEach(doc => {
                         if (!seenIds.has(doc.id)) {
                             results.push({ firestoreId: doc.id, ...doc.data() });
                             seenIds.add(doc.id);
                         }
                     });
-                } catch (err) {
-                    console.error("Name Search Error (Index might be missing):", err);
-                }
+                } catch (err) { console.error("First Name Search Error:", err); }
 
-                // 3. RENDER RESULTS
-                renderDropdown(results);
+                // 3. SEARCH BY LAST NAME
+                try {
+                    const lastSnap = await db.collection('patients')
+                        .orderBy('lastName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+                    lastSnap.forEach(doc => {
+                        if (!seenIds.has(doc.id)) {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        }
+                    });
+                } catch (err) { console.error("Last Name Search Error:", err); }
+
+                // 4. FALLBACK: Search recent 50 patients by full name (Catches combined names)
+                try {
+                    const recentPatients = await db.collection('patients').orderBy('createdAt', 'desc').limit(50).get();
+                    recentPatients.forEach(doc => {
+                        if (seenIds.has(doc.id)) return; 
+                        
+                        const p = doc.data();
+                        const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+                        
+                        if (fullName.includes(term)) {
+                            results.push({ firestoreId: doc.id, ...p });
+                            seenIds.add(doc.id);
+                        }
+                    });
+                } catch (err) { console.error("Fallback Search Error:", err); }
+
+                // 5. RENDER RESULTS
+                autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matching patients found.</div>' : '';
+                
+                results.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                        hiddenPatientId.value = p.patientId; 
+                        autocompleteList.style.display = 'none';
+                        loadPatientHistory(p.patientId);
+                    });
+                    autocompleteList.appendChild(div);
+                });
             }, 300); 
         });
-
-        function renderDropdown(patients) {
-            autocompleteList.innerHTML = '';
-            if (patients.length === 0) { 
-                autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
-                return; 
-            }
-            
-            patients.forEach(p => {
-                const div = document.createElement('div');
-                div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
-                div.addEventListener('click', () => {
-                    searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
-                    hiddenPatientId.value = p.patientId; 
-                    autocompleteList.style.display = 'none';
-                    loadPatientHistory(p.patientId);
-                });
-                autocompleteList.appendChild(div);
-            });
-        }
 
         document.addEventListener('click', (e) => {
             if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
         });
-        // --- END OF SCALABLE SERVER-SIDE SEARCH ---
+        // --- END OF FOOLPROOF SEARCH ---
 
         // --- START OF LOAD PATIENT HISTORY ---
         function loadPatientHistory(patientIdString) {
