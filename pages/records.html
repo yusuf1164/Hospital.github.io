@@ -73,17 +73,30 @@
         enforceAuth(['records', 'doctor', 'admin', 'nurse']);
 
         auth.onAuthStateChanged((user) => {
-            if (!user) return;
+    if (!user) return;
 
-            const searchInput = document.getElementById('searchPatientInput');
-            const autocompleteList = document.getElementById('autocompleteList');
-            const hiddenPatientId = document.getElementById('selectedPatientId');
-            const historyContainer = document.getElementById('historyContainer');
-            let debounceTimer;
+    const searchInput = document.getElementById('searchPatientInput');
+    const autocompleteList = document.getElementById('autocompleteList');
+    const hiddenPatientId = document.getElementById('selectedPatientId');
+    const historyContainer = document.getElementById('historyContainer');
+    let debounceTimer;
 
-            // --- START OF FOOLPROOF SEARCH ---
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.trim().toLowerCase();
+    // --- START OF URL PARAMETER AUTO-LOAD ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlPatientId = urlParams.get('id');
+    
+    if (urlPatientId) {
+        // Set the search bar to show the ID that was passed
+        searchInput.value = urlPatientId;
+        hiddenPatientId.value = urlPatientId;
+        // Automatically load the history for this ID
+        loadPatientHistory(urlPatientId);
+    }
+    // --- END OF URL PARAMETER AUTO-LOAD ---
+
+    // --- START OF FOOLPROOF SEARCH ---
+    searchInput.addEventListener('input', (e) => {
+    const term = e.target.value.trim().toLowerCase();
                 clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
                 historyContainer.style.display = 'none';
