@@ -15,7 +15,6 @@
                 <p>Dispense medications and manage inventory.</p>
             </div>
 
-            <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
             <!-- PHARMACY TABS -->
@@ -33,16 +32,50 @@
                 </div>
             </div>
 
-            <!-- TAB 2: WALK-IN SALES (Coming in Part 2) -->
+            <!-- TAB 2: WALK-IN SALES (POS) -->
             <div id="section-walkin" style="display: none;">
                 <div class="pos-grid">
+                    <!-- POS Form -->
                     <div class="form-card">
-                        <h3>Walk-in Sale (OTC)</h3>
-                        <p style="color: #666; font-size: 14px;">Point of Sale system will be built here in the next step.</p>
+                        <h3>Add to Cart</h3>
+                        <div class="form-grid">
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label>Select Drug (Inventory)</label>
+                                <select id="posDrugSelect" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                                    <option value="">Loading drugs...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Quantity</label>
+                                <input type="number" id="posQty" value="1" min="1" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                            </div>
+                            <div class="form-group" style="display:flex; align-items:flex-end;">
+                                <button onclick="addToCart()" class="btn btn-primary" style="width: 100%; padding: 11px;">+ Add</button>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Cart Display -->
                     <div class="pos-cart">
-                        <h3>Cart</h3>
-                        <p style="color: #666; font-size: 14px;">No items added yet.</p>
+                        <h3>Cart Summary</h3>
+                        <div id="cartItems" style="margin-top: 15px; max-height: 250px; overflow-y: auto;">
+                            <p style="color: #888; font-size: 14px;">Cart is empty.</p>
+                        </div>
+                        <div class="pos-total">
+                            <span>Total:</span>
+                            <span id="cartTotal">₦0</span>
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 15px;">
+                            <label>Payment Method</label>
+                            <select id="posPaymentMethod" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                                <option value="Cash">Cash</option>
+                                <option value="POS">POS</option>
+                                <option value="Transfer">Bank Transfer</option>
+                            </select>
+                        </div>
+
+                        <button onclick="checkoutWalkin()" class="btn-submit" style="margin-top: 10px; background-color: #10b981;">Complete Sale</button>
                     </div>
                 </div>
             </div>
@@ -80,6 +113,30 @@
     </main>
     <footer id="footer-placeholder"></footer>
 
+    <!-- MODAL: Dispense Payment Method -->
+    <div id="dispenseModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Complete Dispense</h3>
+            <p style="margin-bottom: 10px; font-size: 14px;">Patient: <strong id="dispPatient"></strong></p>
+            <p style="margin-bottom: 10px; font-size: 14px;">Drug: <strong id="dispDrug"></strong></p>
+            <p style="margin-bottom: 20px; font-size: 14px;">Price: <strong id="dispPrice" style="color:#2563eb;"></strong></p>
+            
+            <div class="form-group">
+                <label>Payment Method</label>
+                <select id="dispPaymentMethod" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px;">
+                    <option value="Cash">Cash</option>
+                    <option value="POS">POS</option>
+                    <option value="Transfer">Bank Transfer</option>
+                </select>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeModal('dispenseModal')">Cancel</button>
+                <button class="btn btn-primary" style="flex:1;" onclick="confirmDispense()">Confirm & Bill</button>
+            </div>
+        </div>
+    </div>
+
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -89,6 +146,12 @@
         // --- START OF PHARMACY INITIALIZATION ---
         enforceAuth(['pharmacy', 'admin']);
         
+        let globalInventory = []; // Store inventory for POS
+        let currentCart = []; // Store POS cart items
+        let pendingDispenseData = null; // Store data for dispense modal
+
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
+
         // --- START OF TAB SWITCHING LOGIC ---
         window.switchTab = function(tab) {
             document.getElementById('section-queue').style.display = tab === 'queue' ? 'block' : 'none';
@@ -107,10 +170,11 @@
             const cardContainer = document.getElementById('pharmacyCardContainer');
             const inventoryContainer = document.getElementById('inventoryCardContainer');
             const searchInput = document.getElementById('searchPharmacy');
+            const posDrugSelect = document.getElementById('posDrugSelect');
             let debounceTimer;
             let unsubscribeSnapshot = null;
 
-            // --- START OF OPD QUEUE LOGIC (From Part 1) ---
+            // --- START OF OPD QUEUE LOGIC ---
             function loadInitialPrescriptions() {
                 cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>`;
                 if (unsubscribeSnapshot) unsubscribeSnapshot(); 
@@ -119,8 +183,6 @@
                     let prescriptions = [];
                     snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
                     renderPrescriptionCards(prescriptions);
-                }, error => {
-                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Error: ${error.message}</p>`;
                 });
             }
 
@@ -145,8 +207,6 @@
                         nameSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ id: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
                         results.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
                         renderPrescriptionCards(results);
-                    }).catch(error => {
-                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Search Error: ${error.message}</p>`;
                     });
                 }, 600);
             });
@@ -158,7 +218,7 @@
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
                     let actionHtml = d.status === 'Pending' 
-                        ? `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${d.medication.replace(/'/g, "\\'")}')">Dispense</button>`
+                        ? `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="openDispenseModal('${d.id}', '${d.patientId}', '${d.patientName}', '${d.medication.replace(/'/g, "\\'")}')">Dispense</button>`
                         : `<span style="color:#065f46; font-weight:bold;">Dispensed</span>`;
                     
                     cardContainer.innerHTML += `
@@ -179,16 +239,156 @@
                 });
             }
 
-            window.dispenseDrug = function(id, patientId, medication) {
-                showConfirm("Confirm Dispense", `Have you dispensed <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
-                    db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
-                    .then(() => { 
-                        logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
-                        showAlert("Success", "Drugs dispensed successfully!", "✔️"); 
-                    }).catch((error) => showAlert("Error", error.message, "❌"));
+            // --- START OF DISPENSE MODAL LOGIC ---
+            window.openDispenseModal = function(id, patientId, patientName, medication) {
+                // Find price in inventory (if it exists)
+                const inventoryItem = globalInventory.find(i => i.name.toLowerCase().includes(medication.toLowerCase()));
+                const price = inventoryItem ? inventoryItem.price : 0;
+
+                pendingDispenseData = { id, patientId, patientName, medication, price };
+
+                document.getElementById('dispPatient').textContent = patientName;
+                document.getElementById('dispDrug').textContent = medication;
+                document.getElementById('dispPrice').textContent = `₦${price.toLocaleString()}`;
+                document.getElementById('dispenseModal').style.display = 'flex';
+            };
+
+            window.confirmDispense = function() {
+                if (!pendingDispenseData) return;
+                const paymentMethod = document.getElementById('dispPaymentMethod').value;
+                const { id, patientId, patientName, medication, price } = pendingDispenseData;
+
+                closeModal('dispenseModal');
+
+                // 1. Update Prescription Status
+                db.collection('prescriptions').doc(id).update({ status: 'Dispensed' }).then(() => {
+                    
+                    // 2. Generate Bill if price > 0
+                    if (price > 0) {
+                        db.collection('bills').add({
+                            patientId: patientId,
+                            patientName: patientName,
+                            service: `Pharmacy - ${medication}`,
+                            amount: price,
+                            status: 'Paid', // Marked as paid because they paid at the counter
+                            paymentMethod: paymentMethod,
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+
+                    // 3. Deduct Stock (Optional: Only if we matched a drug)
+                    if (price > 0) {
+                        const invItem = globalInventory.find(i => i.name.toLowerCase().includes(medication.toLowerCase()));
+                        if (invItem) {
+                            db.collection('inventory').doc(invItem.id).update({
+                                stock: firebase.firestore.FieldValue.increment(-1)
+                            });
+                        }
+                    }
+
+                    logActivity(auth.currentUser, "Dispensed Drugs", `Patient: ${patientId}, Drug: ${medication}, Payment: ${paymentMethod}`);
+                    showAlert("Success", "Drugs dispensed and bill generated!", "✔️");
+                    pendingDispenseData = null;
+                }).catch(err => showAlert("Error", err.message, "❌"));
+            };
+            // --- END OF DISPENSE MODAL LOGIC ---
+
+            // --- START OF POS LOGIC ---
+            window.addToCart = function() {
+                const drugId = posDrugSelect.value;
+                const qty = parseInt(document.getElementById('posQty').value);
+
+                if (!drugId || qty < 1) { showAlert("Error", "Please select a drug and valid quantity.", "❌"); return; }
+
+                const drug = globalInventory.find(d => d.id === drugId);
+                if (!drug) return;
+                if (drug.stock < qty) { showAlert("Error", `Only ${drug.stock} units of ${drug.name} left in stock.`, "❌"); return; }
+
+                // Check if already in cart
+                const existing = currentCart.find(c => c.id === drugId);
+                if (existing) {
+                    if (existing.qty + qty > drug.stock) { showAlert("Error", "Not enough stock for this total quantity.", "❌"); return; }
+                    existing.qty += qty;
+                } else {
+                    currentCart.push({ id: drug.id, name: drug.name, price: drug.price, qty: qty });
+                }
+
+                renderCart();
+                document.getElementById('posQty').value = 1;
+            };
+
+            function renderCart() {
+                const cartContainer = document.getElementById('cartItems');
+                const totalContainer = document.getElementById('cartTotal');
+                
+                if (currentCart.length === 0) {
+                    cartContainer.innerHTML = '<p style="color: #888; font-size: 14px;">Cart is empty.</p>';
+                    totalContainer.textContent = '₦0';
+                    return;
+                }
+
+                cartContainer.innerHTML = '';
+                let total = 0;
+
+                currentCart.forEach((item, index) => {
+                    total += (item.price * item.qty);
+                    cartContainer.innerHTML += `
+                        <div class="pos-cart-item">
+                            <div>
+                                <strong>${item.name}</strong><br>
+                                <small style="color:#666;">${item.qty} x ₦${item.price.toLocaleString()}</small>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:10px;">
+                                <strong>₦${(item.price * item.qty).toLocaleString()}</strong>
+                                <button onclick="removeFromCart(${index})" style="background:none; border:none; color:#dc2626; cursor:pointer;">✖</button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                totalContainer.textContent = `₦${total.toLocaleString()}`;
+            }
+
+            window.removeFromCart = function(index) {
+                currentCart.splice(index, 1);
+                renderCart();
+            };
+
+            window.checkoutWalkin = function() {
+                if (currentCart.length === 0) { showAlert("Error", "Cart is empty.", "❌"); return; }
+                const paymentMethod = document.getElementById('posPaymentMethod').value;
+                const total = currentCart.reduce((sum, item) => sum + (item.price * item.qty), 0);
+
+                showConfirm("Complete Sale", `Confirm payment of <strong>₦${total.toLocaleString()}</strong> via ${paymentMethod}?`, () => {
+                    const batch = db.batch();
+
+                    // 1. Generate Bill
+                    const billRef = db.collection('bills').doc();
+                    batch.set(billRef, {
+                        patientId: "WALK-IN",
+                        patientName: "Walk-in Customer (OTC)",
+                        service: `Pharmacy Walk-in (${currentCart.length} items)`,
+                        amount: total,
+                        status: 'Paid',
+                        paymentMethod: paymentMethod,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 2. Deduct Stock
+                    currentCart.forEach(item => {
+                        const invRef = db.collection('inventory').doc(item.id);
+                        batch.update(invRef, { stock: firebase.firestore.FieldValue.increment(-item.qty) });
+                    });
+
+                    batch.commit().then(() => {
+                        logActivity(auth.currentUser, "Walk-in Sale", `Amount: ₦${total}, Method: ${paymentMethod}`);
+                        showAlert("Success", "Sale completed successfully!", "✔️");
+                        currentCart = [];
+                        renderCart();
+                    }).catch(err => showAlert("Error", err.message, "❌"));
                 });
             };
-            // --- END OF OPD QUEUE LOGIC ---
+            // --- END OF POS LOGIC ---
 
             // --- START OF INVENTORY MANAGEMENT LOGIC ---
             document.getElementById('inventoryForm').addEventListener('submit', (e) => {
@@ -212,13 +412,22 @@
             });
 
             db.collection('inventory').orderBy('name').onSnapshot(snapshot => {
+                globalInventory = [];
+                posDrugSelect.innerHTML = '<option value="">Select drug...</option>';
+                
                 if (snapshot.empty) {
                     inventoryContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">No drugs in inventory.</p>`;
                     return;
                 }
+                
                 inventoryContainer.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
+                    globalInventory.push({ id: doc.id, ...d });
+                    
+                    // Populate POS Dropdown
+                    posDrugSelect.innerHTML += `<option value="${doc.id}">${d.name} - ₦${d.price} (${d.stock} left)</option>`;
+
                     const badgeClass = d.stock > 10 ? 'status-complete' : 'status-pending';
                     inventoryContainer.innerHTML += `
                         <div class="data-card" style="border-left: 4px solid #10b981;">
