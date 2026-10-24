@@ -320,3 +320,22 @@ a.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0
 /* ========================================= */
 /* --- END OF TREATMENT CARD LAYOUT --- */
 /* ========================================= */
+
+
+
+/* ========================================= */
+/* --- START OF EMERGENCY CARD LAYOUT --- */
+/* ========================================= */
+.emergency-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; margin-top: 20px; }
+.emergency-card { background: #ffffff; border: 1px solid #e5e7eb; border-left: 4px solid #dc2626; border-radius: 12px; padding: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s, box-shadow 0.2s; display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; }
+.emergency-card:hover { transform: translateY(-3px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); border-color: #dc2626; }
+.emergency-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 10px; margin-bottom: 5px; }
+.emergency-id { color: #2563eb; font-weight: bold; font-size: 16px; }
+.emergency-date { font-size: 11px; color: #6b7280; }
+.emergency-name { font-size: 18px; font-weight: bold; color: #111827; }
+.emergency-details { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #4b5563; margin-top: 5px; }
+.emergency-reason { background: #fef2f2; color: #dc2626; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; margin-top: 5px; border: 1px solid #fecaca; }
+.emergency-action { margin-top: 10px; text-align: right; }
+/* ========================================= */
+/* --- END OF EMERGENCY CARD LAYOUT --- */
+/* ========================================= */
