@@ -474,3 +474,20 @@ window.showPrompt = function(title, message, defaultValue, onConfirm) {
     setTimeout(() => input.focus(), 300);
 };
 // --- END OF SHOW PROMPT ---
+
+
+// ==========================================
+// 12. SMART BACK BUTTON LOGIC
+// ==========================================
+// --- START OF SMART BACK BUTTON ---
+function goBack() {
+    // Check if there is a previous page in the browser history
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        // Fallback: If they opened the page directly, send them to the dashboard
+        const isPagesFolder = window.location.pathname.includes('/pages/');
+        window.location.href = isPagesFolder ? '../dashboard.html' : 'dashboard.html';
+    }
+}
+// --- END OF SMART BACK BUTTON ---
