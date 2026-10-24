@@ -198,25 +198,27 @@
                     }
 
                     cardContainer.innerHTML += `
-                        <div class="data-card">
-                            <div class="data-card-header">
-                                <span class="data-id">${d.patientId}</span>
-                                <span class="data-date">${date}</span>
-                            </div>
-                            <div class="data-name">${d.patientName}</div>
-                            <div class="data-info">
-                                <strong>Service:</strong> ${d.service}<br>
-                                <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()}
-                            </div>
-                            <div class="data-action">
-                                <span class="status-badge ${badgeClass}">${d.status}</span>
-                                <div style="display:flex; gap:5px;">
-                                    ${actionHtml}
-                                    <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
-                                </div>
-                            </div>
-                        </div>
-                    `;
+    <div class="data-card">
+        <div class="data-card-header">
+            <span class="data-id">${d.patientId}</span>
+            <span class="data-date">${date}</span>
+        </div>
+        <div class="data-name">${d.patientName}</div>
+        <div class="data-info">
+            <strong>Service:</strong> ${d.service}<br>
+            <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()}<br>
+            <!-- ADDED PAYMENT METHOD HERE -->
+            ${d.paymentMethod ? `<strong>Payment:</strong> ${d.paymentMethod}` : ''}
+        </div>
+        <div class="data-action">
+            <span class="status-badge ${badgeClass}">${d.status}</span>
+            <div style="display:flex; gap:5px;">
+                ${actionHtml}
+                <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
+            </div>
+        </div>
+    </div>
+`;
                 });
             });
 
