@@ -5,9 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Patient List - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
-    <style>
-        .search-box { width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; }
-    </style>
 </head>
 <body>
     <header id="header-placeholder"></header>
@@ -16,28 +13,19 @@
         <div class="table-container">
             <div class="page-header">
                 <h1>👥 Patient List</h1>
-                <p>Search and view all registered patients.</p>
+                <p>Search and view registered patients.</p>
             </div>
 
-            <!-- Search Bar -->
-            <input type="text" id="searchPatient" class="search-box" placeholder="Search by Patient ID, Name, or Phone Number...">
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
 
-            <!-- Patient Table -->
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Age</th>
-                        <th>Gender</th>
-                        <th>Phone</th>
-                        <th>Date Registered</th>
-                    </tr>
-                </thead>
-                <tbody id="patientListBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading patients...</td></tr>
-                </tbody>
-            </table>
+            <!-- Search Bar -->
+            <input type="text" id="searchPatient" class="search-box" placeholder="Type to search by Name, P ID, or Phone..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+
+            <!-- Patient Cards Container -->
+            <div id="patientCardContainer" class="patient-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading patients...</p>
+            </div>
         </div>
     </main>
 
@@ -49,75 +37,136 @@
     <script src="../script.js"></script>
 
     <script>
-        // 1. APPLY THE GUARD
+        // --- START OF PATIENT LIST INITIALIZATION ---
         enforceAuth(['reception', 'doctor', 'nurse', 'admin', 'records']);
-
-        // 2. PAGE LOGIC
-        let allPatients = []; 
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            const tbody = document.getElementById('patientListBody');
+            const cardContainer = document.getElementById('patientCardContainer');
             const searchInput = document.getElementById('searchPatient');
+            let debounceTimer;
 
-            // Fetch all patients
-            db.collection('patients').onSnapshot((snapshot) => {
-                allPatients = []; 
-                snapshot.forEach(doc => {
-                    allPatients.push({ firestoreId: doc.id, ...doc.data() });
-                });
-
-                // Manually sort by createdAt in JavaScript (Newest first)
-                allPatients.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA;
-                });
-
-                renderTable(allPatients);
-            }, error => {
-                // Catch errors so it doesn't freeze
-                console.error("Firestore Error: ", error);
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Database Error: ${error.message}</td></tr>`;
-            });
-
-            // Search Logic
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                const filtered = allPatients.filter(p => {
-                    const pId = String(p.patientId || '').toLowerCase();
-                    const name = `${p.firstName || ''} ${p.lastName || ''}`.toLowerCase();
-                    const phone = String(p.phone || '').toLowerCase();
+            // --- START OF INITIAL FETCH (SCALABLE) ---
+            function loadInitialPatients() {
+                cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Loading patients...</p>';
+                
+                db.collection('patients').orderBy('createdAt', 'desc').limit(20).get().then(snapshot => {
+                    if (snapshot.empty) {
+                        cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No patients found.</p>';
+                        return;
+                    }
                     
-                    return pId.includes(term) || name.includes(term) || phone.includes(term);
+                    let patients = [];
+                    snapshot.forEach(doc => {
+                        patients.push({ firestoreId: doc.id, ...doc.data() });
+                    });
+                    
+                    renderPatientCards(patients);
+                }).catch(error => {
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Error: ${error.message}</p>`;
                 });
-                renderTable(filtered);
-            });
+            }
+            // --- END OF INITIAL FETCH ---
 
-            // Render Table Function
-            function renderTable(patients) {
+            // --- START OF DEBOUNCED SERVER-SIDE SEARCH ---
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
+
+                debounceTimer = setTimeout(() => {
+                    if (term === "") {
+                        loadInitialPatients(); 
+                        return;
+                    }
+
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Searching...</p>';
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(20)
+                        .get();
+
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        if (results.length === 0) {
+                            cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No matching patients found.</p>';
+                            return;
+                        }
+
+                        results.sort((a, b) => {
+                            const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                            const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                            return timeB - timeA;
+                        });
+
+                        renderPatientCards(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Search Error: ${error.message}<br><br><small>If it mentions an index, check the browser console for the link to create it.</small></p>`;
+                    });
+
+                }, 300); 
+            });
+            // --- END OF DEBOUNCED SERVER-SIDE SEARCH ---
+
+            // --- START OF RENDER CARDS ---
+            function renderPatientCards(patients) {
                 if (patients.length === 0) {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No patients found.</td></tr>`;
+                    cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No patients found.</p>';
                     return;
                 }
 
-                tbody.innerHTML = '';
+                cardContainer.innerHTML = '';
                 patients.forEach(p => {
-                    const date = p.createdAt ? p.createdAt.toDate().toLocaleDateString() : 'Just now';
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${p.patientId || 'N/A'}</strong></td>
-                            <td><strong>${p.firstName} ${p.lastName}</strong></td>
-                            <td>${p.age}</td>
-                            <td>${p.gender}</td>
-                            <td>${p.phone}</td>
-                            <td>${date}</td>
-                        </tr>
+                    const dateStr = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'Just now';
+
+                    cardContainer.innerHTML += `
+                        <div class="patient-card">
+                            <div class="patient-card-header">
+                                <span class="patient-id">${p.patientId || 'N/A'}</span>
+                                <span class="patient-date">${dateStr}</span>
+                            </div>
+                            <div class="patient-name">${p.firstName} ${p.lastName}</div>
+                            <div class="patient-details">
+                                <div><strong>Age:</strong> ${p.age || 'N/A'}</div>
+                                <div><strong>Gender:</strong> ${p.gender || 'N/A'}</div>
+                                <div style="grid-column: 1 / -1;"><strong>Phone:</strong> ${p.phone || 'N/A'}</div>
+                            </div>
+                        </div>
                     `;
                 });
             }
+            // --- END OF RENDER CARDS ---
+
+            loadInitialPatients();
         });
+        // --- END OF PATIENT LIST INITIALIZATION ---
     </script>
 </body>
 </html>
