@@ -15,23 +15,21 @@
                 <p>Record patient vitals.</p>
             </div>
 
-            <!-- BACK TO DASHBOARD BUTTON -->
-            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+            <!-- SMART BACK BUTTON -->
+            <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
             <div class="form-card">
                 <h3>Record Vitals</h3>
                 <form id="nursingForm">
                     <div class="form-grid">
-                        <!-- AUTOCOMPLETE SEARCH -->
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient</label>
                             <div class="autocomplete-container">
-                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID..." autocomplete="off">
                                 <div id="autocompleteList" class="autocomplete-list"></div>
                                 <input type="hidden" id="selectedPatientId">
                             </div>
                         </div>
-                        
                         <div class="form-group"><label>BP (mmHg)</label><input type="text" id="bp" required placeholder="120/80"></div>
                         <div class="form-group"><label>Temp (°C)</label><input type="number" step="0.1" id="temp" required placeholder="37.2"></div>
                         <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" id="weight" required placeholder="70.5"></div>
@@ -42,14 +40,9 @@
             </div>
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Vitals</h3>
-            <table>
-                <thead>
-                    <tr><th>Patient ID</th><th>Patient Name</th><th>BP</th><th>Temp</th><th>Weight</th><th>Pulse</th><th>Date</th></tr>
-                </thead>
-                <tbody id="vitalsTableBody">
-                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading vitals...</td></tr>
-                </tbody>
-            </table>
+            <div id="vitalsCardContainer" class="card-grid-layout">
+                <p style="text-align:center; width:100%; color:#888;">Loading vitals...</p>
+            </div>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -60,158 +53,94 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START OF NURSING INITIALIZATION ---
         enforceAuth(['nurse']);
-
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-
             const searchInput = document.getElementById('patientSearchInput');
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
-            const tbody = document.getElementById('vitalsTableBody');
+            const cardContainer = document.getElementById('vitalsCardContainer');
             let debounceTimer;
 
-            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
+            // Search Logic
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
-                hiddenPatientId.value = "";
-                searchInput.dataset.name = ""; // Clear stored name
+                hiddenPatientId.value = ""; searchInput.dataset.name = "";
                 autocompleteList.style.display = 'none';
+                if (term.length < 2) return; 
 
-                if (term.length < 2) return; // Don't search until they type 2 letters
-
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
                     autocompleteList.style.display = 'block';
+                    let results = []; let seenIds = new Set();
 
-                    const searchTerm = term.toLowerCase();
-                    const upperTerm = term.toUpperCase();
+                    try {
+                        const idSnap = await db.collection('patients').where('patientId', '==', term.toUpperCase()).get();
+                        idSnap.forEach(doc => { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); });
+                    } catch (e) {}
+                    try {
+                        const st = term.charAt(0).toUpperCase() + term.slice(1);
+                        const nameSnap = await db.collection('patients').orderBy('firstName').startAt(st).endAt(st + '\uf8ff').limit(10).get();
+                        nameSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
+                    } catch (e) {}
 
-                    // Query 1: Search by First Name
-                    const nameQuery = db.collection('patients')
-                        .orderBy('firstName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(10)
-                        .get();
-
-                    // Query 2: Search by Patient ID
-                    const idQuery = db.collection('patients')
-                        .where('patientId', '==', upperTerm)
-                        .get();
-
-                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
-                        let results = [];
-                        let seenIds = new Set();
-
-                        nameSnap.forEach(doc => {
-                            results.push({ firestoreId: doc.id, ...doc.data() });
-                            seenIds.add(doc.id);
-                        });
-
-                        idSnap.forEach(doc => {
-                            if (!seenIds.has(doc.id)) {
-                                results.push({ firestoreId: doc.id, ...doc.data() });
-                                seenIds.add(doc.id);
-                            }
-                        });
-
-                        renderDropdown(results);
-                    }).catch(error => {
-                        console.error("Search Error:", error);
-                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matches.</div>' : '';
+                    results.forEach(p => {
+                        const div = document.createElement('div');
+                        div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                        div.onclick = () => {
+                            searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                            hiddenPatientId.value = p.patientId; searchInput.dataset.name = `${p.firstName} ${p.lastName}`;
+                            autocompleteList.style.display = 'none';
+                        };
+                        autocompleteList.appendChild(div);
                     });
-                }, 300); 
+                }, 300);
             });
+            document.addEventListener('click', (e) => { if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none'; });
 
-            function renderDropdown(patients) {
-                autocompleteList.innerHTML = '';
-                if (patients.length === 0) { 
-                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
-                    return; 
-                }
+            // Load Vitals Queue
+            db.collection('vitals').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
+                if (snapshot.empty) { cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No vitals recorded.</p>`; return; }
+                let results = []; snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
                 
-                patients.forEach(p => {
-                    const div = document.createElement('div');
-                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
-                    div.addEventListener('click', () => {
-                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
-                        hiddenPatientId.value = p.patientId;
-                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form submit
-                        autocompleteList.style.display = 'none';
-                    });
-                    autocompleteList.appendChild(div);
-                });
-            }
-
-            document.addEventListener('click', (e) => {
-                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
-            });
-            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
-
-            // --- START OF LOAD RECENT VITALS ---
-            db.collection('vitals').onSnapshot(snapshot => {
-                if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No vitals recorded yet.</td></tr>`;
-                    return;
-                }
-                let vitals = [];
-                snapshot.forEach(doc => vitals.push(doc.data()));
-                vitals.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA;
-                });
-                tbody.innerHTML = '';
-                vitals.slice(0, 20).forEach(d => {
-                    // User's exact custom date format preserved
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
-                     year: 'numeric', 
-                     month: 'short',
-                     day: 'numeric', 
-                     hour: '2-digit', 
-                     minute: '2-digit', 
-                     second: '2-digit',
-                     hour12: true 
-                     }) : 'Just now';
-                    
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.bp}</td><td>${d.temp}°C</td><td>${d.weight}kg</td><td>${d.pulse}</td><td>${date}</td>
-                        </tr>
+                cardContainer.innerHTML = '';
+                results.forEach(d => {
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
+                    cardContainer.innerHTML += `
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.patientId}</span>
+                                <span class="data-date">${date}</span>
+                            </div>
+                            <div class="data-name">${d.patientName}</div>
+                            <div class="data-info" style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
+                                <div><strong>BP:</strong> ${d.bp}</div>
+                                <div><strong>Temp:</strong> ${d.temp}°C</div>
+                                <div><strong>Weight:</strong> ${d.weight}kg</div>
+                                <div><strong>Pulse:</strong> ${d.pulse}</div>
+                            </div>
+                        </div>
                     `;
                 });
-            }, error => {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
-            // --- END OF LOAD RECENT VITALS ---
 
-            // --- START OF SUBMIT VITALS ---
+            // Submit Vitals
             document.getElementById('nursingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
-                
-                const patientId = hiddenPatientId.value;
-                const patientName = searchInput.dataset.name; // Retrieve from stored dataset
-
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient.", "❌"); return; }
                 db.collection('vitals').add({
-                    patientId: patientId, patientName: patientName,
+                    patientId: hiddenPatientId.value, patientName: searchInput.dataset.name,
                     bp: document.getElementById('bp').value, temp: document.getElementById('temp').value,
                     weight: document.getElementById('weight').value, pulse: document.getElementById('pulse').value,
                     recordedBy: user.uid, createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    showAlert("Success", "Vitals Saved successfully!", "✔️");
-                    document.getElementById('nursingForm').reset();
-                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
+                    showAlert("Success", "Vitals Saved!", "✔️");
+                    document.getElementById('nursingForm').reset(); searchInput.value = ''; hiddenPatientId.value = '';
                 }).catch(err => showAlert("Error", err.message, "❌"));
             });
-            // --- END OF SUBMIT VITALS ---
         });
-        // --- END OF NURSING INITIALIZATION ---
     </script>
 </body>
 </html>
