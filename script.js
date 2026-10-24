@@ -363,7 +363,7 @@ function resetInactivityTimer() {
                 console.error("Auto-logout error:", error);
                 window.location.reload();
             });
-        }, 10 * 60 * 1000); 
+        }, 10 * 600 * 1000); 
     }
 }
 
