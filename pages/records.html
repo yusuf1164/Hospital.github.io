@@ -5,13 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical Records - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
-    <style>
-        .record-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .record-block h3 { color: #1e3a8a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; }
-        .record-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; font-size: 14px; }
-        .record-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .record-date { font-size: 12px; color: #6b7280; float: right; }
-    </style>
 </head>
 <body>
     <header id="header-placeholder"></header>
@@ -22,8 +15,10 @@
                 <p>View complete patient history across all departments.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
             <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
 
+            <!-- Search Patient -->
             <div class="form-card" style="margin-bottom: 30px;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Search Patient (Name, ID, or Phone)</label>
@@ -35,6 +30,7 @@
                 </div>
             </div>
 
+            <!-- Patient History Container (Hidden by default) -->
             <div id="historyContainer" style="display: none;">
                 <div class="record-block"><h3>🌡️ Nursing Vitals</h3><div id="vitalsList"></div></div>
                 <div class="record-block"><h3>🩺 OPD Consultations</h3><div id="consultationsList"></div></div>
@@ -128,7 +124,6 @@
                     div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
-                        // Important: We use p.patientId (P0001) to load history, not the Firestore ID!
                         hiddenPatientId.value = p.patientId; 
                         autocompleteList.style.display = 'none';
                         loadPatientHistory(p.patientId);
@@ -149,7 +144,6 @@
                 const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
                 sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
 
-                // Fetch all records using the 'P0001' string
                 Promise.all([
                     db.collection('vitals').where('patientId', '==', patientIdString).get(),
                     db.collection('consultations').where('patientId', '==', patientIdString).get(),
@@ -163,7 +157,6 @@
                         hour: '2-digit', minute: '2-digit', hour12: true 
                     }) : 'N/A';
 
-                    // 1. Vitals
                     let vitalsHTML = '';
                     if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
                     vitalsSnap.forEach(doc => {
@@ -172,7 +165,6 @@
                     });
                     document.getElementById('vitalsList').innerHTML = vitalsHTML;
 
-                    // 2. Consultations
                     let consultHTML = '';
                     if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
                     consultSnap.forEach(doc => {
@@ -187,7 +179,6 @@
                     });
                     document.getElementById('consultationsList').innerHTML = consultHTML;
 
-                    // 3. Labs
                     let labsHTML = '';
                     if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
                     labsSnap.forEach(doc => {
@@ -197,7 +188,6 @@
                     });
                     document.getElementById('labsList').innerHTML = labsHTML;
 
-                    // 4. Radiology
                     let radHTML = '';
                     if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
                     radSnap.forEach(doc => {
@@ -207,7 +197,6 @@
                     });
                     document.getElementById('radiologyList').innerHTML = radHTML;
 
-                    // 5. Bills
                     let billsHTML = '';
                     if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
                     billsSnap.forEach(doc => {
