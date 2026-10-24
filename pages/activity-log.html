@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -16,23 +15,15 @@
                 <p>Monitor all staff actions across the hospital.</p>
             </div>
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>Date & Time</th>
-                        <th>Staff ID</th>
-                        <th>Staff Name</th>
-                        <th>Action</th>
-                        <th>Details</th>
-                    </tr>
-                </thead>
-                <tbody id="logTableBody">
-                    <tr><td colspan="5" style="text-align:center; color:#888;">Loading logs...</td></tr>
-                </tbody>
-            </table>
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
+            <!-- Logs Container -->
+            <div id="logContainer">
+                <p style="text-align: center; color:#888;">Loading logs...</p>
+            </div>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -41,50 +32,49 @@
     <script src="../script.js"></script>
 
     <script>
-        // 1. APPLY THE GUARD
+        // --- START OF ACTIVITY LOG INITIALIZATION ---
         enforceAuth(['admin']);
 
-        // 2. LOAD THE DATA
         auth.onAuthStateChanged((user) => {
-            if (!user) { return; }
+            if (!user) return;
 
-            const tbody = document.getElementById('logTableBody');
+            const logContainer = document.getElementById('logContainer');
 
+            // Load latest 100 logs to keep it scalable
             db.collection('auditLogs').orderBy('timestamp', 'desc').limit(100).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No activity recorded yet.</td></tr>`;
+                    logContainer.innerHTML = `<p style="text-align:center; color:#888;">No activity recorded yet.</p>`;
                     return;
                 }
                 
-                tbody.innerHTML = '';
+                logContainer.innerHTML = '';
                 snapshot.forEach(doc => {
                     const d = doc.data();
-                    let date = 'Just now';
-                    if (d.timestamp && typeof d.timestamp.toDate === 'function') {
-                    date = d.timestamp.toDate().toLocaleString(undefined, { 
-                    year: 'numeric', month: 'short', day: 'numeric', 
-                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true 
-                });
-            }
+                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'Just now';
+
                     let badgeColor = 'status-active';
                     if (d.action.includes('Registered')) badgeColor = 'status-complete';
                     if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
 
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><small>${date}</small></td>
-                            <td><strong style="color:#2563eb;">${d.staffId || 'N/A'}</strong></td>
-                            <td><strong>${d.staffName || 'Staff Member'}</strong></td>
-                            <td><span class="status-badge ${badgeColor}">${d.action}</span></td>
-                            <td>${d.details}</td>
-                        </tr>
+                    logContainer.innerHTML += `
+                        <div class="log-card">
+                            <div class="log-header">
+                                <span class="log-staff">${d.staffName || 'Staff Member'} (ID: ${d.staffId || 'N/A'})</span>
+                                <span class="log-date">${date}</span>
+                            </div>
+                            <div class="log-action"><span class="status-badge ${badgeColor}">${d.action}</span></div>
+                            <div class="log-details">${d.details}</div>
+                        </div>
                     `;
                 });
             }, error => {
-                console.error("Firestore Error:", error);
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                logContainer.innerHTML = `<p style="text-align:center; color:red;">Error: ${error.message}</p>`;
             });
         });
+        // --- END OF ACTIVITY LOG INITIALIZATION ---
     </script>
 </body>
 </html>
