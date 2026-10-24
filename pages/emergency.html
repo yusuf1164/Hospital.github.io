@@ -15,6 +15,9 @@
                 <p>Fast-track patient intake and triage management.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <div class="form-card" style="border-left: 4px solid #dc2626;">
                 <h3>Fast-Track Registration</h3>
                 <form id="emergencyForm">
@@ -22,10 +25,28 @@
                         <div class="form-group"><label>First Name</label><input type="text" id="firstName" required placeholder="John"></div>
                         <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required placeholder="Doe"></div>
                         <div class="form-group"><label>Age</label><input type="number" id="age" required placeholder="30"></div>
+                        
                         <div class="form-group">
                             <label>Gender</label>
-                            <select id="gender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
+                            <select id="gender" required>
+                                <option value="">Select...</option>
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                                <option value="Other">Other</option>
+                            </select>
                         </div>
+
+                        <!-- RELIGION DROPDOWN (Islam First) -->
+                        <div class="form-group">
+                            <label>Religion</label>
+                            <select id="religion" required>
+                                <option value="">Select...</option>
+                                <option value="Islam">Islam</option>
+                                <option value="Christianity">Christianity</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
                         <div class="form-group"><label>Phone Number (Optional)</label><input type="tel" id="phone" placeholder="+1 (555) 000-0000"></div>
                         <div class="form-group" style="grid-column: 1 / -1;"><label style="color: #dc2626; font-weight: bold;">Triage Level / Emergency Reason</label><input type="text" id="triage" required placeholder="e.g. Severe bleeding, Heart attack"></div>
                     </div>
@@ -33,19 +54,18 @@
                 </form>
             </div>
 
+            <!-- Filter Buttons -->
             <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
                 <button class="btn btn-primary filter-btn" data-filter="Active" style="flex: 1; background-color: #dc2626;">Active Cases</button>
                 <button class="btn btn-outline filter-btn" data-filter="Treated" style="flex: 1; border-color: #065f46; color: #065f46;">Treated Cases</button>
                 <button class="btn btn-outline filter-btn" data-filter="All" style="flex: 1; border-color: #1e3a8a; color: #1e3a8a;">All Cases</button>
             </div>
 
+            <!-- Emergency Cards Container -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Emergency Records</h3>
-            <table>
-                <thead><tr><th>Patient ID</th><th>Patient Name</th><th>Age / Gender</th><th>Triage Reason</th><th>Date & Time</th><th>Status</th><th>Action</th></tr></thead>
-                <tbody id="emergencyTableBody">
-                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading emergency cases...</td></tr>
-                </tbody>
-            </table>
+            <div id="emergencyCardContainer" class="emergency-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading emergency cases...</p>
+            </div>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -56,32 +76,37 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START EMERGENCY LOGIC ---
+        // --- START OF EMERGENCY INITIALIZATION ---
         enforceAuth(['admin', 'doctor', 'nurse', 'reception']);
         let allEmergencies = [];
         let currentFilter = 'Active';
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-            const tbody = document.getElementById('emergencyTableBody');
+            
+            const cardContainer = document.getElementById('emergencyCardContainer');
             const form = document.getElementById('emergencyForm');
 
-            // Load Emergency Cases
-            db.collection('emergencies').onSnapshot((snapshot) => {
+            // --- START OF SCALABLE FETCH (LIMIT TO 50) ---
+            db.collection('emergencies').orderBy('createdAt', 'desc').limit(50).onSnapshot((snapshot) => {
                 allEmergencies = [];
                 snapshot.forEach(doc => allEmergencies.push({ id: doc.id, ...doc.data() }));
-                allEmergencies.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
                 applyFilter(currentFilter);
+            }, error => {
+                cardContainer.innerHTML = `<p style="color:red; text-align:center;">Error: ${error.message}</p>`;
             });
+            // --- END OF SCALABLE FETCH ---
 
-            // Filter Buttons
+            // --- START OF FILTER BUTTON LOGIC ---
             document.querySelectorAll('.filter-btn').forEach(btn => {
                 if (btn.getAttribute('data-filter') === currentFilter) {
                     btn.className = 'btn btn-primary filter-btn';
                     if (currentFilter === 'Active') btn.style.cssText = 'flex: 1; background-color: #dc2626;';
                 }
+                
                 btn.addEventListener('click', (e) => {
                     currentFilter = e.target.getAttribute('data-filter');
+                    
                     document.querySelectorAll('.filter-btn').forEach(b => {
                         b.className = 'btn btn-outline filter-btn';
                         b.style.cssText = 'flex: 1;';
@@ -89,39 +114,62 @@
                         if (b.getAttribute('data-filter') === 'Treated') b.style.cssText = 'flex: 1; border-color: #065f46; color: #065f46;';
                         if (b.getAttribute('data-filter') === 'All') b.style.cssText = 'flex: 1; border-color: #1e3a8a; color: #1e3a8a;';
                     });
+                    
                     e.target.className = 'btn btn-primary filter-btn';
                     e.target.style.cssText = 'flex: 1;';
                     if (currentFilter === 'Active') e.target.style.backgroundColor = '#dc2626';
+                    
                     applyFilter(currentFilter);
                 });
             });
+            // --- END OF FILTER BUTTON LOGIC ---
 
+            // --- START OF RENDER CARDS ---
             function applyFilter(filter) {
                 let filtered = allEmergencies;
                 if (filter !== 'All') filtered = allEmergencies.filter(e => e.status === filter);
-                if (filtered.length === 0) { tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No ${filter} cases found.</td></tr>`; return; }
                 
-                tbody.innerHTML = '';
+                if (filtered.length === 0) { 
+                    cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No ${filter} cases found.</p>`; 
+                    return; 
+                }
+                
+                cardContainer.innerHTML = '';
                 filtered.forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
-                    const badgeClass = d.status === 'Treated' ? 'status-complete' : 'status-pending';
-                    const actionHtml = d.status === 'Active' ? `<button class="btn btn-primary" onclick="resolveEmergency('${d.id}', '${d.firstName} ${d.lastName}', '${d.patientId}')">Mark Treated</button>` : `<span style="color:#065f46; font-weight:bold;">Completed</span>`;
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', hour12: true 
+                    }) : 'Just now';
 
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.firstName} ${d.lastName}</strong></td>
-                            <td>${d.age} / ${d.gender}</td>
-                            <td style="color: #dc2626; font-weight: bold;">${d.triage}</td>
-                            <td><small>${date}</small></td>
-                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-                            <td>${actionHtml}</td>
-                        </tr>
+                    const badgeClass = d.status === 'Treated' ? 'status-complete' : 'status-pending';
+                    const actionHtml = d.status === 'Active' 
+                        ? `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; background-color: #dc2626;" onclick="resolveEmergency('${d.id}', '${d.firstName} ${d.lastName}', '${d.patientId}')">Mark Treated</button>` 
+                        : `<span style="color:#065f46; font-weight:bold;">Completed</span>`;
+
+                    cardContainer.innerHTML += `
+                        <div class="emergency-card">
+                            <div class="emergency-card-header">
+                                <span class="emergency-id">${d.patientId}</span>
+                                <span class="emergency-date">${date}</span>
+                            </div>
+                            <div class="emergency-name">${d.firstName} ${d.lastName}</div>
+                            <div class="emergency-details">
+                                <span><strong>Age:</strong> ${d.age}</span>
+                                <span><strong>Gender:</strong> ${d.gender}</span>
+                                <span><strong>Religion:</strong> ${d.religion || 'N/A'}</span>
+                            </div>
+                            <div class="emergency-reason">🚨 ${d.triage}</div>
+                            <div class="emergency-action">
+                                <span class="status-badge ${badgeClass}" style="margin-right: 10px;">${d.status}</span>
+                                ${actionHtml}
+                            </div>
+                        </div>
                     `;
                 });
             }
+            // --- END OF RENDER CARDS ---
 
-            // Submit Fast-Track Registration
+            // --- START OF FORM SUBMISSION & PIN GENERATION ---
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('submitBtn');
@@ -131,13 +179,13 @@
                 const lastName = document.getElementById('lastName').value;
                 const age = document.getElementById('age').value;
                 const gender = document.getElementById('gender').value;
+                const religion = document.getElementById('religion').value;
                 const phone = document.getElementById('phone').value || 'N/A';
                 const triage = document.getElementById('triage').value;
 
                 try {
                     const counterRef = db.collection('settings').doc('counters');
                     let generatedPatientId = "";
-                    // Generate 6-digit PIN
                     let generatedPin = Math.floor(100000 + Math.random() * 900000).toString();
 
                     await db.runTransaction(async (transaction) => {
@@ -148,11 +196,13 @@
                         generatedPatientId = `P${String(nextId).padStart(4, '0')}`;
                     });
 
-                    // 1. Save to patients collection WITH PIN
+                    // 1. Save to patients collection WITH PIN & RELIGION
                     await db.collection('patients').add({
                         patientId: generatedPatientId,
                         pin: generatedPin, 
-                        firstName: firstName, lastName: lastName, age: age, gender: gender, phone: phone,
+                        firstName: firstName, lastName: lastName, age: age, gender: gender, 
+                        religion: religion,
+                        phone: phone,
                         address: "Emergency Intake",
                         registeredBy: user.uid,
                         treatmentStatus: 'Ongoing', 
@@ -163,34 +213,38 @@
                     await db.collection('emergencies').add({
                         patientId: generatedPatientId,
                         firstName: firstName, lastName: lastName, age: age, gender: gender,
+                        religion: religion,
                         triage: triage, status: 'Active',
                         createdAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
                     logActivity(auth.currentUser, "Emergency Intake", `Patient ID: ${generatedPatientId}, Reason: ${triage}`);
 
-                    alert(`✅ Emergency Patient Registered!\n\nPatient ID: ${generatedPatientId}\nSecurity PIN: ${generatedPin}\nName: ${firstName} ${lastName}\n\nPlease give this ID and PIN to the patient/parent so they can link their online portal.`);
+                    showAlert("Patient Registered", `Emergency Patient Registered!<br><br>Patient ID: <strong>${generatedPatientId}</strong><br>Security PIN: <strong>${generatedPin}</strong><br><br>Please give this ID and PIN to the patient/parent to link their online portal.`, "✔️");
+                    
                     form.reset();
                     btn.textContent = '🚨 Register Emergency Case'; btn.disabled = false;
 
                 } catch (error) {
-                    alert("Error: " + error.message);
+                    showAlert("Error", error.message, "❌");
                     btn.textContent = '🚨 Register Emergency Case'; btn.disabled = false;
                 }
             });
+            // --- END OF FORM SUBMISSION ---
 
-            // Mark Emergency as Treated
+            // --- START OF RESOLVE EMERGENCY ---
             window.resolveEmergency = function(docId, patientName, patientId) {
-                if (confirm(`Has ${patientName} (${patientId}) been successfully treated/discharged?`)) {
+                showConfirm("Mark as Treated", `Has ${patientName} (${patientId}) been successfully treated/discharged?`, () => {
                     db.collection('emergencies').doc(docId).update({ status: 'Treated' })
                     .then(() => {
                         logActivity(auth.currentUser, "Emergency Treated", `Patient: ${patientName} (${patientId})`);
-                        alert('Patient marked as treated.');
-                    });
-                }
+                        showAlert("Success", "Patient marked as treated.", "✔️");
+                    }).catch(err => showAlert("Error", err.message, "❌"));
+                });
             };
+            // --- END OF RESOLVE EMERGENCY ---
         });
-        // --- END EMERGENCY LOGIC ---
+        // --- END OF EMERGENCY INITIALIZATION ---
     </script>
 </body>
 </html>
