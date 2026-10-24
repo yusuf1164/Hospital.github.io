@@ -24,8 +24,23 @@
                 <p>Generate invoices and process payments.</p>
             </div>
 
-            <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
+
+            <!-- BILLING STATS -->
+            <div class="billing-stats-grid">
+                <div class="billing-stat-card" style="border-top: 4px solid #10b981;">
+                    <h4>Cash Collected</h4>
+                    <p id="statCash">₦0</p>
+                </div>
+                <div class="billing-stat-card" style="border-top: 4px solid #2563eb;">
+                    <h4>POS Collected</h4>
+                    <p id="statPos">₦0</p>
+                </div>
+                <div class="billing-stat-card" style="border-top: 4px solid #f59e0b;">
+                    <h4>Transfer Collected</h4>
+                    <p id="statTransfer">₦0</p>
+                </div>
+            </div>
 
             <div class="form-card">
                 <h3>Create New Invoice</h3>
@@ -60,63 +75,71 @@
     </main>
     <footer id="footer-placeholder"></footer>
 
+    <!-- MODAL: Select Payment Method -->
+    <div id="paymentModal" class="modal">
+        <div class="modal-content" style="text-align:center;">
+            <h3 style="color: #1e3a8a; margin-bottom: 10px;">Select Payment Method</h3>
+            <p style="font-size: 14px; color:#666; margin-bottom: 20px;">How did the patient pay?</p>
+            <input type="hidden" id="payBillId">
+            <input type="hidden" id="payAmount">
+            
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <button class="btn btn-outline" style="border-color: #10b981; color: #10b981; padding: 15px; font-size: 16px;" onclick="processPayment('Cash')">💵 Cash</button>
+                <button class="btn btn-outline" style="border-color: #2563eb; color: #2563eb; padding: 15px; font-size: 16px;" onclick="processPayment('POS')">💳 POS</button>
+                <button class="btn btn-outline" style="border-color: #f59e0b; color: #f59e0b; padding: 15px; font-size: 16px;" onclick="processPayment('Transfer')">🏦 Bank Transfer</button>
+            </div>
+            <button class="btn btn-outline" style="width: 100%; margin-top: 15px; border-color: #ccc; color: #333;" onclick="closeModal('paymentModal')">Cancel</button>
+        </div>
+    </div>
+
     <!-- MODAL: Print Options -->
     <div id="printOptionsModal" class="modal">
         <div class="modal-content" style="max-width: 400px; text-align: center;">
             <h3 style="color: #1e3a8a; margin-bottom: 10px;">Export Receipt</h3>
-            <p style="margin-bottom: 20px; font-size: 14px; color: #666;">Choose how you want to save this receipt.</p>
             <div style="display: flex; gap: 10px;">
-                <button class="btn btn-outline" style="flex:1; border-color: #1e3a8a; color: #1e3a8a; padding: 15px;" onclick="downloadPDF()"><span style="font-size: 24px; display: block; margin-bottom: 5px;">📄</span> Save as PDF</button>
-                <button class="btn btn-primary" style="flex:1; padding: 15px;" onclick="downloadImage()"><span style="font-size: 24px; display: block; margin-bottom: 5px;">🖼️</span> Save as Image</button>
+                <button class="btn btn-outline" style="flex:1; border-color: #1e3a8a; color: #1e3a8a; padding: 15px;" onclick="downloadPDF()"><span style="font-size: 24px; display: block; margin-bottom: 5px;">📄</span> PDF</button>
+                <button class="btn btn-primary" style="flex:1; padding: 15px;" onclick="downloadImage()"><span style="font-size: 24px; display: block; margin-bottom: 5px;">🖼️</span> Image</button>
             </div>
             <button class="btn btn-outline" style="width: 100%; margin-top: 15px; border-color: #ccc; color: #333;" onclick="closeModal('printOptionsModal')">Cancel</button>
         </div>
     </div>
 
     <!-- HIDDEN PRINT RECEIPT CONTAINER -->
-<div id="printableReceipt" style="display: none; background: white; color: black; width: 450px; padding: 30px; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #e5e7eb;">
-    <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 20px; margin-bottom: 20px;">
-        <h2 style="color: #1e3a8a; margin-bottom: 5px; font-size: 24px;">🏥 DEEN HOSPITAL</h2>
-        <p style="font-size: 13px; margin: 2px 0;">123 Health Ave, Medical City</p>
-        <p style="font-size: 13px; margin: 2px 0;">Phone: +1 (555) 123-4567</p>
-        <h3 style="margin-top: 20px; text-transform: uppercase; font-size: 16px; letter-spacing: 2px; color: #000;">Payment Receipt</h3>
-    </div>
-    
-    <div style="font-size: 14px; line-height: 1.8; margin-bottom: 20px; color: #000;">
-        <p style="margin: 5px 0;"><strong>Receipt No:</strong> <span id="printReceiptNo"></span></p>
-        <p style="margin: 5px 0;"><strong>Date & Time:</strong> <span id="printDate"></span></p>
-        <p style="margin: 5px 0;"><strong>Patient ID:</strong> <span id="printPatientId"></span></p>
-        <p style="margin: 5px 0;"><strong>Patient Name:</strong> <span id="printPatientName"></span></p>
-    </div>
-
-    <!-- Service and Amount using Flexbox instead of Table -->
-    <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
-            <strong style="color: #4b5563; font-size: 13px;">SERVICE DESCRIPTION</strong>
-            <strong style="color: #4b5563; font-size: 13px;">AMOUNT</strong>
+    <div id="printableReceipt" style="display: none; background: white; color: black; width: 450px; padding: 30px; box-sizing: border-box; border: 1px solid #e5e7eb;">
+        <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 20px; margin-bottom: 20px;">
+            <h2 style="color: #1e3a8a; margin-bottom: 5px; font-size: 24px;">🏥 DEEN HOSPITAL</h2>
+            <p style="font-size: 13px; margin: 2px 0;">123 Health Ave, Medical City</p>
+            <p style="font-size: 13px; margin: 2px 0;">Phone: +1 (555) 123-4567</p>
+            <h3 style="margin-top: 20px; text-transform: uppercase; font-size: 16px; letter-spacing: 2px; color: #000;">Payment Receipt</h3>
         </div>
-        <div style="display: flex; justify-content: space-between; font-weight: bold;">
-            <span id="printService" style="max-width: 65%; word-wrap: break-word; line-height: 1.4;"></span>
-            <span id="printAmount" style="min-width: 35%; text-align: right;"></span>
+        <div style="font-size: 14px; line-height: 1.8; margin-bottom: 20px; color: #000;">
+            <p style="margin: 5px 0;"><strong>Receipt No:</strong> <span id="printReceiptNo"></span></p>
+            <p style="margin: 5px 0;"><strong>Date & Time:</strong> <span id="printDate"></span></p>
+            <p style="margin: 5px 0;"><strong>Patient ID:</strong> <span id="printPatientId"></span></p>
+            <p style="margin: 5px 0;"><strong>Patient Name:</strong> <span id="printPatientName"></span></p>
+        </div>
+        <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+                <strong style="color: #4b5563; font-size: 13px;">SERVICE DESCRIPTION</strong>
+                <strong style="color: #4b5563; font-size: 13px;">AMOUNT</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-weight: bold;">
+                <span id="printService" style="max-width: 65%; word-wrap: break-word; line-height: 1.4;"></span>
+                <span id="printAmount" style="min-width: 35%; text-align: right;"></span>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #000; padding-top: 15px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">
+            <span>Total Amount</span>
+            <span id="printTotal" style="color: #1e3a8a;"></span>
+        </div>
+        <div style="text-align: right; margin-bottom: 30px; font-weight: bold; font-size: 14px;">
+            <span>Status: </span><span id="printStatus"></span><br>
+            <span>Method: </span><span id="printMethod"></span>
+        </div>
+        <div style="text-align: center; font-size: 13px; color: #555; margin-top: 30px; border-top: 1px dashed #000; padding-top: 20px;">
+            <p style="margin: 5px 0;">Thank you for choosing DEEN Hospital.</p>
         </div>
     </div>
-
-    <!-- Total Amount -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #000; padding-top: 15px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">
-        <span>Total Amount</span>
-        <span id="printTotal" style="color: #1e3a8a;"></span>
-    </div>
-    
-    <!-- Status -->
-    <div style="text-align: right; margin-bottom: 30px; font-weight: bold; font-size: 14px;">
-        <span>Status: </span><span id="printStatus"></span>
-    </div>
-
-    <div style="text-align: center; font-size: 13px; color: #555; margin-top: 30px; border-top: 1px dashed #000; padding-top: 20px;">
-        <p style="margin: 5px 0;">Thank you for choosing DEEN Hospital.</p>
-        <p style="margin: 5px 0;">Get well soon!</p>
-    </div>
-</div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -124,20 +147,20 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF BILLING INITIALIZATION ---
         enforceAuth(['billing', 'reception', 'admin']);
         let allBills = [];
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-
             const cardContainer = document.getElementById('billingCardContainer');
             const searchInput = document.getElementById('patientSearchInput');
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
             let debounceTimer;
 
-            // Search Logic
+            // --- START OF SEARCH LOGIC ---
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
@@ -149,7 +172,6 @@
                     autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
                     autocompleteList.style.display = 'block';
                     let results = []; let seenIds = new Set();
-
                     try {
                         const idSnap = await db.collection('patients').where('patientId', '==', term.toUpperCase()).get();
                         idSnap.forEach(doc => { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); });
@@ -159,7 +181,6 @@
                         const nameSnap = await db.collection('patients').orderBy('firstName').startAt(st).endAt(st + '\uf8ff').limit(10).get();
                         nameSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
                     } catch (e) {}
-
                     autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matches.</div>' : '';
                     results.forEach(p => {
                         const div = document.createElement('div');
@@ -171,58 +192,83 @@
                         };
                         autocompleteList.appendChild(div);
                     });
-                }, 300);
+                }, 600);
             });
             document.addEventListener('click', (e) => { if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none'; });
+            // --- END OF SEARCH LOGIC ---
 
-            // Load Bills Queue
-            db.collection('bills').orderBy('createdAt', 'desc').limit(50).onSnapshot(snapshot => {
+            // --- START OF LOAD BILLS & CALCULATE STATS ---
+            db.collection('bills').orderBy('createdAt', 'desc').limit(100).onSnapshot(snapshot => {
                 allBills = [];
-                snapshot.forEach(doc => allBills.push({ id: doc.id, ...doc.data() }));
+                let cashTotal = 0;
+                let posTotal = 0;
+                let transferTotal = 0;
 
-                if (allBills.length === 0) {
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    allBills.push({ id: doc.id, ...d });
+
+                    // Calculate Stats based on Paid bills
+                    if (d.status === 'Paid') {
+                        if (d.paymentMethod === 'Cash') cashTotal += Number(d.amount);
+                        if (d.paymentMethod === 'POS') posTotal += Number(d.amount);
+                        if (d.paymentMethod === 'Transfer') transferTotal += Number(d.amount);
+                    }
+                });
+
+                // Update Stats UI
+                document.getElementById('statCash').textContent = `₦${cashTotal.toLocaleString()}`;
+                document.getElementById('statPos').textContent = `₦${posTotal.toLocaleString()}`;
+                document.getElementById('statTransfer').textContent = `₦${transferTotal.toLocaleString()}`;
+
+                renderBills(allBills);
+            });
+            // --- END OF LOAD BILLS ---
+
+            // --- START OF RENDER CARDS ---
+            function renderBills(bills) {
+                if (bills.length === 0) {
                     cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No invoices generated yet.</p>`;
                     return;
                 }
-                
                 cardContainer.innerHTML = '';
-                allBills.forEach(d => {
+                bills.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Paid' ? 'status-complete' : 'status-pending';
                     
                     let actionHtml = '';
                     if (d.status === 'Pending') {
-                        actionHtml = `<button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick="payBill('${d.id}', '${d.patientName}', '${d.amount}')">Mark Paid</button>`;
+                        actionHtml = `<button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px;" onclick="openPaymentModal('${d.id}', '${d.amount}')">Mark Paid</button>`;
                     } else {
                         actionHtml = `<span style="color:#065f46; font-weight:bold;">Completed</span>`;
                     }
 
                     cardContainer.innerHTML += `
-    <div class="data-card">
-        <div class="data-card-header">
-            <span class="data-id">${d.patientId}</span>
-            <span class="data-date">${date}</span>
-        </div>
-        <div class="data-name">${d.patientName}</div>
-        <div class="data-info">
-            <strong>Service:</strong> ${d.service}<br>
-            <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()}<br>
-            <!-- ADDED PAYMENT METHOD HERE -->
-            ${d.paymentMethod ? `<strong>Payment:</strong> ${d.paymentMethod}` : ''}
-        </div>
-        <div class="data-action">
-            <span class="status-badge ${badgeClass}">${d.status}</span>
-            <div style="display:flex; gap:5px;">
-                ${actionHtml}
-                <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
-            </div>
-        </div>
-    </div>
-`;
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.patientId}</span>
+                                <span class="data-date">${date}</span>
+                            </div>
+                            <div class="data-name">${d.patientName}</div>
+                            <div class="data-info">
+                                <strong>Service:</strong> ${d.service}<br>
+                                <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()}<br>
+                                ${d.paymentMethod ? `<strong>Method:</strong> ${d.paymentMethod}` : ''}
+                            </div>
+                            <div class="data-action">
+                                <span class="status-badge ${badgeClass}">${d.status}</span>
+                                <div style="display:flex; gap:5px;">
+                                    ${actionHtml}
+                                    <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
                 });
-            });
+            }
+            // --- END OF RENDER CARDS ---
 
-            // Submit Invoice
+            // --- START OF GENERATE INVOICE ---
             document.getElementById('billingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient.", "❌"); return; }
@@ -236,17 +282,31 @@
                     document.getElementById('billingForm').reset(); searchInput.value = ''; hiddenPatientId.value = '';
                 });
             });
+            // --- END OF GENERATE INVOICE ---
 
-            window.payBill = function(billId, patientName, amount) {
-                showConfirm("Confirm Payment", `Confirm payment of ₦${amount} from ${patientName}?`, () => {
-                    db.collection('bills').doc(billId).update({ status: 'Paid' })
-                    .then(() => {
-                        logActivity(auth.currentUser, "Processed Payment", `Patient: ${patientName}, Amount: ₦${amount}`);
-                        showAlert("Success", "Payment recorded!", "✔️");
-                    }).catch(err => showAlert("Error", err.message, "❌"));
-                });
+            // --- START OF PAYMENT MODAL & PROCESS ---
+            window.openPaymentModal = function(billId, amount) {
+                document.getElementById('payBillId').value = billId;
+                document.getElementById('payAmount').value = amount;
+                document.getElementById('paymentModal').style.display = 'flex';
             };
 
+            window.processPayment = function(method) {
+                const billId = document.getElementById('payBillId').value;
+                const amount = document.getElementById('payAmount').value;
+                
+                db.collection('bills').doc(billId).update({ 
+                    status: 'Paid',
+                    paymentMethod: method
+                }).then(() => {
+                    logActivity(auth.currentUser, "Processed Payment", `Amount: ₦${amount}, Method: ${method}`);
+                    showAlert("Success", `Payment recorded via ${method}!`, "✔️");
+                    closeModal('paymentModal');
+                }).catch(err => showAlert("Error", err.message, "❌"));
+            };
+            // --- END OF PAYMENT MODAL ---
+
+            // --- START OF PRINT LOGIC ---
             window.openPrintModal = function(billId) {
                 const bill = allBills.find(b => b.id === billId);
                 if (!bill) return;
@@ -258,6 +318,7 @@
                 document.getElementById('printAmount').textContent = `₦${Number(bill.amount).toLocaleString()}`;
                 document.getElementById('printTotal').textContent = `₦${Number(bill.amount).toLocaleString()}`;
                 document.getElementById('printStatus').textContent = bill.status.toUpperCase();
+                document.getElementById('printMethod').textContent = bill.paymentMethod || 'N/A';
                 document.getElementById('printOptionsModal').style.display = 'flex';
             };
 
@@ -271,15 +332,19 @@
             window.downloadImage = function() {
                 closeModal('printOptionsModal');
                 const receipt = document.getElementById('printableReceipt');
-                receipt.style.display = 'block'; receipt.style.position = 'absolute'; receipt.style.left = '-9999px';
-                html2canvas(receipt, { scale: 2, backgroundColor: "#ffffff" }).then(canvas => {
-                    receipt.style.display = 'none'; 
-                    const link = document.createElement('a');
-                    link.download = `Receipt_${document.getElementById('printReceiptNo').innerText}.png`;
-                    link.href = canvas.toDataURL('image/png'); link.click();
-                }).catch(err => { showAlert("Error", "Error generating image.", "❌"); receipt.style.display = 'none'; });
+                receipt.style.display = 'block'; receipt.style.position = 'absolute'; receipt.style.top = '0'; receipt.style.left = '0'; receipt.style.zIndex = '-9999'; receipt.style.opacity = '0';
+                setTimeout(() => {
+                    html2canvas(receipt, { scale: 2, backgroundColor: "#ffffff", windowWidth: 450, width: 450 }).then(canvas => {
+                        receipt.style.display = 'none'; 
+                        const link = document.createElement('a');
+                        link.download = `Receipt_${document.getElementById('printReceiptNo').innerText}.png`;
+                        link.href = canvas.toDataURL('image/png'); link.click();
+                    }).catch(err => { showAlert("Error", "Error generating image.", "❌"); receipt.style.display = 'none'; });
+                }, 100);
             };
+            // --- END OF PRINT LOGIC ---
         });
+        // --- END OF BILLING INITIALIZATION ---
     </script>
 </body>
 </html>
