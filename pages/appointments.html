@@ -14,6 +14,11 @@
                 <h1>📅 Appointments</h1>
                 <p>Book and manage clinic visits.</p>
             </div>
+
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
+            <!-- Patient Profile Selector (Only for Patients) -->
             <div class="form-card" id="profileSelectorCard" style="display: none; border-left: 4px solid #2563eb; margin-bottom: 20px;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Select Profile</label>
@@ -22,6 +27,8 @@
                     </select>
                 </div>
             </div>
+
+            <!-- Booking Form (Only for Patients) -->
             <div class="form-card" id="bookingSection" style="display: none;">
                 <h3>Book New Appointment</h3>
                 <form id="appointmentForm">
@@ -44,40 +51,37 @@
                         </div>
                     </div>
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 250px;">Book Appointment</button>
-                    <div id="formError" class="error-message" style="margin-top: 10px;"></div>
                 </form>
             </div>
+
+            <!-- Appointments Cards Container -->
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Appointment Schedule</h3>
-            <table>
-                <thead>
-                    <tr><th>Date & Time</th><th>Patient Name</th><th>Doctor</th><th>Type</th><th>Booked on</th><th>Status</th><th>Action</th></tr>
-                </thead>
-                <tbody id="appointmentsTableBody">
-                    <tr><td colspan="6" style="text-align:center; color:#888;">Loading appointments...</td></tr>
-                </tbody>
-            </table>
-                   <div class="form-footer">
-                      <a href="../dashboard.html">Back to Dashboard</a>
-                   </div>
+            <div id="appointmentCardContainer" class="appointment-grid">
+                <p style="text-align: center; width: 100%; color: #888;">Loading appointments...</p>
+            </div>
             
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
+    
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF APPOINTMENTS INITIALIZATION ---
         enforceAuth(['patient', 'reception', 'doctor', 'appointments']);
+        
         auth.onAuthStateChanged((user) => {
             if (!user) return;
+            
             const profileSelectorCard = document.getElementById('profileSelectorCard');
             const familyProfileSelect = document.getElementById('familyProfileSelect');
             const bookingSection = document.getElementById('bookingSection');
             const apptTypeSelect = document.getElementById('apptType');
             const doctorSelect = document.getElementById('doctorSelect');
-            const tbody = document.getElementById('appointmentsTableBody');
+            const cardContainer = document.getElementById('appointmentCardContainer');
             
             let userRoles = ['patient'];
             let isStrictlyPatient = false;
@@ -85,17 +89,20 @@
             let selectedPatientId = ""; 
             let unsubscribeAppts = null; 
 
+            // --- START OF USER ROLE & SETUP LOGIC ---
             db.collection('users').doc(user.uid).get().then(doc => {
                 const data = doc.data() || {};
                 userRoles = data.roles || (data.role ? [data.role] : ['patient']);
                 const linkedIds = data.linkedPatientIds || [];
                 isStrictlyPatient = userRoles.includes('patient') && !userRoles.includes('admin') && !userRoles.includes('reception') && !userRoles.includes('doctor') && !userRoles.includes('nurse') && !userRoles.includes('appointments');
 
+                // Load Appointment Types
                 db.collection('appointmentTypes').get().then(snap => {
                     apptTypeSelect.innerHTML = '<option value="">Select type...</option>';
                     snap.forEach(d => apptTypeSelect.innerHTML += `<option value="${d.data().name}">${d.data().name}</option>`);
                 });
 
+                // Load Doctors
                 db.collection('users').get().then(snap => {
                     doctorSelect.innerHTML = '<option value="">Select doctor...</option>';
                     let foundDoctors = false;
@@ -109,6 +116,7 @@
                     if (!foundDoctors) doctorSelect.innerHTML = '<option value="">No doctors available</option>';
                 });
 
+                // Setup UI based on Role
                 if (isStrictlyPatient) {
                     bookingSection.style.display = 'block'; 
                     profileSelectorCard.style.display = 'block'; 
@@ -120,17 +128,18 @@
                             });
                             familyProfileSelect.innerHTML = '<option value="">Select a profile...</option>';
                             allPatientsData.forEach(p => familyProfileSelect.innerHTML += `<option value="${p.patientId}">${p.firstName} ${p.lastName} (ID: ${p.patientId})</option>`);
+                            
                             if (allPatientsData.length === 1) {
                                 familyProfileSelect.selectedIndex = 1;
                                 selectedPatientId = allPatientsData[0].patientId;
                                 loadAppointments();
                             } else {
-                                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Please select a profile above.</td></tr>`;
+                                cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">Please select a profile above.</p>`;
                             }
                         });
                     } else {
                         familyProfileSelect.innerHTML = '<option value="">No linked IDs found</option>';
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">You need to link a hospital ID first.</td></tr>`;
+                        cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">You need to link a hospital ID first.</p>`;
                     }
                 } else {
                     profileSelectorCard.style.display = 'none';
@@ -138,105 +147,138 @@
                     loadAppointments();
                 }
             });
+            // --- END OF USER ROLE & SETUP LOGIC ---
 
+            // --- START OF PROFILE SWITCH ---
             familyProfileSelect.addEventListener('change', (e) => {
                 selectedPatientId = e.target.value;
                 if (selectedPatientId) { loadAppointments(); } 
                 else {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Please select a profile above.</td></tr>`;
+                    cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">Please select a profile above.</p>`;
                     if(unsubscribeAppts) unsubscribeAppts();
                 }
             });
+            // --- END OF PROFILE SWITCH ---
 
+            // --- START OF LOAD APPOINTMENTS (SCALABLE) ---
             function loadAppointments() {
                 if (unsubscribeAppts) unsubscribeAppts(); 
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">Loading appointments...</td></tr>`;
-                let query = db.collection('appointments');
+                cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">Loading appointments...</p>`;
+                
+                // Base query with a limit to prevent loading thousands of records
+                let query = db.collection('appointments').orderBy('createdAt', 'desc').limit(50);
+                
                 if (isStrictlyPatient) {
                     if (!selectedPatientId) return; 
-                    query = query.where('patientId', '==', selectedPatientId);
+                    // For patients, we filter by their selected profile
+                    query = db.collection('appointments')
+                        .where('patientId', '==', selectedPatientId)
+                        .orderBy('createdAt', 'desc')
+                        .limit(50);
                 }
+
                 unsubscribeAppts = query.onSnapshot(snapshot => {
                     if (snapshot.empty) {
-                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#888;">No appointments scheduled.</td></tr>`;
+                        cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No appointments scheduled.</p>`;
                         return;
                     }
+                    
                     let appointments = [];
                     snapshot.forEach(doc => appointments.push({ id: doc.id, ...doc.data() }));
-                    appointments.sort((a, b) => {
-                        const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                        const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                        return timeB - timeA; 
-                    });tbody.innerHTML = '';
-appointments.forEach(d => {
-    // Format the Booked On date (createdAt)
-    const bookedDate = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
-        year: 'numeric', month: 'short', day: 'numeric', 
-        hour: '2-digit', minute: '2-digit', hour12: true 
-    }) : 'Just now';
-
-    // Format the Scheduled Appointment Date (dateTime string)
-    let scheduledDate = d.dateTime;
-    try {
-        scheduledDate = new Date(d.dateTime).toLocaleString(undefined, { 
-            year: 'numeric', month: 'short', day: 'numeric', 
-            hour: '2-digit', minute: '2-digit', hour12: true 
-        });
-    } catch (e) {
-        // If formatting fails, it will just show the raw string
-    }
-
-    const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
-    
-    let actionHtml = '<span style="color:#888;">None</span>';
-    if (!isStrictlyPatient && d.status === 'Pending') {
-        actionHtml = `
-            <button class="btn btn-primary" style="padding:4px 8px; font-size:12px; margin-bottom:2px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
-            <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:red; color:red;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
-        `;
-    }
-    tbody.innerHTML += `
-        <tr>
-            <td>${scheduledDate}</td>
-            <td><strong>${d.patientName}</strong></td>
-            <td>${d.doctor}</td>
-            <td>${d.type}</td>
-            <td><small>${bookedDate}</small></td>
-            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-            <td>${actionHtml}</td>
-        </tr>
-    `;
-});
                     
+                    cardContainer.innerHTML = '';
+                    appointments.forEach(d => {
+                        const bookedDate = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                            year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true 
+                        }) : 'Just now';
+
+                        let scheduledDate = d.dateTime;
+                        try {
+                            scheduledDate = new Date(d.dateTime).toLocaleString(undefined, { 
+                                year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true 
+                            });
+                        } catch (e) {}
+
+                        const badgeClass = d.status === 'Confirmed' ? 'status-complete' : (d.status === 'Cancelled' ? 'status-pending' : 'status-active');
+                        
+                        let actionHtml = '';
+                        if (!isStrictlyPatient && d.status === 'Pending') {
+                            actionHtml = `
+                                <div style="display:flex; gap:5px;">
+                                    <button class="btn btn-primary" style="padding:4px 8px; font-size:12px;" onclick="updateAppt('${d.id}', 'Confirmed')">Confirm</button>
+                                    <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color:#dc2626; color:#dc2626;" onclick="updateAppt('${d.id}', 'Cancelled')">Cancel</button>
+                                </div>
+                            `;
+                        }
+
+                        cardContainer.innerHTML += `
+                            <div class="appointment-card">
+                                <div class="appointment-card-header">
+                                    <span class="appointment-date">${scheduledDate}</span>
+                                    <span class="appointment-booked-date">Booked: ${bookedDate}</span>
+                                </div>
+                                <div class="appointment-name">${d.patientName}</div>
+                                <div class="appointment-doctor">${d.doctor}</div>
+                                <div class="appointment-type">Type: ${d.type}</div>
+                                <div class="appointment-action">
+                                    <span class="status-badge ${badgeClass}">${d.status}</span>
+                                    ${actionHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
                 }, error => {
-                    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Database Error: ${error.message}</td></tr>`;
+                    cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:red;">Database Error: ${error.message}</p>`;
                 });
             }
+            // --- END OF LOAD APPOINTMENTS ---
 
+            // --- START OF BOOKING FORM SUBMISSION ---
             document.getElementById('appointmentForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 let patientNameToBook = isStrictlyPatient ? `${allPatientsData.find(p => p.patientId === selectedPatientId).firstName} ${allPatientsData.find(p => p.patientId === selectedPatientId).lastName}` : "Walk-in Patient"; 
-                if (isStrictlyPatient && !selectedPatientId) { alert("Please select a profile first."); return; }
+                
+                if (isStrictlyPatient && !selectedPatientId) { showAlert("Error", "Please select a profile first.", "❌"); return; }
                 
                 const btn = document.getElementById('submitBtn');
                 btn.textContent = 'Booking...'; btn.disabled = true;
+
                 db.collection('appointments').add({
-                    patientUid: user.uid, patientId: selectedPatientId, patientName: patientNameToBook,
-                    type: apptTypeSelect.value, doctor: doctorSelect.value, dateTime: document.getElementById('apptDate').value,
-                    reason: document.getElementById('reason').value, status: 'Pending', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    patientUid: user.uid, 
+                    patientId: selectedPatientId, 
+                    patientName: patientNameToBook,
+                    type: apptTypeSelect.value, 
+                    doctor: doctorSelect.value, 
+                    dateTime: document.getElementById('apptDate').value,
+                    reason: document.getElementById('reason').value, 
+                    status: 'Pending', 
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
                     logActivity(auth.currentUser, "Booked Appointment", `For: ${patientNameToBook} (${selectedPatientId})`);
-                    alert('Appointment Booked Successfully!'); document.getElementById('appointmentForm').reset();
+                    showAlert("Success", "Appointment Booked Successfully!", "✔️"); 
+                    document.getElementById('appointmentForm').reset();
                     btn.textContent = 'Book Appointment'; btn.disabled = false;
-                }).catch(err => { alert("Error: " + err.message); btn.textContent = 'Book Appointment'; btn.disabled = false; });
+                }).catch(err => { 
+                    showAlert("Error", err.message, "❌"); 
+                    btn.textContent = 'Book Appointment'; btn.disabled = false; 
+                });
             });
+            // --- END OF BOOKING FORM SUBMISSION ---
 
+            // --- START OF UPDATE APPOINTMENT STATUS ---
             window.updateAppt = function(id, status) {
-                if(confirm(`Mark this appointment as ${status}?`)) {
-                    db.collection('appointments').doc(id).update({ status: status }).then(() => logActivity(auth.currentUser, `Appointment ${status}`, `ID: ${id}`));
-                }
+                showConfirm("Update Appointment", `Mark this appointment as <strong>${status}</strong>?`, () => {
+                    db.collection('appointments').doc(id).update({ status: status })
+                    .then(() => {
+                        logActivity(auth.currentUser, `Appointment ${status}`, `ID: ${id}`);
+                        showAlert("Success", `Appointment marked as ${status}`, "✔️");
+                    })
+                    .catch(err => showAlert("Error", err.message, "❌"));
+                });
             };
+            // --- END OF UPDATE APPOINTMENT STATUS ---
         });
+        // --- END OF APPOINTMENTS INITIALIZATION ---
     </script>
 </body>
 </html>
