@@ -24,6 +24,9 @@
                 <p>Generate invoices and process payments.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <div class="form-card">
                 <h3>Create New Invoice</h3>
                 <form id="billingForm">
@@ -130,8 +133,8 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF BILLING INITIALIZATION ---
         enforceAuth(['billing', 'reception', 'admin']);
-        let allPatients = [];
         let allBills = [];
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
@@ -143,44 +146,86 @@
             const searchInput = document.getElementById('patientSearchInput');
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
+            let debounceTimer;
 
-            db.collection('patients').get().then(snap => {
-                snap.forEach(doc => allPatients.push(doc.data()));
-            });
-
-            searchInput.addEventListener('focus', () => renderDropdown(allPatients));
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
-                const filtered = allPatients.filter(p => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    const phone = String(p.phone).toLowerCase();
-                    return name.includes(term) || pid.includes(term) || phone.includes(term);
-                });
-                renderDropdown(filtered);
+                searchInput.dataset.name = ""; // Clear stored name
+                autocompleteList.style.display = 'none';
+
+                if (term.length < 2) return; // Don't search until they type 2 letters
+
+                debounceTimer = setTimeout(() => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
+
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        renderDropdown(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    });
+                }, 300);
             });
 
             function renderDropdown(patients) {
                 autocompleteList.innerHTML = '';
-                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                if (patients.length === 0) { 
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                    return; 
+                }
+                
                 patients.forEach(p => {
                     const div = document.createElement('div');
                     div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                         hiddenPatientId.value = p.patientId;
-                        document.getElementById('patientSearchInput').dataset.name = `${p.firstName} ${p.lastName}`;
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form
                         autocompleteList.style.display = 'none';
                     });
                     autocompleteList.appendChild(div);
                 });
-                autocompleteList.style.display = 'block';
             }
+
             document.addEventListener('click', (e) => {
                 if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
+            // --- START OF LOAD BILLS QUEUE ---
             db.collection('bills').onSnapshot(snapshot => {
                 allBills = [];
                 snapshot.forEach(doc => allBills.push({ id: doc.id, ...doc.data() }));
@@ -224,13 +269,15 @@
                     `;
                 });
             });
+            // --- END OF LOAD BILLS QUEUE ---
 
+            // --- START OF SUBMIT INVOICE ---
             document.getElementById('billingForm').addEventListener('submit', (e) => {
                 e.preventDefault();
                 if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
                 
                 const patientId = hiddenPatientId.value;
-                const patientName = document.getElementById('patientSearchInput').dataset.name;
+                const patientName = searchInput.dataset.name; // Retrieve stored name
                 const amount = document.getElementById('amount').value;
 
                 db.collection('bills').add({
@@ -239,23 +286,27 @@
                     createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
                     logActivity(auth.currentUser, "Generated Invoice", `Patient: ${patientName} (${patientId}), Amount: ₦${amount}`);
-                    showAlert("Success", "Invoice generated!", "✅"); 
+                    showAlert("Success", "Invoice generated!", "✔️"); 
                     document.getElementById('billingForm').reset(); 
-                    searchInput.value = ''; hiddenPatientId.value = '';
+                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
                 });
             });
+            // --- END OF SUBMIT INVOICE ---
 
+            // --- START OF PAY BILL ---
             window.payBill = function(billId, patientName, amount) {
                 showConfirm("Confirm Payment", `Confirm payment of ₦${amount} from ${patientName}?`, () => {
                     db.collection('bills').doc(billId).update({ status: 'Paid' })
                     .then(() => {
                         logActivity(auth.currentUser, "Processed Payment", `Patient: ${patientName}, Amount: ₦${amount}`);
-                        showAlert("Success", "Payment recorded successfully!", "✅");
+                        showAlert("Success", "Payment recorded successfully!", "✔️");
                     })
                     .catch(err => showAlert("Error", err.message, "❌"));
                 });
             };
+            // --- END OF PAY BILL ---
 
+            // --- START OF PRINT RECEIPT ---
             window.openPrintModal = function(billId) {
                 const bill = allBills.find(b => b.id === billId);
                 if (!bill) return;
@@ -272,7 +323,9 @@
 
                 document.getElementById('printOptionsModal').style.display = 'flex';
             };
+            // --- END OF PRINT RECEIPT ---
 
+            // --- START OF EXPORT PDF ---
             window.downloadPDF = function() {
                 closeModal('printOptionsModal');
                 const receipt = document.getElementById('printableReceipt');
@@ -282,7 +335,9 @@
                     setTimeout(() => { receipt.style.display = 'none'; }, 500);
                 }, 300);
             };
+            // --- END OF EXPORT PDF ---
 
+            // --- START OF EXPORT IMAGE ---
             window.downloadImage = function() {
                 closeModal('printOptionsModal');
                 const receipt = document.getElementById('printableReceipt');
@@ -301,7 +356,9 @@
                     receipt.style.display = 'none';
                 });
             };
+            // --- END OF EXPORT IMAGE ---
         });
+        // --- END OF BILLING INITIALIZATION ---
     </script>
 </body>
 </html>
