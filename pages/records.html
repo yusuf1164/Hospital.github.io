@@ -3,40 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Records - DEEN Hospital</title>
+    <title>Radiology - DEEN Hospital</title>
     <link rel="stylesheet" href="../style.css">
-    <style>
-        .record-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .record-block h3 { color: #1e3a8a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; }
-        .record-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; font-size: 14px; }
-        .record-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .record-date { font-size: 12px; color: #6b7280; float: right; }
-    </style>
 </head>
 <body>
     <header id="header-placeholder"></header>
     <main>
-        <div class="table-container" style="max-width: 900px;">
+        <div class="table-container">
             <div class="page-header">
-                <h1>🗂️ Medical Records</h1>
-                <p>View complete patient history across all departments.</p>
+                <h1>🩻 Radiology / Imaging</h1>
+                <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
             </div>
 
-            <div class="form-card" style="margin-bottom: 30px;">
-                <div class="form-group" style="margin-bottom: 0;">
-                    <label>Search Patient (Name, ID, or Phone)</label>
-                    <input type="text" id="searchPatientInput" placeholder="Type to search..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px; margin-bottom: 10px;">
-                    <select id="patientSelect" required size="4" style="width: 100%; padding: 10px; border-radius: 5px; display: none;"></select>
-                </div>
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
+            <div class="form-card">
+                <h3>New Scan Request (Walk-in)</h3>
+                <form id="radForm">
+                    <div class="form-grid">
+                        <!-- AUTOCOMPLETE SEARCH -->
+                        <div class="form-group" style="grid-column: 1 / -1;">
+                            <label>Search Patient</label>
+                            <div class="autocomplete-container">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <div id="autocompleteList" class="autocomplete-list"></div>
+                                <input type="hidden" id="selectedPatientId">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Scan Type</label>
+                            <select id="scanType" required><option value="">Loading scans...</option></select>
+                        </div>
+                        <div class="form-group">
+                            <label>Requested By</label>
+                            <input type="text" id="requestedBy" required placeholder="Doctor's Name / Walk-in">
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Send to Radiology</button>
+                </form>
             </div>
 
-            <div id="historyContainer" style="display: none;">
-                <div class="record-block"><h3>🌡️ Nursing Vitals</h3><div id="vitalsList"></div></div>
-                <div class="record-block"><h3>🩺 OPD Consultations</h3><div id="consultationsList"></div></div>
-                <div class="record-block"><h3>🧪 Laboratory Results</h3><div id="labsList"></div></div>
-                <div class="record-block"><h3>🩻 Radiology Scans</h3><div id="radiologyList"></div></div>
-                <div class="record-block"><h3>💳 Billing History</h3><div id="billingList"></div></div>
-            </div>
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Pending Scan Requests</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Patient ID</th>
+                        <th>Patient Name</th>
+                        <th>Scan Type</th>
+                        <th>Requested By</th>
+                        <th>Date & Time</th>
+                        <th>Status</th>
+                        <th>Result / Action</th>
+                    </tr>
+                </thead>
+                <tbody id="radiologyTableBody">
+                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading requests...</td></tr>
+                </tbody>
+            </table>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -47,70 +72,181 @@
     <script src="../script.js"></script>
 
     <script>
-        enforceAuth(['records', 'doctor']);
+        // --- START OF RADIOLOGY INITIALIZATION ---
+        enforceAuth(['radiology']);
+
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-            const patientSelect = document.getElementById('patientSelect');
-            const searchInput = document.getElementById('searchPatientInput');
-            const historyContainer = document.getElementById('historyContainer');
-            let allPatients = [];
 
-            db.collection('patients').get().then((snapshot) => {
-                snapshot.forEach(doc => allPatients.push({ id: doc.id, ...doc.data() }));
-            }).catch(err => console.error(err));
+            const searchInput = document.getElementById('patientSearchInput');
+            const autocompleteList = document.getElementById('autocompleteList');
+            const hiddenPatientId = document.getElementById('selectedPatientId');
+            const tbody = document.getElementById('radiologyTableBody');
+            let debounceTimer;
 
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                if (term.length < 2) { patientSelect.style.display = 'none'; return; }
-                const filtered = allPatients.filter(p => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    const phone = String(p.phone).toLowerCase();
-                    return name.includes(term) || pid.includes(term) || phone.includes(term);
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
+                hiddenPatientId.value = "";
+                searchInput.dataset.name = ""; // Clear stored name
+                autocompleteList.style.display = 'none';
+
+                if (term.length < 2) return; // Don't search until they type 2 letters
+
+                debounceTimer = setTimeout(() => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
+
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        renderDropdown(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    });
+                }, 300); 
+            });
+
+            function renderDropdown(patients) {
+                autocompleteList.innerHTML = '';
+                if (patients.length === 0) { 
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                    return; 
+                }
+                
+                patients.forEach(p => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                    div.addEventListener('click', () => {
+                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                        hiddenPatientId.value = p.patientId;
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form
+                        autocompleteList.style.display = 'none';
+                    });
+                    autocompleteList.appendChild(div);
                 });
-                patientSelect.innerHTML = '<option value="">Select matching patient...</option>';
-                filtered.forEach(p => patientSelect.innerHTML += `<option value="${p.id}">${p.patientId} - ${p.firstName} ${p.lastName}</option>`);
-                patientSelect.style.display = filtered.length > 0 ? 'block' : 'none';
+            }
+
+            document.addEventListener('click', (e) => {
+                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            patientSelect.addEventListener('change', (e) => {
-                const pid = e.target.value;
-                if (!pid) { historyContainer.style.display = 'none'; return; }
-                historyContainer.style.display = 'block';
-                const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
-                sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading...</p>');
+            // --- START OF LOAD SCAN TYPES ---
+            db.collection('radiologyScans').get().then(snap => {
+                const scanSelect = document.getElementById('scanType');
+                scanSelect.innerHTML = '<option value="">Select scan...</option>';
+                snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+            });
+            // --- END OF LOAD SCAN TYPES ---
 
-                Promise.all([
-                    db.collection('vitals').where('patientId', '==', pid).get(),
-                    db.collection('consultations').where('patientId', '==', pid).get(),
-                    db.collection('labResults').where('patientId', '==', pid).get(),
-                    db.collection('radiology').where('patientId', '==', pid).get(),
-                    db.collection('bills').where('patientId', '==', pid).get()
-                ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
-                    const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
+            // --- START OF LOAD QUEUE ---
+            db.collection('radiology').onSnapshot((snapshot) => {
+                if (snapshot.empty) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
+                    return;
+                }
+                let results = [];
+                snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+                results.sort((a, b) => {
+                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
+                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
+                    return timeB - timeA;
+                });
+                
+                tbody.innerHTML = '';
+                results.forEach(d => {
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
+                        year: 'numeric', month: 'short', day: 'numeric', 
+                        hour: '2-digit', minute: '2-digit', second: '2-digit',
+                        hour12: true 
+                    }) : 'Just now';
+
+                    const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
+                    let actionHtml = '';
                     
-                    let vitalsHTML = ''; if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals.</p>';
-                    vitalsSnap.forEach(doc => { const d = doc.data(); vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg</div>`; });
-                    document.getElementById('vitalsList').innerHTML = vitalsHTML;
-
-                    let consultHTML = ''; if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations.</p>';
-                    consultSnap.forEach(doc => { const d = doc.data(); consultHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>Doctor:</strong> ${d.doctorName || 'Doctor'}<br><strong>Diagnosis:</strong> ${d.diagnosis}</div>`; });
-                    document.getElementById('consultationsList').innerHTML = consultHTML;
-
-                    let labsHTML = ''; if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests.</p>';
-                    labsSnap.forEach(doc => { const d = doc.data(); const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>'; labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`; });
-                    document.getElementById('labsList').innerHTML = labsHTML;
-
-                    let radHTML = ''; if (radSnap.empty) radHTML = '<p style="color:#888;">No scans.</p>';
-                    radSnap.forEach(doc => { const d = doc.data(); const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>'; radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`; });
-                    document.getElementById('radiologyList').innerHTML = radHTML;
-
-                    let billsHTML = ''; if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills.</p>';
-                    billsSnap.forEach(doc => { const d = doc.data(); const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>'; billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`; });
-                    document.getElementById('billingList').innerHTML = billsHTML;
-                }).catch(err => alert("Error fetching records: " + err.message));
+                    if (d.status === 'Pending') {
+                        actionHtml = `<div style="display:flex; gap:5px;"><input type="text" id="result_${d.id}" placeholder="Findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:100px;"><button class="btn btn-primary" onclick="saveScanResult('${d.id}')">Save</button></div>`;
+                    } else {
+                        actionHtml = `<strong>${d.result}</strong>`;
+                    }
+                    
+                    tbody.innerHTML += `
+                        <tr>
+                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
+                            <td><strong>${d.patientName}</strong></td>
+                            <td>${d.scanType}</td>
+                            <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
+                            <td><small>${date}</small></td>
+                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
+                            <td>${actionHtml}</td>
+                        </tr>
+                    `;
+                });
+            }, error => {
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
+            // --- END OF LOAD QUEUE ---
+
+            // --- START OF SUBMIT SCAN REQUEST ---
+            document.getElementById('radForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
+                
+                const patientId = hiddenPatientId.value;
+                const patientName = searchInput.dataset.name; // Retrieve stored name
+
+                db.collection('radiology').add({
+                    patientId: patientId, patientName: patientName,
+                    scanType: document.getElementById('scanType').value, requestedBy: document.getElementById('requestedBy').value,
+                    status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    showAlert("Success", "Scan requested!", "✔️"); 
+                    document.getElementById('radForm').reset(); 
+                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
+                }).catch(err => showAlert("Error", err.message, "❌"));
+            });
+            // --- END OF SUBMIT SCAN REQUEST ---
+
+            // --- START OF SAVE RESULT ---
+            window.saveScanResult = function(docId) {
+                const resultInput = document.getElementById(`result_${docId}`).value;
+                if (!resultInput) { showAlert("Error", "Please enter findings.", "❌"); return; }
+                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' })
+                .then(() => showAlert("Success", "Result saved!", "✔️"));
+            };
+            // --- END OF SAVE RESULT ---
         });
+        // --- END OF RADIOLOGY INITIALIZATION ---
     </script>
 </body>
 </html>
