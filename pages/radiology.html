@@ -15,6 +15,9 @@
                 <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
             </div>
 
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <div class="form-card">
                 <h3>New Scan Request (Walk-in)</h3>
                 <form id="radForm">
@@ -50,13 +53,13 @@
                         <th>Patient Name</th>
                         <th>Scan Type</th>
                         <th>Requested By</th>
-                        <th>Date & Time</th> <!-- ADDED DATE COLUMN -->
+                        <th>Date & Time</th>
                         <th>Status</th>
                         <th>Result / Action</th>
                     </tr>
                 </thead>
                 <tbody id="radiologyTableBody">
-                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading requests...</td></tr> <!-- UPDATED COLSPAN -->
+                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading requests...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -69,6 +72,7 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF RADIOLOGY INITIALIZATION ---
         enforceAuth(['radiology']);
 
         auth.onAuthStateChanged((user) => {
@@ -78,52 +82,94 @@
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
             const tbody = document.getElementById('radiologyTableBody');
-            let allPatients = [];
+            let debounceTimer;
 
-            // Load Patients for Autocomplete
-            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); });
-            
-            // Load Scan Types
-            db.collection('radiologyScans').get().then(snap => {
-                const scanSelect = document.getElementById('scanType');
-                scanSelect.innerHTML = '<option value="">Select scan...</option>';
-                snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
-            });
-
-            // Autocomplete Logic
-            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
-                const filtered = allPatients.filter(p => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    const phone = String(p.phone).toLowerCase();
-                    return name.includes(term) || pid.includes(term) || phone.includes(term);
-                });
-                renderDropdown(filtered);
+                searchInput.dataset.name = ""; // Clear stored name
+                autocompleteList.style.display = 'none';
+
+                if (term.length < 2) return; // Don't search until they type 2 letters
+
+                debounceTimer = setTimeout(() => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
+
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        renderDropdown(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    });
+                }, 300); 
             });
 
             function renderDropdown(patients) {
                 autocompleteList.innerHTML = '';
-                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                if (patients.length === 0) { 
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                    return; 
+                }
+                
                 patients.forEach(p => {
                     const div = document.createElement('div');
                     div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                         hiddenPatientId.value = p.patientId;
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form
                         autocompleteList.style.display = 'none';
                     });
                     autocompleteList.appendChild(div);
                 });
-                autocompleteList.style.display = 'block';
             }
+
             document.addEventListener('click', (e) => {
                 if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            // Load Queue
+            // --- START OF LOAD SCAN TYPES ---
+            db.collection('radiologyScans').get().then(snap => {
+                const scanSelect = document.getElementById('scanType');
+                scanSelect.innerHTML = '<option value="">Select scan...</option>';
+                snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
+            });
+            // --- END OF LOAD SCAN TYPES ---
+
+            // --- START OF LOAD QUEUE ---
             db.collection('radiology').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
@@ -139,7 +185,6 @@
                 
                 tbody.innerHTML = '';
                 results.forEach(d => {
-                    // NEW 12-HOUR LOCAL DATE FORMAT
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
                         year: 'numeric', month: 'short', day: 'numeric', 
                         hour: '2-digit', minute: '2-digit', second: '2-digit',
@@ -161,7 +206,7 @@
                             <td><strong>${d.patientName}</strong></td>
                             <td>${d.scanType}</td>
                             <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
-                            <td><small>${date}</small></td> <!-- ADDED DATE DATA -->
+                            <td><small>${date}</small></td>
                             <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
                             <td>${actionHtml}</td>
                         </tr>
@@ -170,32 +215,38 @@
             }, error => {
                 tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
+            // --- END OF LOAD QUEUE ---
 
-            // Submit Request
+            // --- START OF SUBMIT SCAN REQUEST ---
             document.getElementById('radForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!hiddenPatientId.value) { alert("Please select a patient from the dropdown."); return; }
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
                 
                 const patientId = hiddenPatientId.value;
-                const patientName = allPatients.find(p => p.patientId === patientId).firstName + " " + allPatients.find(p => p.patientId === patientId).lastName;
+                const patientName = searchInput.dataset.name; // Retrieve stored name
 
                 db.collection('radiology').add({
                     patientId: patientId, patientName: patientName,
                     scanType: document.getElementById('scanType').value, requestedBy: document.getElementById('requestedBy').value,
                     status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
-                    alert('Scan requested!'); 
+                    showAlert("Success", "Scan requested!", "✔️"); 
                     document.getElementById('radForm').reset(); 
-                    searchInput.value = ''; hiddenPatientId.value = '';
-                });
+                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
+                }).catch(err => showAlert("Error", err.message, "❌"));
             });
+            // --- END OF SUBMIT SCAN REQUEST ---
 
+            // --- START OF SAVE RESULT ---
             window.saveScanResult = function(docId) {
                 const resultInput = document.getElementById(`result_${docId}`).value;
-                if (!resultInput) { alert("Please enter findings."); return; }
-                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' }).then(() => alert('Result saved!'));
+                if (!resultInput) { showAlert("Error", "Please enter findings.", "❌"); return; }
+                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' })
+                .then(() => showAlert("Success", "Result saved!", "✔️"));
             };
+            // --- END OF SAVE RESULT ---
         });
+        // --- END OF RADIOLOGY INITIALIZATION ---
     </script>
 </body>
 </html>
