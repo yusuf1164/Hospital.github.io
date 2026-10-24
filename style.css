@@ -361,17 +361,32 @@ a.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0
 
 
 /* ========================================= */
-/* --- START OF MEDICAL RECORDS LAYOUT --- */
+/* --- START OF MEDICAL RECORDS CARD LAYOUT --- */
 /* ========================================= */
-.record-block { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-.record-block h3 { color: #1e3a8a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; }
-.record-item { border-bottom: 1px solid #f3f4f6; padding: 10px 0; font-size: 14px; }
-.record-item:last-child { border-bottom: none; padding-bottom: 0; }
-.record-date { font-size: 12px; color: #6b7280; float: right; }
-/* ========================================= */
-/* --- END OF MEDICAL RECORDS LAYOUT --- */
-/* ========================================= */
+.record-section { margin-bottom: 30px; }
+.record-section h3 { color: #1e3a8a; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px; font-size: 18px; }
 
+/* The Grid that holds the cards */
+.record-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+
+/* The Individual Card */
+.record-card { background: #ffffff; border: 1px solid #e5e7eb; border-left: 4px solid #2563eb; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); transition: transform 0.2s; display: flex; flex-direction: column; gap: 8px; }
+.record-card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+
+/* Card Header (Date) */
+.record-card-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #f3f4f6; padding-bottom: 8px; margin-bottom: 5px; font-size: 11px; color: #6b7280; }
+
+/* Card Body */
+.record-card-body { font-size: 13px; color: #374151; line-height: 1.5; }
+.record-card-body strong { color: #111827; }
+
+/* Status Badges for Records */
+.record-badge-paid { background: #d1fae5; color: #065f46; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+.record-badge-pending { background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+.record-badge-critical { background: #fee2e2; color: #dc2626; padding: 2px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+/* ========================================= */
+/* --- END OF MEDICAL RECORDS CARD LAYOUT --- */
+/* ========================================= */
 
 
 /* ========================================= */
