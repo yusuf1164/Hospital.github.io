@@ -8,7 +8,6 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
-
     <main>
         <div class="table-container">
             <div class="page-header">
@@ -18,17 +17,16 @@
 
             <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
-            
+
             <!-- Search Bar -->
-            <input type="text" id="searchPatient" class="search-box" placeholder="Type to search by Name, P ID, or Phone..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+            <input type="text" id="searchPatient" class="search-box" placeholder="Search by Name, P ID, or Phone..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
 
             <!-- Patient Cards Container -->
-            <div id="patientCardContainer" class="patient-grid">
+            <div id="patientCardContainer" class="card-grid-layout">
                 <p style="text-align: center; width: 100%; color: #888;">Loading patients...</p>
             </div>
         </div>
     </main>
-
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -58,10 +56,7 @@
                     }
                     
                     let patients = [];
-                    snapshot.forEach(doc => {
-                        patients.push({ firestoreId: doc.id, ...doc.data() });
-                    });
-                    
+                    snapshot.forEach(doc => patients.push({ firestoreId: doc.id, ...doc.data() }));
                     renderPatientCards(patients);
                 }).catch(error => {
                     cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Error: ${error.message}</p>`;
@@ -69,68 +64,71 @@
             }
             // --- END OF INITIAL FETCH ---
 
-            // --- START OF DEBOUNCED SERVER-SIDE SEARCH ---
+            // --- START OF FOOLPROOF SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.trim();
+                const term = e.target.value.trim().toLowerCase();
                 clearTimeout(debounceTimer);
 
-                debounceTimer = setTimeout(() => {
-                    if (term === "") {
-                        loadInitialPatients(); 
-                        return;
-                    }
+                if (term === "") {
+                    loadInitialPatients(); 
+                    return;
+                }
 
+                debounceTimer = setTimeout(async () => {
                     cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">Searching...</p>';
-                    const searchTerm = term.toLowerCase();
+                    let results = [];
+                    let seenIds = new Set();
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); 
                     const upperTerm = term.toUpperCase();
 
-                    const nameQuery = db.collection('patients')
-                        .orderBy('firstName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(20)
-                        .get();
+                    // 1. Search by Exact ID
+                    try {
+                        const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).get();
+                        idSnap.forEach(doc => { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); });
+                    } catch (err) { console.error(err); }
 
-                    const idQuery = db.collection('patients')
-                        .where('patientId', '==', upperTerm)
-                        .get();
+                    // 2. Search by First Name
+                    try {
+                        const firstSnap = await db.collection('patients').orderBy('firstName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(10).get();
+                        firstSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
+                    } catch (err) { console.error(err); }
 
-                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
-                        let results = [];
-                        let seenIds = new Set();
+                    // 3. Search by Last Name
+                    try {
+                        const lastSnap = await db.collection('patients').orderBy('lastName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(10).get();
+                        lastSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
+                    } catch (err) { console.error(err); }
 
-                        nameSnap.forEach(doc => {
-                            results.push({ firestoreId: doc.id, ...doc.data() });
-                            seenIds.add(doc.id);
-                        });
-
-                        idSnap.forEach(doc => {
-                            if (!seenIds.has(doc.id)) {
-                                results.push({ firestoreId: doc.id, ...doc.data() });
+                    // 4. Fallback: Recent 50
+                    try {
+                        const recentPatients = await db.collection('patients').orderBy('createdAt', 'desc').limit(50).get();
+                        recentPatients.forEach(doc => {
+                            if (seenIds.has(doc.id)) return; 
+                            const p = doc.data();
+                            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+                            const phoneStr = String(p.phone || '').toLowerCase();
+                            if (fullName.includes(term) || phoneStr.includes(term)) {
+                                results.push({ firestoreId: doc.id, ...p });
                                 seenIds.add(doc.id);
                             }
                         });
+                    } catch (err) { console.error(err); }
 
-                        if (results.length === 0) {
-                            cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No matching patients found.</p>';
-                            return;
-                        }
-
+                    // Render Results
+                    if (results.length === 0) {
+                        cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No matching patients found.</p>';
+                    } else {
+                        // Sort newest first
                         results.sort((a, b) => {
                             const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                             const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
                             return timeB - timeA;
                         });
-
                         renderPatientCards(results);
-                    }).catch(error => {
-                        console.error("Search Error:", error);
-                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color: red;">Search Error: ${error.message}<br><br><small>If it mentions an index, check the browser console for the link to create it.</small></p>`;
-                    });
-
+                    }
                 }, 300); 
             });
-            // --- END OF DEBOUNCED SERVER-SIDE SEARCH ---
+            // --- END OF FOOLPROOF SERVER-SIDE SEARCH ---
 
             // --- START OF RENDER CARDS ---
             function renderPatientCards(patients) {
@@ -147,16 +145,19 @@
                     }) : 'Just now';
 
                     cardContainer.innerHTML += `
-                        <div class="patient-card">
-                            <div class="patient-card-header">
-                                <span class="patient-id">${p.patientId || 'N/A'}</span>
-                                <span class="patient-date">${dateStr}</span>
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${p.patientId || 'N/A'}</span>
+                                <span class="data-date">${dateStr}</span>
                             </div>
-                            <div class="patient-name">${p.firstName} ${p.lastName}</div>
-                            <div class="patient-details">
-                                <div><strong>Age:</strong> ${p.age || 'N/A'}</div>
-                                <div><strong>Gender:</strong> ${p.gender || 'N/A'}</div>
-                                <div style="grid-column: 1 / -1;"><strong>Phone:</strong> ${p.phone || 'N/A'}</div>
+                            <div class="data-name">${p.firstName} ${p.lastName}</div>
+                            <div class="data-info">
+                                <strong>Age:</strong> ${p.age || 'N/A'} | <strong>Gender:</strong> ${p.gender || 'N/A'}<br>
+                                <strong>Religion:</strong> ${p.religion || 'N/A'}<br>
+                                <strong>Phone:</strong> ${p.phone || 'N/A'}
+                            </div>
+                            <div class="data-action" style="justify-content: flex-end;">
+                                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="window.location.href='records.html?id=${p.patientId}'">View Records</button>
                             </div>
                         </div>
                     `;
