@@ -74,32 +74,49 @@
     </div>
 
     <!-- HIDDEN PRINT RECEIPT CONTAINER -->
-    <div id="printableReceipt" style="display: none; background: white; color: black; width: 500px; padding: 30px; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-        <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 20px; margin-bottom: 30px;">
-            <h2 style="color: #1e3a8a; margin-bottom: 5px; font-size: 24px;">🏥 DEEN HOSPITAL</h2>
-            <p style="font-size: 13px; margin: 2px 0;">123 Health Ave, Medical City</p>
-            <p style="font-size: 13px; margin: 2px 0;">Phone: +1 (555) 123-4567</p>
-            <h3 style="margin-top: 20px; text-transform: uppercase; font-size: 18px; letter-spacing: 2px; color: #000;">Payment Receipt</h3>
+<div id="printableReceipt" style="display: none; background: white; color: black; width: 450px; padding: 30px; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border: 1px solid #e5e7eb;">
+    <div style="text-align: center; border-bottom: 2px dashed #000; padding-bottom: 20px; margin-bottom: 20px;">
+        <h2 style="color: #1e3a8a; margin-bottom: 5px; font-size: 24px;">🏥 DEEN HOSPITAL</h2>
+        <p style="font-size: 13px; margin: 2px 0;">123 Health Ave, Medical City</p>
+        <p style="font-size: 13px; margin: 2px 0;">Phone: +1 (555) 123-4567</p>
+        <h3 style="margin-top: 20px; text-transform: uppercase; font-size: 16px; letter-spacing: 2px; color: #000;">Payment Receipt</h3>
+    </div>
+    
+    <div style="font-size: 14px; line-height: 1.8; margin-bottom: 20px; color: #000;">
+        <p style="margin: 5px 0;"><strong>Receipt No:</strong> <span id="printReceiptNo"></span></p>
+        <p style="margin: 5px 0;"><strong>Date & Time:</strong> <span id="printDate"></span></p>
+        <p style="margin: 5px 0;"><strong>Patient ID:</strong> <span id="printPatientId"></span></p>
+        <p style="margin: 5px 0;"><strong>Patient Name:</strong> <span id="printPatientName"></span></p>
+    </div>
+
+    <!-- Service and Amount using Flexbox instead of Table -->
+    <div style="background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 5px;">
+            <strong style="color: #4b5563; font-size: 13px;">SERVICE DESCRIPTION</strong>
+            <strong style="color: #4b5563; font-size: 13px;">AMOUNT</strong>
         </div>
-        <div style="font-size: 14px; line-height: 1.8; margin-bottom: 30px; color: #000;">
-            <p style="margin: 5px 0;"><strong>Receipt No:</strong> <span id="printReceiptNo"></span></p>
-            <p style="margin: 5px 0;"><strong>Date & Time:</strong> <span id="printDate"></span></p>
-            <p style="margin: 5px 0;"><strong>Patient ID:</strong> <span id="printPatientId"></span></p>
-            <p style="margin: 5px 0;"><strong>Patient Name:</strong> <span id="printPatientName"></span></p>
-        </div>
-        <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; border: 1px solid #ccc; table-layout: fixed;">
-            <thead><tr style="background-color: #f3f4f6; border-bottom: 2px solid #000;"><th style="padding: 10px; text-align: left; color: #000; width: 70%;">Service Description</th><th style="padding: 10px; text-align: right; color: #000; width: 30%;">Amount</th></tr></thead>
-            <tbody><tr><td style="padding: 10px; border-bottom: 1px solid #ccc; color: #000; word-wrap: break-word;" id="printService"></td><td style="padding: 10px; text-align: right; border-bottom: 1px solid #ccc; color: #000;" id="printAmount"></td></tr></tbody>
-        </table>
-        <div style="text-align: right; font-size: 18px; font-weight: bold; margin-bottom: 40px; color: #000;">
-            <p style="margin: 5px 0;">Total: <span id="printTotal"></span></p>
-            <p style="margin: 5px 0;">Status: <span id="printStatus"></span></p>
-        </div>
-        <div style="text-align: center; font-size: 13px; color: #555; margin-top: 40px; border-top: 1px dashed #000; padding-top: 20px;">
-            <p style="margin: 5px 0;">Thank you for choosing DEEN Hospital.</p>
-            <p style="margin: 5px 0;">Get well soon!</p>
+        <div style="display: flex; justify-content: space-between; font-weight: bold;">
+            <span id="printService" style="max-width: 65%; word-wrap: break-word; line-height: 1.4;"></span>
+            <span id="printAmount" style="min-width: 35%; text-align: right;"></span>
         </div>
     </div>
+
+    <!-- Total Amount -->
+    <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #000; padding-top: 15px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">
+        <span>Total Amount</span>
+        <span id="printTotal" style="color: #1e3a8a;"></span>
+    </div>
+    
+    <!-- Status -->
+    <div style="text-align: right; margin-bottom: 30px; font-weight: bold; font-size: 14px;">
+        <span>Status: </span><span id="printStatus"></span>
+    </div>
+
+    <div style="text-align: center; font-size: 13px; color: #555; margin-top: 30px; border-top: 1px dashed #000; padding-top: 20px;">
+        <p style="margin: 5px 0;">Thank you for choosing DEEN Hospital.</p>
+        <p style="margin: 5px 0;">Get well soon!</p>
+    </div>
+</div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
