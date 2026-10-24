@@ -15,6 +15,9 @@
                 <p>Doctor consultation, diagnosis, and routing to departments.</p>
             </div>
 
+            <!-- RETURN TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
+
             <div class="form-card">
                 <h3>New Consultation</h3>
                 <form id="opdForm">
@@ -96,7 +99,7 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START OPD LOGIC ---
+        // --- START OF OPD INITIALIZATION ---
         enforceAuth(['doctor']);
         
         window.toggleFields = function() {
@@ -113,47 +116,87 @@
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
             const historyBody = document.getElementById('opdHistoryBody');
-            let allPatients = [];
+            let debounceTimer;
 
-            // Load Patients
-            db.collection('patients').get().then((snapshot) => {
-                snapshot.forEach(doc => allPatients.push({ firestoreId: doc.id, ...doc.data() }));
-            });
-
-            // Autocomplete Logic
-            searchInput.addEventListener('focus', () => { renderDropdown(allPatients); });
+            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
+                const term = e.target.value.trim();
+                clearTimeout(debounceTimer);
                 hiddenPatientId.value = "";
-                const filtered = allPatients.filter(p => {
-                    const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                    const pid = String(p.patientId).toLowerCase();
-                    return name.includes(term) || pid.includes(term);
-                });
-                renderDropdown(filtered);
+                autocompleteList.style.display = 'none';
+
+                if (term.length < 2) return; // Don't search until they type at least 2 letters
+
+                debounceTimer = setTimeout(() => {
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                    autocompleteList.style.display = 'block';
+
+                    const searchTerm = term.toLowerCase();
+                    const upperTerm = term.toUpperCase();
+
+                    // Query 1: Search by First Name
+                    const nameQuery = db.collection('patients')
+                        .orderBy('firstName')
+                        .startAt(searchTerm)
+                        .endAt(searchTerm + '\uf8ff')
+                        .limit(10)
+                        .get();
+
+                    // Query 2: Search by Patient ID (e.g., P0001)
+                    const idQuery = db.collection('patients')
+                        .where('patientId', '==', upperTerm)
+                        .get();
+
+                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                        let results = [];
+                        let seenIds = new Set();
+
+                        nameSnap.forEach(doc => {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        });
+
+                        idSnap.forEach(doc => {
+                            if (!seenIds.has(doc.id)) {
+                                results.push({ firestoreId: doc.id, ...doc.data() });
+                                seenIds.add(doc.id);
+                            }
+                        });
+
+                        renderDropdown(results);
+                    }).catch(error => {
+                        console.error("Search Error:", error);
+                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    });
+                }, 300); // 300ms debounce
             });
 
             function renderDropdown(patients) {
                 autocompleteList.innerHTML = '';
-                if (patients.length === 0) { autocompleteList.style.display = 'none'; return; }
+                if (patients.length === 0) { 
+                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                    return; 
+                }
+                
                 patients.forEach(p => {
                     const div = document.createElement('div');
                     div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                     div.addEventListener('click', () => {
                         searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                         hiddenPatientId.value = p.patientId;
-                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`;
+                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Save name for form submit
                         autocompleteList.style.display = 'none';
                     });
                     autocompleteList.appendChild(div);
                 });
-                autocompleteList.style.display = 'block';
             }
+
             document.addEventListener('click', (e) => {
                 if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
             });
+            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            // Load Dynamic Services
+            // --- START OF LOAD DYNAMIC SERVICES ---
             db.collection('labTests').get().then(snap => {
                 const labSelect = document.getElementById('labTest');
                 snap.forEach(doc => labSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
@@ -162,8 +205,9 @@
                 const radSelect = document.getElementById('radiologyScan');
                 snap.forEach(doc => radSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
+            // --- END OF LOAD DYNAMIC SERVICES ---
 
-            // Load History
+            // --- START OF LOAD CONSULTATION HISTORY ---
             db.collection('consultations').onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     historyBody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No consultations recorded yet.</td></tr>`;
@@ -195,12 +239,14 @@
                     `;
                 });
             });
+            // --- END OF LOAD CONSULTATION HISTORY ---
 
-            // Submit Form
+            // --- START OF FORM SUBMISSION ---
             document.getElementById('opdForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
                 const btn = document.getElementById('submitBtn');
-                if (!hiddenPatientId.value) { alert("Please select a patient."); return; }
+                
+                if (!hiddenPatientId.value) { showAlert("Error", "Please search and select a patient from the dropdown.", "❌"); return; }
                 btn.textContent = 'Saving...'; btn.disabled = true;
 
                 const patientId = hiddenPatientId.value; 
@@ -232,7 +278,6 @@
                     if (reqLab) await db.collection('labResults').add({ patientId, patientName, testType: document.getElementById('labTest').value, doctorId: user.uid, doctorName, doctorStaffId, status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     if (reqRadiology) await db.collection('radiology').add({ patientId, patientName, scanType: document.getElementById('radiologyScan').value, doctorId: user.uid, doctorName, doctorStaffId, status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp() });
                     
-                    // SEND TO BILLING
                     if (reqBilling) {
                         await db.collection('bills').add({
                             patientId: patientId, patientName: patientName,
@@ -242,16 +287,17 @@
                         });
                     }
 
-                    alert('Consultation saved and requests routed!');
+                    showAlert("Success", "Consultation saved and requests routed!", "✔️");
                     document.getElementById('opdForm').reset(); toggleFields(); searchInput.value = ''; hiddenPatientId.value = '';
                     btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 } catch (error) {
-                    alert("Error: " + error.message);
+                    showAlert("Error", error.message, "❌");
                     btn.textContent = 'Save & Send Requests'; btn.disabled = false;
                 }
             });
+            // --- END OF FORM SUBMISSION ---
         });
-        // --- END OPD LOGIC ---
+        // --- END OF OPD INITIALIZATION ---
     </script>
 </body>
 </html>
