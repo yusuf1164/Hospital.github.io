@@ -12,18 +12,70 @@
         <div class="table-container">
             <div class="page-header">
                 <h1>💊 Pharmacy</h1>
-                <p>Dispense medications based on doctor consultations.</p>
+                <p>Dispense medications and manage inventory.</p>
             </div>
 
             <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
-            
-            <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
 
-            <!-- Pharmacy Cards Container -->
-            <div id="pharmacyCardContainer" class="pharmacy-grid">
-                <p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>
+            <!-- PHARMACY TABS -->
+            <div class="pharmacy-tabs">
+                <button class="pharmacy-tab active" onclick="switchTab('queue')" id="tab-queue">OPD Queue</button>
+                <button class="pharmacy-tab" onclick="switchTab('walkin')" id="tab-walkin">Walk-in Sales</button>
+                <button class="pharmacy-tab" onclick="switchTab('inventory')" id="tab-inventory">Inventory</button>
             </div>
+
+            <!-- TAB 1: OPD QUEUE -->
+            <div id="section-queue">
+                <input type="text" id="searchPharmacy" placeholder="Search by Patient Name or P ID..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
+                <div id="pharmacyCardContainer" class="card-grid-layout">
+                    <p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>
+                </div>
+            </div>
+
+            <!-- TAB 2: WALK-IN SALES (Coming in Part 2) -->
+            <div id="section-walkin" style="display: none;">
+                <div class="pos-grid">
+                    <div class="form-card">
+                        <h3>Walk-in Sale (OTC)</h3>
+                        <p style="color: #666; font-size: 14px;">Point of Sale system will be built here in the next step.</p>
+                    </div>
+                    <div class="pos-cart">
+                        <h3>Cart</h3>
+                        <p style="color: #666; font-size: 14px;">No items added yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: INVENTORY MANAGEMENT -->
+            <div id="section-inventory" style="display: none;">
+                <div class="form-card" style="border-left: 4px solid #10b981;">
+                    <h3>Add New Drug to Inventory</h3>
+                    <form id="inventoryForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>Drug Name</label>
+                                <input type="text" id="drugName" required placeholder="e.g. Paracetamol 500mg">
+                            </div>
+                            <div class="form-group">
+                                <label>Price (₦)</label>
+                                <input type="number" id="drugPrice" required placeholder="e.g. 500">
+                            </div>
+                            <div class="form-group">
+                                <label>Initial Stock (Quantity)</label>
+                                <input type="number" id="drugStock" required placeholder="e.g. 100">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-submit" id="addDrugBtn" style="margin-top: 15px; max-width: 200px;">Add Drug</button>
+                    </form>
+                </div>
+
+                <h3 style="color: #1e3a8a; margin-bottom: 15px;">Current Inventory</h3>
+                <div id="inventoryCardContainer" class="card-grid-layout">
+                    <p style="text-align: center; width: 100%; color:#888;">Loading inventory...</p>
+                </div>
+            </div>
+
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
@@ -35,121 +87,90 @@
 
     <script>
         // --- START OF PHARMACY INITIALIZATION ---
-        enforceAuth(['pharmacy']);
+        enforceAuth(['pharmacy', 'admin']);
         
+        // --- START OF TAB SWITCHING LOGIC ---
+        window.switchTab = function(tab) {
+            document.getElementById('section-queue').style.display = tab === 'queue' ? 'block' : 'none';
+            document.getElementById('section-walkin').style.display = tab === 'walkin' ? 'block' : 'none';
+            document.getElementById('section-inventory').style.display = tab === 'inventory' ? 'block' : 'none';
+            
+            document.getElementById('tab-queue').classList.toggle('active', tab === 'queue');
+            document.getElementById('tab-walkin').classList.toggle('active', tab === 'walkin');
+            document.getElementById('tab-inventory').classList.toggle('active', tab === 'inventory');
+        };
+        // --- END OF TAB SWITCHING LOGIC ---
+
         auth.onAuthStateChanged((user) => {
             if (!user) return;
             
             const cardContainer = document.getElementById('pharmacyCardContainer');
+            const inventoryContainer = document.getElementById('inventoryCardContainer');
             const searchInput = document.getElementById('searchPharmacy');
             let debounceTimer;
             let unsubscribeSnapshot = null;
 
-            // --- START OF SCALABLE INITIAL LOAD ---
+            // --- START OF OPD QUEUE LOGIC (From Part 1) ---
             function loadInitialPrescriptions() {
                 cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Loading prescriptions...</p>`;
-                
                 if (unsubscribeSnapshot) unsubscribeSnapshot(); 
 
-                unsubscribeSnapshot = db.collection('prescriptions')
-                    .orderBy('createdAt', 'desc')
-                    .limit(50) 
-                    .onSnapshot((snapshot) => {
-                        let prescriptions = [];
-                        snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
-                        renderCards(prescriptions);
-                    }, error => {
-                        cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Error: ${error.message}</p>`;
-                    });
+                unsubscribeSnapshot = db.collection('prescriptions').orderBy('createdAt', 'desc').limit(50).onSnapshot((snapshot) => {
+                    let prescriptions = [];
+                    snapshot.forEach(doc => prescriptions.push({ id: doc.id, ...doc.data() }));
+                    renderPrescriptionCards(prescriptions);
+                }, error => {
+                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Error: ${error.message}</p>`;
+                });
             }
-            // --- END OF SCALABLE INITIAL LOAD ---
 
-            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
+                if (term === "") { loadInitialPrescriptions(); return; }
 
-                if (term === "") {
-                    loadInitialPrescriptions(); 
-                    return;
-                }
-
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     if (unsubscribeSnapshot) unsubscribeSnapshot(); 
-                    
                     cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">Searching...</p>`;
                     
-                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
+                    const searchTerm = term.charAt(0).toUpperCase() + term.slice(1);
                     const upperTerm = term.toUpperCase();
 
                     const idQuery = db.collection('prescriptions').where('patientId', '==', upperTerm).get();
-                    const nameQuery = db.collection('prescriptions')
-                        .orderBy('patientName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(20)
-                        .get();
+                    const nameQuery = db.collection('prescriptions').orderBy('patientName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(20).get();
 
                     Promise.all([idQuery, nameQuery]).then(([idSnap, nameSnap]) => {
-                        let results = [];
-                        let seenIds = new Set();
-
-                        idSnap.forEach(doc => {
-                            results.push({ id: doc.id, ...doc.data() });
-                            seenIds.add(doc.id);
-                        });
-
-                        nameSnap.forEach(doc => {
-                            if (!seenIds.has(doc.id)) {
-                                results.push({ id: doc.id, ...doc.data() });
-                                seenIds.add(doc.id);
-                            }
-                        });
-
-                        results.sort((a, b) => {
-                            const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                            const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                            return timeB - timeA;
-                        });
-
-                        renderCards(results);
+                        let results = []; let seenIds = new Set();
+                        idSnap.forEach(doc => { results.push({ id: doc.id, ...doc.data() }); seenIds.add(doc.id); });
+                        nameSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ id: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
+                        results.sort((a, b) => (b.createdAt ? b.createdAt.toMillis() : 0) - (a.createdAt ? a.createdAt.toMillis() : 0));
+                        renderPrescriptionCards(results);
                     }).catch(error => {
-                        console.error("Search Error:", error);
                         cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:red;">Search Error: ${error.message}</p>`;
                     });
-                }, 300);
+                }, 600);
             });
-            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
 
-            // --- START OF RENDER CARDS ---
-            function renderCards(prescriptions) {
-                if (prescriptions.length === 0) {
-                    cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">No prescriptions found.</p>`;
-                    return;
-                }
+            function renderPrescriptionCards(prescriptions) {
+                if (prescriptions.length === 0) { cardContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">No prescriptions found.</p>`; return; }
                 cardContainer.innerHTML = '';
                 prescriptions.forEach(d => {
                     const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Dispensed' ? 'status-complete' : 'status-pending';
-                    
-                    let actionHtml = '';
-                    if (d.status === 'Pending') {
-                        const safeMed = d.medication ? d.medication.replace(/'/g, "\\'") : '';
-                        actionHtml = `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${safeMed}')">Dispense</button>`;
-                    } else {
-                        actionHtml = `<span style="color:#065f46; font-weight:bold;">Dispensed</span>`;
-                    }
+                    let actionHtml = d.status === 'Pending' 
+                        ? `<button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="dispenseDrug('${d.id}', '${d.patientId}', '${d.medication.replace(/'/g, "\\'")}')">Dispense</button>`
+                        : `<span style="color:#065f46; font-weight:bold;">Dispensed</span>`;
                     
                     cardContainer.innerHTML += `
-                        <div class="pharmacy-card">
-                            <div class="pharmacy-card-header">
-                                <span class="pharmacy-id">${d.patientId}</span>
-                                <span class="pharmacy-date">${date}</span>
+                        <div class="data-card">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.patientId}</span>
+                                <span class="data-date">${date}</span>
                             </div>
-                            <div class="pharmacy-name">${d.patientName}</div>
-                            <div style="font-size:12px; color:#6b7280;">Requested by: ${d.doctorName || 'Doctor'} (ID: ${d.doctorStaffId || 'N/A'})</div>
-                            <div class="pharmacy-med">💊 ${d.medication}</div>
-                            <div class="pharmacy-action">
+                            <div class="data-name">${d.patientName}</div>
+                            <div style="font-size:12px; color:#6b7280;">Requested by: ${d.doctorName || 'Doctor'}</div>
+                            <div class="data-info" style="margin-top:10px;"><strong>Medication:</strong> ${d.medication}</div>
+                            <div class="data-action">
                                 <span class="status-badge ${badgeClass}">${d.status}</span>
                                 ${actionHtml}
                             </div>
@@ -157,20 +178,62 @@
                     `;
                 });
             }
-            // --- END OF RENDER CARDS ---
 
-            // --- START OF DISPENSE DRUG ---
             window.dispenseDrug = function(id, patientId, medication) {
                 showConfirm("Confirm Dispense", `Have you dispensed <strong>${medication}</strong> for patient <strong>${patientId}</strong>?`, function() {
                     db.collection('prescriptions').doc(id).update({ status: 'Dispensed' })
                     .then(() => { 
                         logActivity(auth.currentUser, "Dispensed Drugs", `Patient ID: ${patientId}, Drug: ${medication}`); 
                         showAlert("Success", "Drugs dispensed successfully!", "✔️"); 
-                    })
-                    .catch((error) => showAlert("Error", error.message, "❌"));
+                    }).catch((error) => showAlert("Error", error.message, "❌"));
                 });
             };
-            // --- END OF DISPENSE DRUG ---
+            // --- END OF OPD QUEUE LOGIC ---
+
+            // --- START OF INVENTORY MANAGEMENT LOGIC ---
+            document.getElementById('inventoryForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                const btn = document.getElementById('addDrugBtn');
+                btn.textContent = 'Adding...'; btn.disabled = true;
+
+                db.collection('inventory').add({
+                    name: document.getElementById('drugName').value,
+                    price: Number(document.getElementById('drugPrice').value),
+                    stock: Number(document.getElementById('drugStock').value),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).then(() => {
+                    showAlert("Success", "Drug added to inventory!", "✔️");
+                    document.getElementById('inventoryForm').reset();
+                    btn.textContent = 'Add Drug'; btn.disabled = false;
+                }).catch(err => {
+                    showAlert("Error", err.message, "❌");
+                    btn.textContent = 'Add Drug'; btn.disabled = false;
+                });
+            });
+
+            db.collection('inventory').orderBy('name').onSnapshot(snapshot => {
+                if (snapshot.empty) {
+                    inventoryContainer.innerHTML = `<p style="text-align: center; width: 100%; color:#888;">No drugs in inventory.</p>`;
+                    return;
+                }
+                inventoryContainer.innerHTML = '';
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    const badgeClass = d.stock > 10 ? 'status-complete' : 'status-pending';
+                    inventoryContainer.innerHTML += `
+                        <div class="data-card" style="border-left: 4px solid #10b981;">
+                            <div class="data-card-header">
+                                <span class="data-id">${d.name}</span>
+                                <span class="data-date">₦${d.price.toLocaleString()}</span>
+                            </div>
+                            <div class="data-info" style="margin-top:10px; background:#fff;">
+                                <strong>Stock Available:</strong> <span class="status-badge ${badgeClass}">${d.stock} units</span>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+            // --- END OF INVENTORY MANAGEMENT LOGIC ---
 
             loadInitialPrescriptions();
         });
