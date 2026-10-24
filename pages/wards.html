@@ -14,6 +14,9 @@
                 <h1>🛏️ Wards & Rooms</h1>
                 <p>Manage patient admissions, beds, and nurse assignments.</p>
             </div>
+
+            <!-- BACK TO DASHBOARD BUTTON -->
+            <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
             
             <div style="margin-bottom: 25px;">
                 <input type="text" id="roomSearchInput" placeholder="Search Rooms by Number or Name..." style="width: 100%; padding: 12px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;" oninput="filterRooms()">
@@ -94,23 +97,24 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF WARDS INITIALIZATION ---
         enforceAuth(['admin', 'doctor', 'nurse', 'reception']);
-        let allPatients = [];
         let currentRooms = [];
         let globalNursesList = []; 
 
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
-            db.collection('patients').get().then(snap => { snap.forEach(doc => allPatients.push(doc.data())); });
-
+            // Load Rooms Real-time
             db.collection('rooms').orderBy('roomNo').onSnapshot(snap => {
                 currentRooms = [];
                 snap.forEach(doc => currentRooms.push({ id: doc.id, ...doc.data() }));
                 renderRooms(); 
             });
         });
+        // --- END OF WARDS INITIALIZATION ---
 
+        // --- START OF ROOM SEARCH & RENDER ---
         window.filterRooms = function() { renderRooms(); };
 
         function renderRooms() {
@@ -203,7 +207,9 @@
                 `;
             });
         }
+        // --- END OF ROOM SEARCH & RENDER ---
 
+        // --- START OF MODAL CONTROLS ---
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
 
         window.openAssignPatient = function(roomId, bedNo) {
@@ -211,66 +217,131 @@
             document.getElementById('modalBedNo').value = bedNo;
             document.getElementById('wardPatientSearch').value = '';
             document.getElementById('selectedWardPatientId').value = '';
+            document.getElementById('wardPatientSearch').dataset.name = ''; // Clear stored name
             document.getElementById('assignPatientModal').style.display = 'flex';
         };
+        // --- END OF MODAL CONTROLS ---
 
+        // --- START OF SCALABLE PATIENT SEARCH FOR WARDS ---
         const wardSearchInput = document.getElementById('wardPatientSearch');
         const wardAutocompleteList = document.getElementById('wardAutocompleteList');
-        
-        wardSearchInput.addEventListener('focus', () => renderWardDropdown(allPatients));
+        let wardDebounceTimer;
+
         wardSearchInput.addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase();
+            const term = e.target.value.trim();
+            clearTimeout(wardDebounceTimer);
             document.getElementById('selectedWardPatientId').value = "";
-            const filtered = allPatients.filter(p => {
-                const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-                const pid = String(p.patientId).toLowerCase();
-                return name.includes(term) || pid.includes(term);
-            });
-            renderWardDropdown(filtered);
+            wardSearchInput.dataset.name = "";
+            wardAutocompleteList.style.display = 'none';
+
+            if (term.length < 2) return; // Search only after 2 characters
+
+            wardDebounceTimer = setTimeout(() => {
+                wardAutocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
+                wardAutocompleteList.style.display = 'block';
+
+                const searchTerm = term.toLowerCase();
+                const upperTerm = term.toUpperCase();
+
+                const nameQuery = db.collection('patients')
+                    .orderBy('firstName')
+                    .startAt(searchTerm)
+                    .endAt(searchTerm + '\uf8ff')
+                    .limit(10)
+                    .get();
+
+                const idQuery = db.collection('patients')
+                    .where('patientId', '==', upperTerm)
+                    .get();
+
+                Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
+                    let results = [];
+                    let seenIds = new Set();
+
+                    nameSnap.forEach(doc => {
+                        results.push({ firestoreId: doc.id, ...doc.data() });
+                        seenIds.add(doc.id);
+                    });
+
+                    idSnap.forEach(doc => {
+                        if (!seenIds.has(doc.id)) {
+                            results.push({ firestoreId: doc.id, ...doc.data() });
+                            seenIds.add(doc.id);
+                        }
+                    });
+
+                    renderWardDropdown(results);
+                }).catch(error => {
+                    console.error("Search Error:", error);
+                    wardAutocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                });
+            }, 300);
         });
 
         function renderWardDropdown(patients) {
             wardAutocompleteList.innerHTML = '';
-            if (patients.length === 0) { wardAutocompleteList.style.display = 'none'; return; }
+            if (patients.length === 0) { 
+                wardAutocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
+                return; 
+            }
+            
             patients.forEach(p => {
                 const div = document.createElement('div');
                 div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
                 div.addEventListener('click', () => {
                     wardSearchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
                     document.getElementById('selectedWardPatientId').value = p.patientId;
-                    document.getElementById('wardPatientSearch').dataset.name = `${p.firstName} ${p.lastName}`;
+                    wardSearchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name
                     wardAutocompleteList.style.display = 'none';
                 });
                 wardAutocompleteList.appendChild(div);
             });
-            wardAutocompleteList.style.display = 'block';
         }
 
+        document.addEventListener('click', (e) => {
+            if (e.target !== wardSearchInput && e.target !== wardAutocompleteList) wardAutocompleteList.style.display = 'none';
+        });
+        // --- END OF SCALABLE PATIENT SEARCH FOR WARDS ---
+
+        // --- START OF ASSIGN PATIENT TRANSACTION ---
         window.confirmAssignPatient = function() {
             const roomId = document.getElementById('modalRoomId').value;
             const bedNo = parseInt(document.getElementById('modalBedNo').value);
             const patientId = document.getElementById('selectedWardPatientId').value;
-            const patientName = document.getElementById('wardPatientSearch').dataset.name;
+            const patientName = wardSearchInput.dataset.name;
 
             if (!patientId) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
 
-            const room = currentRooms.find(r => r.id === roomId);
+            const roomRef = db.collection('rooms').doc(roomId);
             const nowISO = new Date().toISOString(); 
 
-            let updatedBeds = room.beds.map(b => {
-                if (b.bedNo === bedNo) {
-                    return { bedNo: b.bedNo, patientId: patientId, patientName: patientName, status: 'Stable', admissionDate: nowISO };
-                }
-                return b;
-            });
+            // Using a transaction to prevent double booking
+            db.runTransaction((transaction) => {
+                return transaction.get(roomRef).then((roomDoc) => {
+                    if (!roomDoc.exists) throw new Error("Room does not exist.");
+                    
+                    let roomData = roomDoc.data();
+                    let beds = roomData.beds;
+                    let bedIndex = beds.findIndex(b => b.bedNo === bedNo);
 
-            db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
-                logActivity(auth.currentUser, "Assigned Bed", `Patient ${patientName} to Room ${room.roomNo} Bed ${bedNo}`);
+                    if (bedIndex > -1 && beds[bedIndex].patientId !== null) {
+                        throw new Error("This bed has just been occupied! Please refresh.");
+                    }
+
+                    if (bedIndex > -1) {
+                        beds[bedIndex] = { bedNo: bedNo, patientId: patientId, patientName: patientName, status: 'Stable', admissionDate: nowISO };
+                    }
+                    transaction.update(roomRef, { beds: beds });
+                });
+            }).then(() => {
+                logActivity(auth.currentUser, "Assigned Bed", `Patient ${patientName} to Room ${bedNo}`);
                 closeModal('assignPatientModal');
-                showAlert("Success", "Patient assigned successfully!", "✅");
-            }).catch(err => showAlert("Error", err.message, "❌"));
+                showAlert("Success", "Patient assigned successfully!", "✔️");
+            }).catch(err => showAlert("Action Blocked", err.message, "⚠️"));
         };
+        // --- END OF ASSIGN PATIENT TRANSACTION ---
 
+        // --- START OF UPDATE STATUS ---
         window.openUpdateStatus = function(roomId, bedNo, patientName) {
             document.getElementById('statusRoomId').value = roomId;
             document.getElementById('statusBedNo').value = bedNo;
@@ -299,10 +370,12 @@
             db.collection('rooms').doc(roomId).update({ beds: updatedBeds }).then(() => {
                 logActivity(auth.currentUser, "Updated Bed Status", `${room.beds.find(b=>b.bedNo===bedNo).patientName} marked as ${newStatus}`);
                 closeModal('updateStatusModal');
-                showAlert("Success", "Status updated successfully!", "✅");
+                showAlert("Success", "Status updated successfully!", "✔️");
             }).catch(err => showAlert("Error", err.message, "❌"));
         };
+        // --- END OF UPDATE STATUS ---
 
+        // --- START OF MANAGE NURSES ---
         window.openManageNurses = function(roomId, roomName) {
             document.getElementById('nurseModalRoomId').value = roomId;
             document.getElementById('nurseModalRoomName').textContent = roomName;
@@ -378,6 +451,7 @@
                 }).catch(err => showAlert("Error", err.message, "❌"));
             });
         };
+        // --- END OF MANAGE NURSES ---
     </script>
 </body>
 </html>
