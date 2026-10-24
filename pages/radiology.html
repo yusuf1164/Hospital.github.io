@@ -14,31 +14,27 @@
                 <h1>🩻 Radiology / Imaging</h1>
                 <p>Manage X-Ray, Ultrasound, and CT Scan requests.</p>
             </div>
-
-            <!-- BACK TO DASHBOARD BUTTON -->
             <a href="../dashboard.html" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block;">⬅️ Back to Dashboard</a>
 
             <div class="form-card">
                 <h3>New Scan Request (Walk-in)</h3>
                 <form id="radForm">
                     <div class="form-grid">
-                        <!-- AUTOCOMPLETE SEARCH -->
                         <div class="form-group" style="grid-column: 1 / -1;">
                             <label>Search Patient</label>
                             <div class="autocomplete-container">
-                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID, or Phone..." autocomplete="off">
+                                <input type="text" id="patientSearchInput" placeholder="Type Name, P ID..." autocomplete="off">
                                 <div id="autocompleteList" class="autocomplete-list"></div>
                                 <input type="hidden" id="selectedPatientId">
                             </div>
                         </div>
-                        
                         <div class="form-group">
                             <label>Scan Type</label>
                             <select id="scanType" required><option value="">Loading scans...</option></select>
                         </div>
                         <div class="form-group">
                             <label>Requested By</label>
-                            <input type="text" id="requestedBy" required placeholder="Doctor's Name / Walk-in">
+                            <input type="text" id="requestedBy" required placeholder="Doctor / Walk-in">
                         </div>
                     </div>
                     <button type="submit" class="btn-submit" id="submitBtn" style="margin-top: 15px; max-width: 200px;">Send to Radiology</button>
@@ -46,207 +42,125 @@
             </div>
 
             <h3 style="color: #1e3a8a; margin-bottom: 15px;">Pending Scan Requests</h3>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Patient ID</th>
-                        <th>Patient Name</th>
-                        <th>Scan Type</th>
-                        <th>Requested By</th>
-                        <th>Date & Time</th>
-                        <th>Status</th>
-                        <th>Result / Action</th>
-                    </tr>
-                </thead>
-                <tbody id="radiologyTableBody">
-                    <tr><td colspan="7" style="text-align:center; color:#888;">Loading requests...</td></tr>
-                </tbody>
-            </table>
+            <div id="radCardContainer" class="med-grid">
+                <p style="text-align: center; width: 100%; color:#888;">Loading requests...</p>
+            </div>
         </div>
     </main>
     <footer id="footer-placeholder"></footer>
-
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="../script.js"></script>
 
     <script>
-        // --- START OF RADIOLOGY INITIALIZATION ---
         enforceAuth(['radiology']);
-
         auth.onAuthStateChanged((user) => {
             if (!user) return;
-
             const searchInput = document.getElementById('patientSearchInput');
             const autocompleteList = document.getElementById('autocompleteList');
             const hiddenPatientId = document.getElementById('selectedPatientId');
-            const tbody = document.getElementById('radiologyTableBody');
+            const cardContainer = document.getElementById('radCardContainer');
             let debounceTimer;
 
-            // --- START OF SCALABLE SERVER-SIDE SEARCH ---
+            // Search Logic
             searchInput.addEventListener('input', (e) => {
                 const term = e.target.value.trim();
                 clearTimeout(debounceTimer);
-                hiddenPatientId.value = "";
-                searchInput.dataset.name = ""; // Clear stored name
+                hiddenPatientId.value = ""; searchInput.dataset.name = "";
                 autocompleteList.style.display = 'none';
+                if (term.length < 2) return; 
 
-                if (term.length < 2) return; // Don't search until they type 2 letters
-
-                debounceTimer = setTimeout(() => {
+                debounceTimer = setTimeout(async () => {
                     autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">Searching...</div>';
                     autocompleteList.style.display = 'block';
+                    let results = []; let seenIds = new Set();
 
-                    const searchTerm = term.toLowerCase();
-                    const upperTerm = term.toUpperCase();
+                    try {
+                        const idSnap = await db.collection('patients').where('patientId', '==', term.toUpperCase()).get();
+                        idSnap.forEach(doc => { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); });
+                    } catch (e) {}
 
-                    const nameQuery = db.collection('patients')
-                        .orderBy('firstName')
-                        .startAt(searchTerm)
-                        .endAt(searchTerm + '\uf8ff')
-                        .limit(10)
-                        .get();
+                    try {
+                        const st = term.charAt(0).toUpperCase() + term.slice(1).toLowerCase();
+                        const nameSnap = await db.collection('patients').orderBy('firstName').startAt(st).endAt(st + '\uf8ff').limit(10).get();
+                        nameSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
+                    } catch (e) {}
 
-                    const idQuery = db.collection('patients')
-                        .where('patientId', '==', upperTerm)
-                        .get();
-
-                    Promise.all([nameQuery, idQuery]).then(([nameSnap, idSnap]) => {
-                        let results = [];
-                        let seenIds = new Set();
-
-                        nameSnap.forEach(doc => {
-                            results.push({ firestoreId: doc.id, ...doc.data() });
-                            seenIds.add(doc.id);
-                        });
-
-                        idSnap.forEach(doc => {
-                            if (!seenIds.has(doc.id)) {
-                                results.push({ firestoreId: doc.id, ...doc.data() });
-                                seenIds.add(doc.id);
-                            }
-                        });
-
-                        renderDropdown(results);
-                    }).catch(error => {
-                        console.error("Search Error:", error);
-                        autocompleteList.innerHTML = `<div style="padding: 10px; color: red; font-size: 12px;">Search error. Check console for index link.</div>`;
+                    autocompleteList.innerHTML = results.length === 0 ? '<div style="padding: 10px; color: #888;">No matches.</div>' : '';
+                    results.forEach(p => {
+                        const div = document.createElement('div');
+                        div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
+                        div.onclick = () => {
+                            searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
+                            hiddenPatientId.value = p.patientId; searchInput.dataset.name = `${p.firstName} ${p.lastName}`;
+                            autocompleteList.style.display = 'none';
+                        };
+                        autocompleteList.appendChild(div);
                     });
-                }, 300); 
+                }, 300);
             });
+            document.addEventListener('click', (e) => { if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none'; });
 
-            function renderDropdown(patients) {
-                autocompleteList.innerHTML = '';
-                if (patients.length === 0) { 
-                    autocompleteList.innerHTML = '<div style="padding: 10px; color: #888;">No matching patients found.</div>';
-                    return; 
-                }
-                
-                patients.forEach(p => {
-                    const div = document.createElement('div');
-                    div.innerHTML = `<strong>${p.firstName} ${p.lastName}</strong> (ID: ${p.patientId})`;
-                    div.addEventListener('click', () => {
-                        searchInput.value = `${p.firstName} ${p.lastName} (${p.patientId})`;
-                        hiddenPatientId.value = p.patientId;
-                        searchInput.dataset.name = `${p.firstName} ${p.lastName}`; // Store name for form
-                        autocompleteList.style.display = 'none';
-                    });
-                    autocompleteList.appendChild(div);
-                });
-            }
-
-            document.addEventListener('click', (e) => {
-                if (e.target !== searchInput && e.target !== autocompleteList) autocompleteList.style.display = 'none';
-            });
-            // --- END OF SCALABLE SERVER-SIDE SEARCH ---
-
-            // --- START OF LOAD SCAN TYPES ---
+            // Load Scans Dropdown
             db.collection('radiologyScans').get().then(snap => {
                 const scanSelect = document.getElementById('scanType');
-                scanSelect.innerHTML = '<option value="">Select scan...</option>';
                 snap.forEach(doc => scanSelect.innerHTML += `<option value="${doc.data().name}">${doc.data().name}</option>`);
             });
-            // --- END OF LOAD SCAN TYPES ---
 
-            // --- START OF LOAD QUEUE ---
-            db.collection('radiology').onSnapshot((snapshot) => {
-                if (snapshot.empty) {
-                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#888;">No scan requests in the queue.</td></tr>`;
-                    return;
-                }
-                let results = [];
-                snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-                results.sort((a, b) => {
-                    const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
-                    const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
-                    return timeB - timeA;
-                });
+            // Load Cards
+            db.collection('radiology').orderBy('createdAt', 'desc').limit(50).onSnapshot((snapshot) => {
+                if (snapshot.empty) { cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No scan requests.</p>`; return; }
+                let results = []; snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+                cardContainer.innerHTML = '';
                 
-                tbody.innerHTML = '';
                 results.forEach(d => {
-                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { 
-                        year: 'numeric', month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit', second: '2-digit',
-                        hour12: true 
-                    }) : 'Just now';
-
+                    const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'Just now';
                     const badgeClass = d.status === 'Completed' ? 'status-complete' : 'status-pending';
-                    let actionHtml = '';
-                    
-                    if (d.status === 'Pending') {
-                        actionHtml = `<div style="display:flex; gap:5px;"><input type="text" id="result_${d.id}" placeholder="Findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:100px;"><button class="btn btn-primary" onclick="saveScanResult('${d.id}')">Save</button></div>`;
-                    } else {
-                        actionHtml = `<strong>${d.result}</strong>`;
-                    }
-                    
-                    tbody.innerHTML += `
-                        <tr>
-                            <td><strong style="color:#2563eb;">${d.patientId}</strong></td>
-                            <td><strong>${d.patientName}</strong></td>
-                            <td>${d.scanType}</td>
-                            <td>${d.doctorName || d.requestedBy || 'Walk-in'}</td>
-                            <td><small>${date}</small></td>
-                            <td><span class="status-badge ${badgeClass}">${d.status}</span></td>
-                            <td>${actionHtml}</td>
-                        </tr>
+                    let actionHtml = d.status === 'Pending' 
+                        ? `<div style="display:flex; gap:5px;"><input type="text" id="result_${d.id}" placeholder="Findings..." style="padding:5px; border:1px solid #ccc; border-radius:3px; width:100px;"><button class="btn btn-primary" onclick="saveScanResult('${d.id}')">Save</button></div>`
+                        : `<strong>${d.result}</strong>`;
+
+                    cardContainer.innerHTML += `
+                        <div class="med-card">
+                            <div class="med-header">
+                                <span class="med-id">${d.patientId}</span>
+                                <span class="med-date">${date}</span>
+                            </div>
+                            <div class="med-name">${d.patientName}</div>
+                            <div class="med-info">
+                                <strong>Scan:</strong> ${d.scanType}<br>
+                                <strong>Requested By:</strong> ${d.doctorName || d.requestedBy || 'Walk-in'}
+                            </div>
+                            <div class="med-action">
+                                <span class="status-badge ${badgeClass}">${d.status}</span>
+                                ${actionHtml}
+                            </div>
+                        </div>
                     `;
                 });
-            }, error => {
-                tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
             });
-            // --- END OF LOAD QUEUE ---
 
-            // --- START OF SUBMIT SCAN REQUEST ---
+            // Submit
             document.getElementById('radForm').addEventListener('submit', (e) => {
                 e.preventDefault();
-                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient from the dropdown.", "❌"); return; }
-                
-                const patientId = hiddenPatientId.value;
-                const patientName = searchInput.dataset.name; // Retrieve stored name
-
+                if(!hiddenPatientId.value) { showAlert("Error", "Please select a patient.", "❌"); return; }
                 db.collection('radiology').add({
-                    patientId: patientId, patientName: patientName,
+                    patientId: hiddenPatientId.value, patientName: searchInput.dataset.name,
                     scanType: document.getElementById('scanType').value, requestedBy: document.getElementById('requestedBy').value,
                     status: 'Pending', result: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
                 }).then(() => {
                     showAlert("Success", "Scan requested!", "✔️"); 
-                    document.getElementById('radForm').reset(); 
-                    searchInput.value = ''; hiddenPatientId.value = ''; searchInput.dataset.name = '';
-                }).catch(err => showAlert("Error", err.message, "❌"));
+                    document.getElementById('radForm').reset(); searchInput.value = ''; hiddenPatientId.value = '';
+                });
             });
-            // --- END OF SUBMIT SCAN REQUEST ---
 
-            // --- START OF SAVE RESULT ---
             window.saveScanResult = function(docId) {
                 const resultInput = document.getElementById(`result_${docId}`).value;
                 if (!resultInput) { showAlert("Error", "Please enter findings.", "❌"); return; }
-                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' })
-                .then(() => showAlert("Success", "Result saved!", "✔️"));
+                db.collection('radiology').doc(docId).update({ result: resultInput, status: 'Completed' }).then(() => showAlert("Success", "Result saved!", "✔️"));
             };
-            // --- END OF SAVE RESULT ---
         });
-        // --- END OF RADIOLOGY INITIALIZATION ---
     </script>
 </body>
 </html>
