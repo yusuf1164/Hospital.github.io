@@ -135,10 +135,7 @@
                 <strong style="color: #4b5563; font-size: 13px;">SERVICE DESCRIPTION</strong>
                 <strong style="color: #4b5563; font-size: 13px;">AMOUNT</strong>
             </div>
-            
-            <!-- Container for single or multiple items -->
             <div id="receiptItemsList"></div>
-            
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #000; padding-top: 15px; font-size: 18px; font-weight: bold; margin-bottom: 10px;">
@@ -254,10 +251,14 @@
                         actionHtml = `<span style="color:#065f46; font-weight:bold;">Completed</span>`;
                     }
 
-                    // Show items count if it's an array
-                    let serviceDisplay = d.service;
-                    if (d.items && Array.isArray(d.items)) {
-                        serviceDisplay = `Pharmacy - ${d.items.length} item(s)`;
+                    // BUILD THE ITEMS LIST HTML FOR CARD
+                    let itemsHtml = '';
+                    if (d.items && Array.isArray(d.items) && d.items.length > 0) {
+                        d.items.forEach(item => {
+                            itemsHtml += `<div style="font-size: 12px; color: #4b5563; margin-top: 2px;">• ${item.name} (x${item.qty} ${item.sellUnit || ''})</div>`;
+                        });
+                    } else {
+                        itemsHtml = `<div style="font-size: 13px; color: #4b5563;">${d.service}</div>`;
                     }
 
                     cardContainer.innerHTML += `
@@ -268,9 +269,12 @@
                             </div>
                             <div class="data-name">${d.patientName}</div>
                             <div class="data-info">
-                                <strong>Service:</strong> ${serviceDisplay}<br>
-                                <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()}<br>
-                                ${d.paymentMethod ? `<strong>Method:</strong> ${d.paymentMethod}` : ''}
+                                <strong>Items:</strong>
+                                ${itemsHtml}
+                                <div style="margin-top: 8px; border-top: 1px solid #e5e7eb; padding-top: 8px;">
+                                    <strong>Total:</strong> ₦${Number(d.amount).toLocaleString()}<br>
+                                    ${d.paymentMethod ? `<strong>Method:</strong> ${d.paymentMethod}` : ''}
+                                </div>
                             </div>
                             <div class="data-action">
                                 <span class="status-badge ${badgeClass}">${d.status}</span>
@@ -343,15 +347,16 @@
                 if (bill.items && Array.isArray(bill.items) && bill.items.length > 0) {
                     // Loop through multiple items (from Pharmacy batch)
                     bill.items.forEach(item => {
+                        const itemName = item.sellUnit ? `${item.name} (${item.qty} ${item.sellUnit})` : `${item.name} (x${item.qty})`;
                         itemsList.innerHTML += `
-                            <div style="display: flex; justify-content: space-between; padding: 5px 0; font-size: 13px;">
-                                <span style="max-width: 65%; word-wrap: break-word;">${item.name} (x${item.qty})</span>
-                                <span style="min-width: 35%; text-align: right;">₦${Number(item.totalPrice || (item.price * item.qty)).toLocaleString()}</span>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 13px;">
+                                <span style="max-width: 65%; word-wrap: break-word;">${itemName}</span>
+                                <span style="min-width: 35%; text-align: right;">₦${Number(item.totalPrice).toLocaleString()}</span>
                             </div>
                         `;
                     });
                 } else {
-                    // Single item fallback
+                    // Single item fallback (OPD, Lab, etc.)
                     itemsList.innerHTML = `
                         <div style="display: flex; justify-content: space-between; padding: 5px 0; font-weight: bold;">
                             <span style="max-width: 65%; word-wrap: break-word;">${bill.service}</span>
@@ -367,8 +372,8 @@
                 closeModal('printOptionsModal');
                 const receipt = document.getElementById('printableReceipt');
                 receipt.style.display = 'block';
-                receipt.style.opacity = '1'; // Reset opacity in case image generation failed
-                receipt.style.position = 'static'; // Let it flow naturally for print
+                receipt.style.opacity = '1'; 
+                receipt.style.position = 'static'; 
 
                 setTimeout(() => {
                     window.print();
@@ -383,12 +388,11 @@
                 closeModal('printOptionsModal');
                 const receipt = document.getElementById('printableReceipt');
                 
-                // Show and position offscreen for html2canvas
                 receipt.style.display = 'block'; 
                 receipt.style.position = 'absolute'; 
                 receipt.style.top = '0'; 
                 receipt.style.left = '-9999px'; 
-                receipt.style.opacity = '1'; // MUST be 1 so canvas sees it
+                receipt.style.opacity = '1'; 
 
                 setTimeout(() => {
                     html2canvas(receipt, { 
@@ -403,7 +407,7 @@
                         link.href = canvas.toDataURL('image/png'); 
                         link.click();
                     }).catch(err => { 
-                        showAlert("Error", "Error generating image. Please use PDF instead.", "❌"); 
+                        showAlert("Error", "Error generating image.", "❌"); 
                         receipt.style.display = 'none'; 
                     });
                 }, 100);
