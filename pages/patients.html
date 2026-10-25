@@ -18,6 +18,11 @@
             <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
 
+            <!-- FIX PIN BUTTON -->
+            <button id="fixPinsBtn" class="btn btn-outline" style="border-color: #f59e0b; color: #f59e0b; margin-bottom: 20px; display: inline-block; cursor: pointer; font-weight: bold; width: 100%;">
+                🔑 Generate Missing PINs
+            </button>
+
             <!-- Search Bar -->
             <input type="text" id="searchPatient" class="search-box" placeholder="Search by Name, P ID, or Phone..." style="width: 100%; padding: 12px; margin-bottom: 20px; border: 2px solid #1e3a8a; border-radius: 5px; font-size: 16px;">
 
@@ -44,6 +49,42 @@
             const cardContainer = document.getElementById('patientCardContainer');
             const searchInput = document.getElementById('searchPatient');
             let debounceTimer;
+
+            // --- START OF FIX MISSING PINS ---
+            document.getElementById('fixPinsBtn').addEventListener('click', async () => {
+                showConfirm("Generate Missing PINs", "This will scan all patients and generate a 6-digit PIN for anyone missing one. Proceed?", async () => {
+                    try {
+                        const snapshot = await db.collection('patients').get();
+                        let patientsToFix = [];
+
+                        snapshot.forEach(doc => {
+                            const data = doc.data();
+                            if (!data.pin) { // If pin is missing
+                                patientsToFix.push(doc.id);
+                            }
+                        });
+
+                        if (patientsToFix.length === 0) {
+                            showAlert("Success", "All patients already have a PIN!", "✔️");
+                            return;
+                        }
+
+                        const batch = db.batch();
+                        patientsToFix.forEach(docId => {
+                            const newPin = Math.floor(100000 + Math.random() * 900000).toString();
+                            const docRef = db.collection('patients').doc(docId);
+                            batch.update(docRef, { pin: newPin });
+                        });
+
+                        await batch.commit();
+                        showAlert("Success", `Successfully generated PINs for ${patientsToFix.length} patients!`, "✔️");
+                        loadInitialPatients(); // Refresh the UI
+                    } catch (error) {
+                        showAlert("Error", error.message, "❌");
+                    }
+                });
+            });
+            // --- END OF FIX MISSING PINS ---
 
             // --- START OF INITIAL FETCH (SCALABLE) ---
             function loadInitialPatients() {
@@ -147,11 +188,10 @@
                             <div class="data-name">${p.firstName} ${p.lastName}</div>
                             <div class="data-info">
                                 <strong>Age:</strong> ${p.age || 'N/A'} | <strong>Gender:</strong> ${p.gender || 'N/A'}<br>
-                                <strong>Religion:</strong> ${p.religion || 'N/A'}<br>
                                 <strong>Phone:</strong> ${p.phone || 'N/A'}
                             </div>
                             <div class="data-action" style="justify-content: space-between; align-items: center;">
-                                <!-- NEW VIEW PIN BUTTON -->
+                                <!-- VIEW PIN BUTTON -->
                                 <button class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; border-color: #f59e0b; color: #f59e0b;" onclick="viewPin('${p.pin || ''}', '${p.firstName} ${p.lastName}')">🔑 View PIN</button>
                                 <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="window.location.href='records.html?id=${p.patientId}'">View Records</button>
                             </div>
@@ -164,7 +204,7 @@
             // --- START OF VIEW PIN MODAL LOGIC ---
             window.viewPin = function(pin, patientName) {
                 if (!pin) {
-                    showAlert("No PIN Found", "This patient does not have a security PIN saved in the system.", "⚠️");
+                    showAlert("No PIN Found", "This patient does not have a PIN yet. Click the 'Generate Missing PINs' button above to fix this.", "⚠️");
                     return;
                 }
                 
