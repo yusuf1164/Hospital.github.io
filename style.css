@@ -446,7 +446,7 @@ a.stat-card:hover { transform: translateY(-3px); box-shadow: 0 6px 12px rgba(0,0
 .data-id { color: #2563eb; font-weight: bold; font-size: 16px; }
 .data-date { font-size: 11px; color: #6b7280; }
 .data-name { font-size: 18px; font-weight: bold; color: #111827; }
-.data-info { font-size: 13px; color: #4b5563; background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; margin-top: 5px; }
+.data-info { font-size: 13px; color: #4b5563; background: #f9fafb; padding: 12px; border-radius: 8px; border: 1px solid #e5e7eb; margin-top: 10px; line-height: 1.6; }
 .data-action { margin-top: 10px; display: flex; justify-content: space-between; align-items: center; }
 /* ========================================= */
 /* --- END OF BILLING/NURSING/RECEPTION CARDS --- */
