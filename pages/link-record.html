@@ -12,7 +12,7 @@
     <main>
         <div class="form-container">
             <h2>🔗 Link Hospital Record</h2>
-            <p>Enter the Patient ID and PIN given to you by the receptionist.</p>
+            <p>Enter the Patient ID, PIN, and Date of Birth provided by the receptionist.</p>
             
             <form id="linkForm">
                 <div class="form-group">
@@ -23,18 +23,49 @@
                     <label>Security PIN</label>
                     <input type="password" id="pin" required placeholder="6-digit PIN">
                 </div>
+                <div class="form-group">
+                    <label>Date of Birth</label>
+                    <input type="date" id="dob" required>
+                </div>
                 
                 <button type="submit" class="btn-submit" id="submitBtn">Link Record</button>
                 <div id="errorMsg" class="error-message" style="text-align:center; margin-top:10px;"></div>
             </form>
 
+            <div style="margin-top: 20px; text-align: center; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+                <p style="font-size: 13px; color: #666; margin-bottom: 10px;">Is your name spelled incorrectly on your hospital record?</p>
+                <button onclick="document.getElementById('editRequestModal').style.display = 'flex'" class="btn btn-outline" style="border-color: #f59e0b; color: #f59e0b; width: 100%;">✏️ Request Name Edit</button>
+            </div>
+
             <div class="form-footer">
-                <a href="../dashboard.html">Back to Dashboard</a>
+                <a href="dashboard.html">Back to Dashboard</a>
             </div>
         </div>
     </main>
 
     <footer id="footer-placeholder"></footer>
+
+    <!-- MODAL: Request Name Edit -->
+    <div id="editRequestModal" class="modal">
+        <div class="modal-content">
+            <h3 style="color: #1e3a8a; margin-bottom: 15px;">Request Name Edit</h3>
+            <p style="font-size: 13px; color: #666; margin-bottom: 15px;">The receptionist will review this request and update your file.</p>
+            
+            <div class="form-group">
+                <label>Your Patient ID</label>
+                <input type="text" id="reqPatientId" required placeholder="e.g. P0001">
+            </div>
+            <div class="form-group">
+                <label>Correct Full Name</label>
+                <input type="text" id="reqNewName" required placeholder="e.g. John Doe">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 20px;">
+                <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="document.getElementById('editRequestModal').style.display = 'none'">Cancel</button>
+                <button class="btn btn-primary" style="flex:1; background-color: #f59e0b;" onclick="submitEditRequest()">Send Request</button>
+            </div>
+        </div>
+    </div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
@@ -42,9 +73,11 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF LINK RECORD LOGIC ---
         auth.onAuthStateChanged((user) => {
             if (!user) { window.location.href = '../login.html'; return; }
 
+            // 1. Handle Linking Record
             const form = document.getElementById('linkForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -55,49 +88,31 @@
 
                 const inputId = document.getElementById('patientId').value.trim().toUpperCase();
                 const inputPin = document.getElementById('pin').value.trim();
+                const inputDob = document.getElementById('dob').value;
 
-                // 1. Get the current user's profile (to check their email/phone)
                 db.collection('users').doc(user.uid).get().then(userDoc => {
                     const userData = userDoc.data();
 
-                    // 2. Find the patient record
                     return db.collection('patients').where('patientId', '==', inputId).get().then(snapshot => {
-                        if (snapshot.empty) {
-                            throw new Error("Patient ID not found in hospital database.");
-                        }
+                        if (snapshot.empty) throw new Error("Patient ID not found in hospital database.");
 
                         const patientDoc = snapshot.docs[0];
                         const patientData = patientDoc.data();
 
-                        // 3. Security Checks
-                        if (patientData.pin !== inputPin) {
-                            throw new Error("Incorrect Security PIN.");
-                        }
+                        // Security Checks
+                        if (patientData.pin !== inputPin) throw new Error("Incorrect Security PIN.");
+                        if (patientData.dob !== inputDob) throw new Error("Date of Birth does not match our records.");
 
-                        // Verify if the logged-in user's phone or email matches the hospital record
-                        const matchesEmail = patientData.email && patientData.email.toLowerCase() === userData.email.toLowerCase();
-                        const matchesPhone = patientData.phone && patientData.phone === userData.phone;
-
-                        if (!matchesEmail && !matchesPhone) {
-                            throw new Error("Security Error: The email/phone on your portal account does not match the hospital record.");
-                        }
-
-                        // 4. Success! Add the Patient ID to the user's linked IDs array
                         let linkedIds = userData.linkedPatientIds || [];
+                        if (linkedIds.includes(inputId)) throw new Error("This Patient ID is already linked to your account.");
                         
-                        if (linkedIds.includes(inputId)) {
-                            throw new Error("This Patient ID is already linked to your account.");
-                        }
-                        
-                        linkedIds.push(inputId); // Add the new ID to the array
+                        linkedIds.push(inputId); 
 
-                        return db.collection('users').doc(user.uid).update({
-                            linkedPatientIds: linkedIds
-                        });
+                        return db.collection('users').doc(user.uid).update({ linkedPatientIds: linkedIds });
                     });
                 }).then(() => {
-                    alert('✅ Record Linked Successfully! You can now view this patient\'s history from your dashboard.');
-                    window.location.href = 'dashboard.html';
+                    showAlert("Success", "Record Linked Successfully! You can now view this patient's history.", "✔️");
+                    setTimeout(() => window.location.href = 'dashboard.html', 1500);
                 }).catch(err => {
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = err.message;
@@ -105,6 +120,25 @@
                 });
             });
         });
+
+        // 2. Handle Sending Edit Request
+        window.submitEditRequest = function() {
+            const patientId = document.getElementById('reqPatientId').value.trim().toUpperCase();
+            const newName = document.getElementById('reqNewName').value.trim();
+
+            if (!patientId || !newName) { showAlert("Error", "Please fill in both fields.", "❌"); return; }
+
+            db.collection('editRequests').add({
+                patientId: patientId,
+                requestedName: newName,
+                status: 'Pending',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                document.getElementById('editRequestModal').style.display = 'none';
+                showAlert("Success", "Edit request sent to Reception. They will review it shortly.", "✔️");
+            }).catch(err => showAlert("Error", err.message, "❌"));
+        };
+        // --- END OF LINK RECORD LOGIC ---
     </script>
 </body>
 </html>
