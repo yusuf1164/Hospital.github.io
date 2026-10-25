@@ -30,7 +30,7 @@
     <header id="header-placeholder"></header>
 
     <main>
-        <div class="table-container" style="max-width: 900px;">
+        <div class="table-container" style="max-width: 1000px;">
             <div class="page-header">
                 <h1>💳 My Bills</h1>
                 <p>View your invoices and payment history.</p>
@@ -56,22 +56,20 @@
                 <a href="link-record.html" class="btn btn-primary" style="display: inline-block; padding: 10px 20px; text-decoration: none;">🔗 Link Hospital ID Now</a>
             </div>
 
-            <!-- Bills Table -->
+            <!-- Outstanding Summary -->
+            <div id="totalOutstandingContainer" style="display: none; margin-bottom: 20px;">
+                <div class="billing-stat-card" style="border-top: 4px solid #f59e0b; background: #fffbeb;">
+                    <h4 style="color: #92400e;">Total Outstanding Balance</h4>
+                    <p id="totalOutstandingAmount" style="color: #92400e; font-size: 24px;">₦0</p>
+                </div>
+            </div>
+
+            <!-- Bills Cards Container -->
             <div id="billsContainer" style="display: none;">
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th>Service</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody id="billsTableBody">
-                        <tr><td colspan="5" style="text-align:center; color:#888;">Loading bills...</td></tr>
-                    </tbody>
-                </table>
+                <h3 style="color: #1e3a8a; margin-bottom: 15px;">Recent Invoices</h3>
+                <div id="billsCardLayout" class="card-grid-layout">
+                    <!-- Cards will be injected here -->
+                </div>
             </div>
         </div>
     </main>
@@ -145,7 +143,9 @@
             const profileSelect = document.getElementById('profileSelect');
             const emptyState = document.getElementById('emptyState');
             const billsContainer = document.getElementById('billsContainer');
-            const tbody = document.getElementById('billsTableBody');
+            const cardLayout = document.getElementById('billsCardLayout');
+            const totalOutstandingContainer = document.getElementById('totalOutstandingContainer');
+            
             let allPatientsData = [];
 
             db.collection('users').doc(user.uid).get().then(doc => {
@@ -185,13 +185,14 @@
                     loadBills(firestoreId);
                 } else {
                     billsContainer.style.display = 'none';
+                    totalOutstandingContainer.style.display = 'none';
                 }
             });
 
-            // --- START OF LOAD BILLS ---
+            // --- START OF LOAD BILLS (CARD LAYOUT) ---
             function loadBills(firestorePatientId) {
                 billsContainer.style.display = 'block';
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">Loading bills...</td></tr>`;
+                cardLayout.innerHTML = `<p style="text-align:center; width:100%; color:#888;">Loading bills...</p>`;
                 allBillsData = []; // Reset array
 
                 // Find the P0001 string ID
@@ -200,7 +201,8 @@
 
                 db.collection('bills').where('patientId', '==', patientIdString).get().then(snapshot => {
                     if (snapshot.empty) {
-                        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:#888;">No bills found for this profile.</td></tr>`;
+                        cardLayout.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No bills found for this profile.</p>`;
+                        totalOutstandingContainer.style.display = 'none';
                         return;
                     }
 
@@ -208,7 +210,7 @@
                     snapshot.forEach(doc => {
                         const d = doc.data();
                         bills.push({ id: doc.id, ...d });
-                        allBillsData.push({ id: doc.id, ...d, patientName: patientObj.firstName + ' ' + patientObj.lastName }); // Save for print
+                        allBillsData.push({ id: doc.id, ...d, patientName: patientObj.firstName + ' ' + patientObj.lastName });
                     });
 
                     bills.sort((a, b) => {
@@ -217,39 +219,48 @@
                         return timeB - timeA;
                     });
 
-                    tbody.innerHTML = '';
+                    cardLayout.innerHTML = '';
                     let totalPending = 0;
 
                     bills.forEach(d => {
                         const date = d.createdAt ? d.createdAt.toDate().toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A';
-                        const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
+                        const badgeClass = d.status === 'Paid' ? 'status-complete' : 'status-pending';
+                        
                         if (d.status !== 'Paid') totalPending += Number(d.amount);
 
-                        tbody.innerHTML += `
-                            <tr>
-                                <td>${date}</td>
-                                <td>${d.service}</td>
-                                <td>₦${Number(d.amount).toLocaleString()}</td>
-                                <td>${badge}</td>
-                                <td>
-                                    <button class="btn btn-outline" style="padding:4px 8px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
-                                </td>
-                            </tr>
+                        cardLayout.innerHTML += `
+                            <div class="data-card">
+                                <div class="data-card-header">
+                                    <span class="data-id">${d.patientId}</span>
+                                    <span class="data-date">${date}</span>
+                                </div>
+                                <div class="data-name">${d.patientName || patientObj.firstName + ' ' + patientObj.lastName}</div>
+                                <div class="data-info">
+                                    <strong>Service:</strong> ${d.service}<br>
+                                    <strong>Total:</strong> ₦${Number(d.amount).toLocaleString()}<br>
+                                    ${d.paymentMethod ? `<strong>Method:</strong> ${d.paymentMethod}` : ''}
+                                </div>
+                                <div class="data-action">
+                                    <span class="status-badge ${badgeClass}">${d.status}</span>
+                                    <div style="display:flex; gap:5px;">
+                                        <button class="btn btn-outline" style="padding:5px 10px; font-size:12px; border-color: #1e3a8a; color:#1e3a8a;" onclick="openPrintModal('${d.id}')">Print</button>
+                                    </div>
+                                </div>
+                            </div>
                         `;
                     });
 
+                    // Show Total Outstanding if there is any
                     if (totalPending > 0) {
-                        tbody.innerHTML += `
-                            <tr style="background-color: #fef3c7;">
-                                <td colspan="2" style="text-align:right; font-weight:bold; color:#92400e;">Total Outstanding:</td>
-                                <td style="font-weight:bold; color:#92400e;">₦${totalPending.toLocaleString()}</td>
-                                <td colspan="2"></td>
-                            </tr>
-                        `;
+                        document.getElementById('totalOutstandingAmount').textContent = `₦${totalPending.toLocaleString()}`;
+                        totalOutstandingContainer.style.display = 'block';
+                    } else {
+                        totalOutstandingContainer.style.display = 'none';
                     }
+
                 }).catch(error => {
                     console.error("Error loading bills:", error);
-                    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red;">Error: ${error.message}</td></tr>`;
+                    cardLayout.innerHTML = `<p style="text-align:center; width:100%; color:red;">Error: ${error.message}</p>`;
                 });
             }
             // --- END OF LOAD BILLS ---
