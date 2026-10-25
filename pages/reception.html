@@ -15,8 +15,13 @@
                 <p>Register new patients and manage the hospital intake.</p>
             </div>
 
-            <!-- SMART BACK BUTTON -->
             <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
+
+            <!-- EDIT REQUESTS SECTION -->
+            <div id="editRequestsSection" class="form-card" style="display: none; border-left: 4px solid #f59e0b; margin-bottom: 30px;">
+                <h3>Pending Name Edit Requests</h3>
+                <div id="editRequestsContainer"></div>
+            </div>
 
             <div class="form-card">
                 <h3>Register New Patient</h3>
@@ -24,34 +29,19 @@
                     <div class="form-grid">
                         <div class="form-group"><label>First Name</label><input type="text" id="firstName" required placeholder="John"></div>
                         <div class="form-group"><label>Last Name</label><input type="text" id="lastName" required placeholder="Doe"></div>
-                        
                         <div class="form-group">
                             <label>Date of Birth</label>
                             <input type="date" id="dob" required>
                             <div id="ageDisplay" style="font-size: 12px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div>
                         </div>
-                        
                         <div class="form-group">
                             <label>Gender</label>
-                            <select id="gender" required>
-                                <option value="">Select...</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
+                            <select id="gender" required><option value="">Select...</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select>
                         </div>
-
-                        <!-- RELIGION DROPDOWN -->
                         <div class="form-group">
                             <label>Religion</label>
-                            <select id="religion" required>
-                                <option value="">Select...</option>
-                                <option value="Islam">Islam</option>
-                                <option value="Christianity">Christianity</option>
-                                <option value="Other">Other</option>
-                            </select>
+                            <select id="religion" required><option value="">Select...</option><option value="Islam">Islam</option><option value="Christianity">Christianity</option><option value="Other">Other</option></select>
                         </div>
-
                         <div class="form-group"><label>Phone Number</label><input type="tel" id="phone" required placeholder="+1 (555) 000-0000"></div>
                         <div class="form-group"><label>Email Address</label><input type="email" id="email" placeholder="patient@example.com"></div>
                         <div class="form-group" style="grid-column: 1 / -1;"><label>Address</label><input type="text" id="address" required placeholder="123 Main St"></div>
@@ -74,6 +64,7 @@
     <script src="../script.js"></script>
 
     <script>
+        // --- START OF RECEPTION INITIALIZATION ---
         enforceAuth(['reception', 'admin']);
         
         document.getElementById('dob').addEventListener('change', function() {
@@ -85,8 +76,74 @@
             if (!user) return;
 
             const cardContainer = document.getElementById('receptionCardContainer');
+            const editRequestsContainer = document.getElementById('editRequestsContainer');
+            const editRequestsSection = document.getElementById('editRequestsSection');
 
-            // Load Recent Patients as Cards
+            // 1. Load Edit Requests
+            db.collection('editRequests').where('status', '==', 'Pending').onSnapshot(snapshot => {
+                if (snapshot.empty) {
+                    editRequestsSection.style.display = 'none';
+                    return;
+                }
+                
+                editRequestsSection.style.display = 'block';
+                editRequestsContainer.innerHTML = '';
+                
+                snapshot.forEach(doc => {
+                    const d = doc.data();
+                    editRequestsContainer.innerHTML += `
+                        <div style="background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>Patient ID: ${d.patientId}</strong><br>
+                                <span style="font-size: 13px; color: #6b7280;">Requested Name: <strong>${d.requestedName}</strong></span>
+                            </div>
+                            <div style="display: flex; gap: 5px;">
+                                <button class="btn btn-primary" style="padding: 5px 10px; font-size: 12px; background-color: #10b981;" onclick="approveEdit('${doc.id}', '${d.patientId}', '${d.requestedName.replace(/'/g, "\\'")}')">Approve</button>
+                                <button class="btn btn-outline" style="padding: 5px 10px; font-size: 12px; border-color: #dc2626; color: #dc2626;" onclick="rejectEdit('${doc.id}')">Reject</button>
+                            </div>
+                        </div>
+                    `;
+                });
+            });
+
+            // Approve Function
+            window.approveEdit = function(requestId, patientId, newName) {
+                showConfirm("Approve Edit", `Change patient ${patientId}'s name to <strong>${newName}</strong>?`, () => {
+                    // Split new name into first and last
+                    const nameParts = newName.trim().split(' ');
+                    const firstName = nameParts[0];
+                    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+                    
+                    const batch = db.batch();
+
+                    // Find the patient doc (Note: we need to query by patientId string, not doc ID)
+                    db.collection('patients').where('patientId', '==', patientId).get().then(snap => {
+                        if (!snap.empty) {
+                            const patientDocId = snap.docs[0].id;
+                            const patientRef = db.collection('patients').doc(patientDocId);
+                            batch.update(patientRef, { firstName: firstName, lastName: lastName });
+                        }
+
+                        const requestRef = db.collection('editRequests').doc(requestId);
+                        batch.update(requestRef, { status: 'Approved' });
+
+                        return batch.commit();
+                    }).then(() => {
+                        logActivity(auth.currentUser, "Approved Edit", `Patient ${patientId} name changed to ${newName}`);
+                        showAlert("Success", "Name updated successfully!", "✔️");
+                    }).catch(err => showAlert("Error", err.message, "❌"));
+                });
+            };
+
+            // Reject Function
+            window.rejectEdit = function(requestId) {
+                showConfirm("Reject Edit", "Are you sure you want to reject this name change request?", () => {
+                    db.collection('editRequests').doc(requestId).update({ status: 'Rejected' })
+                    .then(() => showAlert("Success", "Request rejected.", "✔️"));
+                });
+            };
+
+            // 2. Load Recent Patients
             db.collection('patients').orderBy('createdAt', 'desc').limit(10).onSnapshot((snapshot) => {
                 if (snapshot.empty) {
                     cardContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No patients registered yet.</p>`;
@@ -112,7 +169,7 @@
                 });
             });
 
-            // Submit Form
+            // 3. Handle New Registration
             const form = document.getElementById('receptionForm');
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -158,6 +215,7 @@
                 });
             });
         });
+        // --- END OF RECEPTION INITIALIZATION ---
     </script>
 </body>
 </html>
