@@ -138,86 +138,74 @@
 
             // 4. Fetch and Render Records
             function loadRecords(patientId) {
-                historyContainer.style.display = 'block';
+    historyContainer.style.display = 'block';
 
-                const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
-                sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
+    const sections = ['vitalsList', 'consultationsList', 'labsList', 'radiologyList', 'billingList'];
+    sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
 
-                // We use the internal Firestore Document ID (not the P0001 string) to query the records
-                // So we first find the Firestore doc ID for this Patient ID
-                const patientDoc = allPatientsData.find(p => p.patientId === patientId);
-                // Wait, Firestore collections (vitals, labs, etc.) use the internal Document ID as 'patientId'
-                // We need to query by the actual Firestore ID of the patient record.
-                
-                // Let's find the Firestore UID of the patient
-                db.collection('patients').where('patientId', '==', patientId).get().then(snap => {
-                    if (snap.empty) return;
-                    const firestorePatientId = snap.docs[0].id;
+    // FIX: Query directly using the "P0001" string. No need for the middleman lookup.
+    Promise.all([
+        db.collection('vitals').where('patientId', '==', patientId).get(),
+        db.collection('consultations').where('patientId', '==', patientId).get(),
+        db.collection('labResults').where('patientId', '==', patientId).get(),
+        db.collection('radiology').where('patientId', '==', patientId).get(),
+        db.collection('bills').where('patientId', '==', patientId).get()
+    ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
+        
+        const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
 
-                    // Now fetch all records using the internal firestore ID
-                    Promise.all([
-                        db.collection('vitals').where('patientId', '==', firestorePatientId).get(),
-                        db.collection('consultations').where('patientId', '==', firestorePatientId).get(),
-                        db.collection('labResults').where('patientId', '==', firestorePatientId).get(),
-                        db.collection('radiology').where('patientId', '==', firestorePatientId).get(),
-                        db.collection('bills').where('patientId', '==', firestorePatientId).get()
-                    ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
-                        
-                        const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
+        // Vitals
+        let vitalsHTML = '';
+        if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
+        vitalsSnap.forEach(doc => {
+            const d = doc.data();
+            vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg</div>`;
+        });
+        document.getElementById('vitalsList').innerHTML = vitalsHTML;
 
-                        // Vitals
-                        let vitalsHTML = '';
-                        if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
-                        vitalsSnap.forEach(doc => {
-                            const d = doc.data();
-                            vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg</div>`;
-                        });
-                        document.getElementById('vitalsList').innerHTML = vitalsHTML;
+        // Consultations
+        let consultHTML = '';
+        if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
+        consultSnap.forEach(doc => {
+            const d = doc.data();
+            consultHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>Doctor:</strong> ${d.doctorName || 'Doctor'}<br><strong>Diagnosis:</strong> ${d.diagnosis}</div>`;
+        });
+        document.getElementById('consultationsList').innerHTML = consultHTML;
 
-                        // Consultations
-                        let consultHTML = '';
-                        if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
-                        consultSnap.forEach(doc => {
-                            const d = doc.data();
-                            consultHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>Doctor:</strong> ${d.doctorName || 'Doctor'}<br><strong>Diagnosis:</strong> ${d.diagnosis}</div>`;
-                        });
-                        document.getElementById('consultationsList').innerHTML = consultHTML;
+        // Labs
+        let labsHTML = '';
+        if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
+        labsSnap.forEach(doc => {
+            const d = doc.data();
+            const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
+            labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`;
+        });
+        document.getElementById('labsList').innerHTML = labsHTML;
 
-                        // Labs
-                        let labsHTML = '';
-                        if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
-                        labsSnap.forEach(doc => {
-                            const d = doc.data();
-                            const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                            labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`;
-                        });
-                        document.getElementById('labsList').innerHTML = labsHTML;
+        // Radiology
+        let radHTML = '';
+        if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
+        radSnap.forEach(doc => {
+            const d = doc.data();
+            const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
+            radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`;
+        });
+        document.getElementById('radiologyList').innerHTML = radHTML;
 
-                        // Radiology
-                        let radHTML = '';
-                        if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
-                        radSnap.forEach(doc => {
-                            const d = doc.data();
-                            const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-                            radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`;
-                        });
-                        document.getElementById('radiologyList').innerHTML = radHTML;
+        // Bills
+        let billsHTML = '';
+        if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
+        billsSnap.forEach(doc => {
+            const d = doc.data();
+            const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
+            billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`;
+        });
+        document.getElementById('billingList').innerHTML = billsHTML;
 
-                        // Bills
-                        let billsHTML = '';
-                        if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
-                        billsSnap.forEach(doc => {
-                            const d = doc.data();
-                            const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
-                            billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`;
-                        });
-                        document.getElementById('billingList').innerHTML = billsHTML;
-
-                    }).catch(err => {
-                        alert("Error fetching records: " + err.message);
-                    });
-                });
-            }
+    }).catch(err => {
+        alert("Error fetching records: " + err.message);
+    });
+}
         });
     </script>
 </body>
