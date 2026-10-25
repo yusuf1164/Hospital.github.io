@@ -171,8 +171,9 @@
                 
                 if (isStrictlyPatient) {
                     if (!selectedPatientId) return; 
-                    // For patients, we filter by their selected profile
+                    // FIX: Added patientUid to satisfy security rules (Matches the composite index)
                     query = db.collection('appointments')
+                        .where('patientUid', '==', user.uid)
                         .where('patientId', '==', selectedPatientId)
                         .orderBy('createdAt', 'desc')
                         .limit(50);
