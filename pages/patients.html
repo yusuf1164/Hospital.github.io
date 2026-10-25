@@ -81,25 +81,21 @@
                     const searchTerm = term.charAt(0).toUpperCase() + term.slice(1); 
                     const upperTerm = term.toUpperCase();
 
-                    // 1. Search by Exact ID
                     try {
                         const idSnap = await db.collection('patients').where('patientId', '==', upperTerm).get();
                         idSnap.forEach(doc => { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); });
                     } catch (err) { console.error(err); }
 
-                    // 2. Search by First Name
                     try {
                         const firstSnap = await db.collection('patients').orderBy('firstName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(10).get();
                         firstSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
                     } catch (err) { console.error(err); }
 
-                    // 3. Search by Last Name
                     try {
                         const lastSnap = await db.collection('patients').orderBy('lastName').startAt(searchTerm).endAt(searchTerm + '\uf8ff').limit(10).get();
                         lastSnap.forEach(doc => { if (!seenIds.has(doc.id)) { results.push({ firestoreId: doc.id, ...doc.data() }); seenIds.add(doc.id); } });
                     } catch (err) { console.error(err); }
 
-                    // 4. Fallback: Recent 50
                     try {
                         const recentPatients = await db.collection('patients').orderBy('createdAt', 'desc').limit(50).get();
                         recentPatients.forEach(doc => {
@@ -114,11 +110,9 @@
                         });
                     } catch (err) { console.error(err); }
 
-                    // Render Results
                     if (results.length === 0) {
                         cardContainer.innerHTML = '<p style="text-align: center; width: 100%; color: #888;">No matching patients found.</p>';
                     } else {
-                        // Sort newest first
                         results.sort((a, b) => {
                             const timeA = a.createdAt ? a.createdAt.toMillis() : 0;
                             const timeB = b.createdAt ? b.createdAt.toMillis() : 0;
@@ -126,7 +120,7 @@
                         });
                         renderPatientCards(results);
                     }
-                }, 300); 
+                }, 600); 
             });
             // --- END OF FOOLPROOF SERVER-SIDE SEARCH ---
 
@@ -156,7 +150,9 @@
                                 <strong>Religion:</strong> ${p.religion || 'N/A'}<br>
                                 <strong>Phone:</strong> ${p.phone || 'N/A'}
                             </div>
-                            <div class="data-action" style="justify-content: flex-end;">
+                            <div class="data-action" style="justify-content: space-between; align-items: center;">
+                                <!-- NEW VIEW PIN BUTTON -->
+                                <button class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; border-color: #f59e0b; color: #f59e0b;" onclick="viewPin('${p.pin || ''}', '${p.firstName} ${p.lastName}')">🔑 View PIN</button>
                                 <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="window.location.href='records.html?id=${p.patientId}'">View Records</button>
                             </div>
                         </div>
@@ -164,6 +160,23 @@
                 });
             }
             // --- END OF RENDER CARDS ---
+
+            // --- START OF VIEW PIN MODAL LOGIC ---
+            window.viewPin = function(pin, patientName) {
+                if (!pin) {
+                    showAlert("No PIN Found", "This patient does not have a security PIN saved in the system.", "⚠️");
+                    return;
+                }
+                
+                showAlert(
+                    "Patient Security PIN", 
+                    `The Linking PIN for <strong>${patientName}</strong> is:<br><br>
+                    <h1 style="color: #1e3a8a; font-size: 40px; letter-spacing: 8px; margin: 10px 0;">${pin}</h1>
+                    Please write this down or give it to the patient so they can link their online portal.`, 
+                    "🔑"
+                );
+            };
+            // --- END OF VIEW PIN MODAL LOGIC ---
 
             loadInitialPatients();
         });
