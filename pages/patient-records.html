@@ -144,69 +144,102 @@
     sections.forEach(id => document.getElementById(id).innerHTML = '<p style="color:#888;">Loading records...</p>');
 
     // FIX: Query directly using the "P0001" string. No need for the middleman lookup.
-    Promise.all([
-        db.collection('vitals').where('patientId', '==', patientId).get(),
-        db.collection('consultations').where('patientId', '==', patientId).get(),
-        db.collection('labResults').where('patientId', '==', patientId).get(),
-        db.collection('radiology').where('patientId', '==', patientId).get(),
-        db.collection('bills').where('patientId', '==', patientId).get()
     ]).then(([vitalsSnap, consultSnap, labsSnap, radSnap, billsSnap]) => {
-        
-        const formatDate = (ts) => ts ? ts.toDate().toLocaleString() : 'N/A';
+    
+    const formatDate = (ts) => ts ? ts.toDate().toLocaleString(undefined, { 
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', hour12: true 
+    }) : 'N/A';
 
-        // Vitals
-        let vitalsHTML = '';
-        if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888;">No vitals recorded.</p>';
-        vitalsSnap.forEach(doc => {
-            const d = doc.data();
-            vitalsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>BP:</strong> ${d.bp} | <strong>Temp:</strong> ${d.temp}°C | <strong>Weight:</strong> ${d.weight}kg</div>`;
-        });
-        document.getElementById('vitalsList').innerHTML = vitalsHTML;
-
-        // Consultations
-        let consultHTML = '';
-        if (consultSnap.empty) consultHTML = '<p style="color:#888;">No consultations recorded.</p>';
-        consultSnap.forEach(doc => {
-            const d = doc.data();
-            consultHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>Doctor:</strong> ${d.doctorName || 'Doctor'}<br><strong>Diagnosis:</strong> ${d.diagnosis}</div>`;
-        });
-        document.getElementById('consultationsList').innerHTML = consultHTML;
-
-        // Labs
-        let labsHTML = '';
-        if (labsSnap.empty) labsHTML = '<p style="color:#888;">No lab tests recorded.</p>';
-        labsSnap.forEach(doc => {
-            const d = doc.data();
-            const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-            labsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.testType}</strong> - ${res}</div>`;
-        });
-        document.getElementById('labsList').innerHTML = labsHTML;
-
-        // Radiology
-        let radHTML = '';
-        if (radSnap.empty) radHTML = '<p style="color:#888;">No scans recorded.</p>';
-        radSnap.forEach(doc => {
-            const d = doc.data();
-            const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span style="color:#dc2626;">Pending</span>';
-            radHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.scanType}</strong> - ${res}</div>`;
-        });
-        document.getElementById('radiologyList').innerHTML = radHTML;
-
-        // Bills
-        let billsHTML = '';
-        if (billsSnap.empty) billsHTML = '<p style="color:#888;">No bills recorded.</p>';
-        billsSnap.forEach(doc => {
-            const d = doc.data();
-            const badge = d.status === 'Paid' ? '<span class="status-badge status-complete">Paid</span>' : '<span class="status-badge status-pending">Pending</span>';
-            billsHTML += `<div class="record-item"><span class="record-date">${formatDate(d.createdAt)}</span> <strong>${d.service}</strong> - ₦${Number(d.amount).toLocaleString()} ${badge}</div>`;
-        });
-        document.getElementById('billingList').innerHTML = billsHTML;
-
-    }).catch(err => {
-        alert("Error fetching records: " + err.message);
+    // 1. VITALS CARDS
+    let vitalsHTML = '';
+    if (vitalsSnap.empty) vitalsHTML = '<p style="color:#888; grid-column: 1 / -1;">No vitals recorded.</p>';
+    vitalsSnap.forEach(doc => {
+        const d = doc.data();
+        vitalsHTML += `
+            <div class="record-card">
+                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                <div class="record-card-body">
+                    <strong>BP:</strong> ${d.bp} mmHg<br>
+                    <strong>Temp:</strong> ${d.temp}°C<br>
+                    <strong>Weight:</strong> ${d.weight}kg<br>
+                    <strong>Pulse:</strong> ${d.pulse} bpm
+                </div>
+            </div>`;
     });
-}
-        });
+    document.getElementById('vitalsList').innerHTML = vitalsHTML;
+
+    // 2. CONSULTATIONS CARDS
+    let consultHTML = '';
+    if (consultSnap.empty) consultHTML = '<p style="color:#888; grid-column: 1 / -1;">No consultations recorded.</p>';
+    consultSnap.forEach(doc => {
+        const d = doc.data();
+        consultHTML += `
+            <div class="record-card" style="border-left-color: #8b5cf6;">
+                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                <div class="record-card-body">
+                    <strong>Doctor:</strong> ${d.doctorName || 'Unknown'}<br>
+                    <strong>Symptoms:</strong> ${d.symptoms || 'N/A'}<br>
+                    <strong>Diagnosis:</strong> ${d.diagnosis}
+                </div>
+            </div>`;
+    });
+    document.getElementById('consultationsList').innerHTML = consultHTML;
+
+    // 3. LABS CARDS
+    let labsHTML = '';
+    if (labsSnap.empty) labsHTML = '<p style="color:#888; grid-column: 1 / -1;">No lab tests recorded.</p>';
+    labsSnap.forEach(doc => {
+        const d = doc.data();
+        const res = d.status === 'Completed' ? `<strong>Result:</strong> ${d.result}` : '<span class="record-badge-pending">Pending</span>';
+        labsHTML += `
+            <div class="record-card" style="border-left-color: #10b981;">
+                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                <div class="record-card-body">
+                    <strong>Test:</strong> ${d.testType}<br>
+                    ${res}
+                </div>
+            </div>`;
+    });
+    document.getElementById('labsList').innerHTML = labsHTML;
+
+    // 4. RADIOLOGY CARDS
+    let radHTML = '';
+    if (radSnap.empty) radHTML = '<p style="color:#888; grid-column: 1 / -1;">No scans recorded.</p>';
+    radSnap.forEach(doc => {
+        const d = doc.data();
+        const res = d.status === 'Completed' ? `<strong>Findings:</strong> ${d.result}` : '<span class="record-badge-pending">Pending</span>';
+        radHTML += `
+            <div class="record-card" style="border-left-color: #f59e0b;">
+                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                <div class="record-card-body">
+                    <strong>Scan:</strong> ${d.scanType}<br>
+                    ${res}
+                </div>
+            </div>`;
+    });
+    document.getElementById('radiologyList').innerHTML = radHTML;
+
+    // 5. BILLING CARDS
+    let billsHTML = '';
+    if (billsSnap.empty) billsHTML = '<p style="color:#888; grid-column: 1 / -1;">No bills recorded.</p>';
+    billsSnap.forEach(doc => {
+        const d = doc.data();
+        const badge = d.status === 'Paid' ? '<span class="record-badge-paid">Paid</span>' : '<span class="record-badge-pending">Pending</span>';
+        billsHTML += `
+            <div class="record-card" style="border-left-color: #ef4444;">
+                <div class="record-card-header"><span>📅 ${formatDate(d.createdAt)}</span></div>
+                <div class="record-card-body">
+                    <strong>Service:</strong> ${d.service}<br>
+                    <strong>Amount:</strong> ₦${Number(d.amount).toLocaleString()} ${badge}
+                </div>
+            </div>`;
+    });
+    document.getElementById('billingList').innerHTML = billsHTML;
+
+}).catch(err => {
+    showAlert("Error", "Error fetching records: " + err.message, "❌");
+});
     </script>
 </body>
 </html>
