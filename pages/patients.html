@@ -172,33 +172,27 @@
                     return;
                 }
 
-                cardContainer.innerHTML = '';
-                patients.forEach(p => {
-                    const dateStr = p.createdAt ? p.createdAt.toDate().toLocaleString(undefined, { 
-                        year: 'numeric', month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit', hour12: true 
-                    }) : 'Just now';
-
-                    cardContainer.innerHTML += `
-                        <div class="data-card">
-                            <div class="data-card-header">
-                                <span class="data-id">${p.patientId || 'N/A'}</span>
-                                <span class="data-date">${dateStr}</span>
-                            </div>
-                            <div class="data-name">${p.firstName} ${p.lastName}</div>
-                            <div class="data-info">
-                                <strong>Age:</strong> ${p.age || 'N/A'} | <strong>Gender:</strong> ${p.gender || 'N/A'}<br>
-                                <strong>Phone:</strong> ${p.phone || 'N/A'}
-                            </div>
-                            <div class="data-action" style="justify-content: space-between; align-items: center;">
-                                <!-- VIEW PIN BUTTON -->
-                                <button class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; border-color: #f59e0b; color: #f59e0b;" onclick="viewPin('${p.pin || ''}', '${p.firstName} ${p.lastName}')">🔑 View PIN</button>
-                                <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="window.location.href='records.html?id=${p.patientId}'">View Records</button>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
+                cardContainer.innerHTML += `
+    <div class="data-card">
+        <div class="data-card-header">
+            <span class="data-id">${p.patientId || 'N/A'}</span>
+            <span class="data-date">${dateStr}</span>
+        </div>
+        <div class="data-name">${p.firstName} ${p.lastName}</div>
+        
+        <!-- UPDATED INFO BLOCK WITH SPACING -->
+        <div class="data-info">
+            <div style="margin-bottom: 6px;"><strong>Age:</strong> ${p.age || 'N/A'} | <strong>Gender:</strong> ${p.gender || 'N/A'}</div>
+            <div style="margin-bottom: 6px;"><strong>Religion:</strong> ${p.religion || 'N/A'}</div>
+            <div><strong>Phone:</strong> ${p.phone || 'N/A'}</div>
+        </div>
+        
+        <div class="data-action" style="justify-content: space-between; align-items: center;">
+            <button class="btn btn-outline" style="padding: 6px 10px; font-size: 12px; border-color: #f59e0b; color: #f59e0b;" onclick="viewPin('${p.pin || ''}', '${p.firstName} ${p.lastName}')">🔑 View PIN</button>
+            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 12px;" onclick="window.location.href='records.html?id=${p.patientId}'">View Records</button>
+        </div>
+    </div>
+`;
             // --- END OF RENDER CARDS ---
 
             // --- START OF VIEW PIN MODAL LOGIC ---
