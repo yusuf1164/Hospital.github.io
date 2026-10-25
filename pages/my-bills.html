@@ -132,6 +132,7 @@
 
     <script>
         // --- START OF MY-BILLS INITIALIZATION ---
+        enforceAuth(['patient']);  //BOUNCE BACK TO THE LOGIN PAGE
         let allBillsData = []; // Store fetched bills for printing
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
