@@ -213,76 +213,92 @@ function initForms() {
     // --- END OF LOGIN FORM LOGIC ---
 
     // --- START OF STAFF REGISTER FORM LOGIC ---
-    const registerForm = document.getElementById('registerForm');
-    if (registerForm) {
-        registerForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            
-            const firstName = document.getElementById('firstname').value;
-            const lastName = document.getElementById('lastname').value;
-            const gender = document.getElementById('gender').value;
-            const religion = document.getElementById('religion').value;
-            const dob = document.getElementById('dob').value;
-            const email = document.getElementById('email').value;
-            const phone = document.getElementById('phone').value;
-            const password = document.getElementById('password').value;
-            const confirm = document.getElementById('confirmPassword').value;
-            
-            const passwordError = document.getElementById('passwordError');
-            const registerError = document.getElementById('registerError');
-            const btn = document.getElementById('registerBtn');
+    // --- STAFF REGISTER FORM LOGIC ---
+const registerForm = document.getElementById('registerForm');
+if (registerForm) {
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const inviteCode = document.getElementById('inviteCode').value.trim();
+        const firstName = document.getElementById('firstname').value;
+        const lastName = document.getElementById('lastname').value;
+        const gender = document.getElementById('gender').value;
+        const religion = document.getElementById('religion').value;
+        const dob = document.getElementById('dob').value;
+        const email = document.getElementById('email').value;
+        const phone = document.getElementById('phone').value;
+        const password = document.getElementById('password').value;
+        const confirm = document.getElementById('confirmPassword').value;
+        
+        const passwordError = document.getElementById('passwordError');
+        const registerError = document.getElementById('registerError');
+        const btn = document.getElementById('registerBtn');
 
-            if (password !== confirm) {
-                passwordError.style.display = 'block';
-                return;
+        if (password !== confirm) {
+            passwordError.style.display = 'block';
+            return;
+        }
+        passwordError.style.display = 'none';
+        registerError.style.display = 'none';
+
+        btn.textContent = 'Verifying...'; btn.disabled = true;
+
+        try {
+            // 1. Check the Invite Code against the database
+            const configDoc = await db.collection('settings').doc('config').get();
+            const validCode = configDoc.exists ? configDoc.data().inviteCode : null;
+
+            if (!validCode) {
+                throw new Error("Registration is currently disabled. Please contact Admin.");
             }
-            passwordError.style.display = 'none';
+
+            if (inviteCode !== validCode) {
+                throw new Error("Invalid Invite Code. Please contact HR.");
+            }
+
+            // 2. Create the Account
+            btn.textContent = 'Creating Account...';
+            const cred = await auth.createUserWithEmailAndPassword(email, password);
             
+            // 3. Generate Staff ID
+            const counterRef = db.collection('settings').doc('counters');
+            const generatedStaffId = await db.runTransaction(async (transaction) => {
+                const doc = await transaction.get(counterRef);
+                let nextId = 1002; 
+                if (doc.exists && doc.data().lastStaffId) {
+                    nextId = doc.data().lastStaffId + 1;
+                }
+                transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                return String(nextId); 
+            });
+
+            // 4. Save Profile
             const calculatedAge = calculateAge(dob);
+            await db.collection('users').doc(cred.user.uid).set({
+                firstName: firstName,
+                lastName: lastName,
+                gender: gender,
+                religion: religion,
+                dob: dob,
+                age: calculatedAge,
+                email: email,
+                phone: phone,
+                staffId: generatedStaffId, 
+                roles: [],
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-            btn.textContent = 'Creating Account...'; btn.disabled = true;
+            showAlert("Success", "Registration Successful! Your Staff ID has been generated.", "✔️");
+            setTimeout(() => window.location.href = 'dashboard.html', 1500);
 
-            auth.createUserWithEmailAndPassword(email, password)
-                .then((cred) => {
-                    const counterRef = db.collection('settings').doc('counters');
-                    
-                    return db.runTransaction((transaction) => {
-                        return transaction.get(counterRef).then((doc) => {
-                            let nextId = 1002; 
-                            if (doc.exists && doc.data().lastStaffId) {
-                                nextId = doc.data().lastStaffId + 1;
-                            }
-                            transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
-                            return String(nextId); 
-                        });
-                    }).then((generatedStaffId) => {
-                        return db.collection('users').doc(cred.user.uid).set({
-                            firstName: firstName,
-                            lastName: lastName,
-                            gender: gender,
-                            religion: religion,
-                            dob: dob,
-                            age: calculatedAge,
-                            email: email,
-                            phone: phone,
-                            staffId: generatedStaffId, 
-                            roles: [],
-                            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                        });
-                    });
-                })
-                .then(() => {
-                    showAlert("Success", "Registration Successful! Your Staff ID has been generated.", "✔️");
-                    setTimeout(() => window.location.href = 'dashboard.html', 1500);
-                })
-                .catch(err => {
-                    registerError.style.display = 'block';
-                    registerError.textContent = err.message;
-                    btn.textContent = 'Create Account'; 
-                    btn.disabled = false;
-                });
-        });
-    }
+        } catch (err) {
+            registerError.style.display = 'block';
+            registerError.textContent = err.message;
+            btn.textContent = 'Create Account'; 
+            btn.disabled = false;
+        }
+    });
+}
     // --- END OF STAFF REGISTER FORM LOGIC ---
 }
 // --- END OF INITFORMS FUNCTION ---
