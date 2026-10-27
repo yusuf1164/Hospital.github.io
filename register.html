@@ -8,15 +8,19 @@
 </head>
 <body>
     <header id="header-placeholder"></header>
+
     <main>
-        <div class="form-container" style="max-width: 650px;">
+        <div class="form-container">
             <h2>Staff Registration</h2>
             <p>Create an account to access the hospital system.</p>
             
             <form id="registerForm">
-                
-          <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                   
+                <!-- INVITE CODE FIELD -->
+                <div class="form-group" style="background: #fef3c7; padding: 10px; border-radius: 5px; border: 1px solid #f59e0b;">
+                    <label for="inviteCode" style="color: #92400e;">Staff Invite Code</label>
+                    <input type="text" id="inviteCode" required placeholder="Enter code given by HR" style="border-color: #f59e0b;">
+                </div>
+
                 <div class="form-group">
                     <label for="firstname">First Name</label>
                     <input type="text" id="firstname" required placeholder="John">
@@ -25,10 +29,6 @@
                     <label for="lastname">Last Name</label>
                     <input type="text" id="lastname" required placeholder="Doe">
                 </div>
-        </div>
-                
-       <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                   
                 <div class="form-group">
                     <label for="gender">Gender</label>
                     <select id="gender" required>
@@ -38,8 +38,6 @@
                         <option value="Other">Other</option>
                     </select>
                 </div>
-
-                <!-- RELIGION FIELD -->
                 <div class="form-group">
                     <label for="religion">Religion</label>
                     <select id="religion" required>
@@ -49,28 +47,19 @@
                         <option value="Other">Other</option>
                     </select>
                 </div>
-        </div>
-
-        <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                    
                 <div class="form-group">
                     <label for="dob">Date of Birth</label>
                     <input type="date" id="dob" required>
                     <div id="ageDisplay" style="font-size: 14px; color: #2563eb; font-weight: bold; margin-top: 5px;"></div>
                 </div>
-                                <div class="form-group">
-                    <label for="phone">Phone Number</label>
-                    <input type="tel" id="phone" required placeholder="+1 (555) 000-0000">
-                </div>
-        </div>
-        
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" required placeholder="you@example.com">
                 </div>
-                
-            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
-                    
+                <div class="form-group">
+                    <label for="phone">Phone Number</label>
+                    <input type="tel" id="phone" required placeholder="+1 (555) 000-0000">
+                </div>
                 <div class="form-group">
                     <label for="password">Password</label>
                     <input type="password" id="password" required placeholder="••••••••">
@@ -80,7 +69,6 @@
                     <input type="password" id="confirmPassword" required placeholder="••••••••">
                     <div id="passwordError" class="error-message">Passwords do not match.</div>
                 </div>
-            </div>
                 
                 <button type="submit" class="btn-submit" id="registerBtn">Create Account</button>
                 <div id="registerError" class="error-message" style="text-align:center; margin-top:10px;"></div>
@@ -91,6 +79,7 @@
             </div>
         </div>
     </main>
+
     <footer id="footer-placeholder"></footer>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
