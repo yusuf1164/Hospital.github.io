@@ -187,7 +187,28 @@
         let globalAdminRooms = [];
 
         window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; };
+        // --- START OF INVITE CODE LOGIC ---
+const inviteCodeInput = document.getElementById('globalInviteCode');
+const saveInviteCodeBtn = document.getElementById('saveInviteCodeBtn');
 
+// Load current code from database
+db.collection('settings').doc('config').get().then(doc => {
+    if (doc.exists && doc.data().inviteCode) {
+        inviteCodeInput.value = doc.data().inviteCode;
+    }
+});
+
+// Save new code to database
+saveInviteCodeBtn.addEventListener('click', () => {
+    const newCode = inviteCodeInput.value.trim();
+    if (!newCode) { showAlert("Error", "Code cannot be empty.", "❌"); return; }
+    
+    db.collection('settings').doc('config').set({ inviteCode: newCode }, { merge: true })
+    .then(() => showAlert("Success", "Invite code updated successfully!", "✔️"))
+    .catch(err => showAlert("Error", err.message, "❌"));
+});
+// --- END OF INVITE CODE LOGIC ---
+        
         auth.onAuthStateChanged((user) => {
             if (!user) return;
 
