@@ -10,7 +10,7 @@
     <header id="header-placeholder"></header>
 
     <main>
-        <div class="form-container">
+        <div class="form-container" style="max-width: 600px;">
             <h2>Staff Registration</h2>
             <p>Create an account to access the hospital system.</p>
             
@@ -20,7 +20,8 @@
                     <label for="inviteCode" style="color: #92400e;">Staff Invite Code</label>
                     <input type="text" id="inviteCode" required placeholder="Enter code given by HR" style="border-color: #f59e0b;">
                 </div>
-
+                
+            <div class="form-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px;">
                 <div class="form-group">
                     <label for="firstname">First Name</label>
                     <input type="text" id="firstname" required placeholder="John">
@@ -29,6 +30,8 @@
                     <label for="lastname">Last Name</label>
                     <input type="text" id="lastname" required placeholder="Doe">
                 </div>
+            </div>
+                
                 <div class="form-group">
                     <label for="gender">Gender</label>
                     <select id="gender" required>
