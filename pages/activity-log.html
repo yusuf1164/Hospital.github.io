@@ -32,56 +32,59 @@
     <script src="../script.js"></script>
 
     <script>
-        // --- START OF ACTIVITY LOG INITIALIZATION ---
-        enforceAuth(['admin', 'hr']);
+    // --- START OF ACTIVITY LOG INITIALIZATION ---
+    enforceAuth(['admin', 'hr']);
 
-        auth.onAuthStateChanged((user) => {
-            if (!user) return;
+    auth.onAuthStateChanged((user) => {
+        if (!user) return;
 
-            const logContainer = document.getElementById('logContainer');
+        const logContainer = document.getElementById('logContainer');
 
-            // Load latest 50 logs to keep it scalable
-            db.collection('auditLogs').orderBy('timestamp', 'desc').limit(50).onSnapshot((snapshot) => {
-                if (snapshot.empty) {
-                    logContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No activity recorded yet.</p>`;
-                    return;
-                }
+        // Load latest 50 logs to keep it scalable
+        db.collection('auditLogs').orderBy('timestamp', 'desc').limit(50).onSnapshot((snapshot) => {
+            if (snapshot.empty) {
+                logContainer.innerHTML = `<p style="text-align:center; width:100%; color:#888;">No activity recorded yet.</p>`;
+                return;
+            }
+            
+            logContainer.innerHTML = '';
+            snapshot.forEach(doc => {
+                const d = doc.data();
+                const date = d.timestamp ? d.timestamp.toDate().toLocaleString(undefined, { 
+                    year: 'numeric', month: 'short', day: 'numeric', 
+                    hour: '2-digit', minute: '2-digit', hour12: true 
+                }) : 'Just now';
+
+                // FIX: Added fallback in case 'action' is missing so it doesn't crash
+                const actionText = d.action || 'Action';
                 
-                logContainer.innerHTML = '';
-                snapshot.forEach(doc => {
-                    const d = doc.data();
-                    const date = d.timestamp ? d.timestamp.toDate().toLocaleString(undefined, { 
-                        year: 'numeric', month: 'short', day: 'numeric', 
-                        hour: '2-digit', minute: '2-digit', hour12: true 
-                    }) : 'Just now';
+                // COLOR BADGES BASED ON ACTION
+                let badgeColor = 'status-active';
+                if (actionText.includes('Registered')) badgeColor = 'status-complete';
+                if (actionText.includes('Dispensed') || actionText.includes('Paid')) badgeColor = 'status-pending';
 
-                    // COLOR BADGES BASED ON ACTION
-                    let badgeColor = 'status-active';
-                    if (d.action.includes('Registered')) badgeColor = 'status-complete';
-                    if (d.action.includes('Dispensed') || d.action.includes('Paid')) badgeColor = 'status-pending';
+                // FIX: Prevent long random Firebase UIDs from showing as IDs
+                let displayId = d.staffId || 'N/A';
+                if (displayId.length > 10) displayId = 'N/A'; // Firebase UIDs are ~28 characters
 
-                    // FIX: Prevent long random Firebase UIDs from showing as IDs
-                    let displayId = d.staffId || 'N/A';
-                    if (displayId.length > 10) displayId = 'N/A'; // Firebase UIDs are ~28 characters
-
-                    logContainer.innerHTML += `
-                        <div class="data-card" style="border-left: 4px solid #2563eb;">
-                            <div class="data-card-header">
-                                <span class="data-id">${d.staffName || 'Staff Member'} <small style="color:#6b7280; font-weight:normal;">(ID: ${displayId})</small></span>
-                                <span class="data-date">${date}</span>
-                            </div>
-                            <div class="data-info">
-                                <strong>Action:</strong> <span class="status-badge ${badgeColor}">${d.action}</span><br>
-                                <strong>Details:</strong> ${d.details}
-                            </div>
+                logContainer.innerHTML += `
+                    <div class="data-card" style="border-left: 4px solid #2563eb;">
+                        <div class="data-card-header">
+                            <span class="data-id">${d.staffName || 'Staff Member'} <small style="color:#6b7280; font-weight:normal;">(ID: ${displayId})</small></span>
+                            <span class="data-date">${date}</span>
                         </div>
-                    `;
-                });
-            }, error => {
-                logContainer.innerHTML = `<p style="text-align:center; width:100%; color:red;">Error: ${error.message}</p>`;
+                        <div class="data-info">
+                            <strong>Action:</strong> <span class="status-badge ${badgeColor}">${actionText}</span><br>
+                            <strong>Details:</strong> ${d.details || 'No details provided'}
+                        </div>
+                    </div>
+                `;
             });
+        }, error => {
+            logContainer.innerHTML = `<p style="text-align:center; width:100%; color:red;">Error: ${error.message}</p>`;
         });
-        // --- END OF ACTIVITY LOG INITIALIZATION ---
-    </script>
+    });
+    // --- END OF ACTIVITY LOG INITIALIZATION ---
+</script>
 </body>
 </html>
