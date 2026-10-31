@@ -15,181 +15,121 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // ==========================================
-// 2. PAGE INITIALIZATION
+// 2. HELPER FUNCTIONS
 // ==========================================
-// --- START OF INITIALIZATION ---
-document.addEventListener('DOMContentLoaded', () => {
-    loadHeader();
-    loadFooter();
-    initForms();
-});
-// --- END OF INITIALIZATION ---
-
-
-// ==========================================
-// 3. LOAD HEADER & FOOTER
-// ==========================================
-// --- START OF LOAD HEADER ---
-function loadHeader() {
-    const inPagesFolder = window.location.pathname.includes('/pages/');
-    const headerPath = inPagesFolder ? '../header.html' : 'header.html';
-    
-    fetch(headerPath, { cache: "no-store" })
-        .then(res => res.text())
-        .then(data => {
-            const ph = document.getElementById('header-placeholder');
-            if (ph) {
-                ph.innerHTML = data;
-                if (inPagesFolder) {
-                    ph.querySelectorAll('a[href^="index"]').forEach(a => a.href = '../index.html');
-                    ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
-                    ph.querySelectorAll('a[href^="login"], a[href^="register"], a[href^="dashboard"], a[href^="patient-register"]').forEach(a => a.href = '../' + a.getAttribute('href'));
-                }
-                initMobileMenu();
-                updateAuthUI();
-            }
-        })
-        .catch(err => console.error('Header load error:', err));
-}
-// --- END OF LOAD HEADER ---
-
-// --- START OF LOAD FOOTER ---
-function loadFooter() {
-    const inPagesFolder = window.location.pathname.includes('/pages/');
-    const footerPath = inPagesFolder ? '../footer.html' : 'footer.html';
-    
-    fetch(footerPath, { cache: "no-store" })
-        .then(res => res.text())
-        .then(data => {
-            const ph = document.getElementById('footer-placeholder');
-            if (ph) {
-                ph.innerHTML = data;
-                if (inPagesFolder) {
-                    ph.querySelectorAll('a[href^="pages/"]').forEach(a => a.href = a.getAttribute('href').replace('pages/', ''));
-                }
-            }
-        })
-        .catch(err => console.error('Footer load error:', err));
-}
-// --- END OF LOAD FOOTER ---
-
-
-// ==========================================
-// 4. MOBILE MENU TOGGLE
-// ==========================================
-// --- START OF MOBILE MENU ---
-function initMobileMenu() {
-    const menuToggle = document.getElementById('menu-toggle');
-    const navLinks = document.getElementById('nav-links');
-    if (menuToggle && navLinks) {
-        menuToggle.addEventListener('click', () => navLinks.classList.toggle('active'));
-    }
-}
-// --- END OF MOBILE MENU ---
-
-
-// ==========================================
-// 5. DYNAMIC HEADER BUTTONS & LOGOUT
-// ==========================================
-// --- START OF AUTH UI ---
-function updateAuthUI() {
-    const authButtons = document.getElementById('auth-buttons');
-    const dynamicLinks = document.getElementById('dynamic-dept-links');
-    if (!authButtons) return;
-    
-    const inPagesFolder = window.location.pathname.includes('/pages/');
-    const prefix = inPagesFolder ? '../' : '';
-    const rootUrl = window.location.origin + window.location.pathname.split('/pages/')[0];
-
-    auth.onAuthStateChanged((user) => {
-        if (user) {
-            authButtons.innerHTML = `
-                <a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a>
-                <a href="#" id="logoutLink" class="btn btn-primary">Logout</a>
-            `;
-            
-            db.collection('users').doc(user.uid).get().then(doc => {
-                const data = doc.data() || {};
-                let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
-                
-                let linksHTML = `<a href="${prefix}pages/emergency.html" class="nav-link">Emergency</a>`;
-
-                if (userRoles.includes('admin') || userRoles.includes('doctor')) {
-                    linksHTML += `<a href="${prefix}pages/opd.html" class="nav-link">OPD</a>`;
-                }
-                if (userRoles.includes('admin') || userRoles.includes('lab')) {
-                    linksHTML += `<a href="${prefix}pages/laboratory.html" class="nav-link">Lab</a>`;
-                }
-                if (userRoles.includes('admin') || userRoles.includes('pharmacy')) {
-                    linksHTML += `<a href="${prefix}pages/pharmacy.html" class="nav-link">Pharmacy</a>`;
-                }
-                
-                if(dynamicLinks) dynamicLinks.innerHTML = linksHTML;
-            });
-
-            const logoutLink = document.getElementById('logoutLink');
-            if (logoutLink) {
-                logoutLink.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    auth.signOut().then(() => {
-                        window.location.href = rootUrl + '/index.html';
-                    }).catch(() => {
-                        window.location.href = rootUrl + '/index.html';
-                    });
-                });
-            }
-        } else {
-            authButtons.innerHTML = `
-                <a href="${prefix}login.html" class="btn btn-outline">Login</a>
-                <a href="${prefix}register.html" class="btn btn-outline">Staff Register</a>
-                <a href="${prefix}patient-register.html" class="btn btn-primary">Patient Register</a>
-            `;
-            if(dynamicLinks) dynamicLinks.innerHTML = `<a href="${prefix}pages/emergency.html" class="nav-link">Emergency</a>`;
-        }
-    });
-}
-// --- END OF AUTH UI ---
-
-
-// ==========================================
-// 6. HELPER: CALCULATE AGE FROM DOB
-// ==========================================
-// --- START OF CALCULATE AGE HELPER ---
 function calculateAge(dobString) {
     if (!dobString) return "";
     const birthDate = new Date(dobString);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
 }
-// --- END OF CALCULATE AGE HELPER ---
 
+function logActivity(user, action, details) {
+    if (!user) return;
+    db.collection('users').doc(user.uid).get().then(doc => {
+        const data = doc.data() || {};
+        db.collection('auditLogs').add({
+            userId: user.uid, 
+            staffName: data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member', 
+            staffId: data.staffId || 'N/A', 
+            action: action, 
+            details: details,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+    });
+}
 
-// ==========================================
-// 7. FORMS (LOGIN & STAFF REGISTER)
-// ==========================================
-// --- START OF INITFORMS FUNCTION ---
-function initForms() {
-    
-    // --- START OF LIVE AGE CALCULATION ---
-    const dobInputs = document.querySelectorAll('input[type="date"]');
-    dobInputs.forEach(input => {
-        input.addEventListener('change', function() {
-            const age = calculateAge(this.value);
-            const displayDiv = this.nextElementSibling;
-            if (displayDiv && displayDiv.id.includes('ageDisplay')) {
-                // UPDATED: Now only says "Age: X"
-                displayDiv.textContent = age !== "" ? `Age: ${age}` : "";
+function enforceAuth(allowedRoles) {
+    auth.onAuthStateChanged((user) => {
+        if (!user || !user.emailVerified) { 
+            window.location.href = '../login.html'; 
+            return; 
+        }
+        db.collection('users').doc(user.uid).get().then(doc => {
+            if (!doc.exists) { window.location.href = '../login.html'; return; }
+            const data = doc.data();
+            let userRoles = data.roles || [];
+            if (userRoles.includes('admin')) return; 
+            const hasAccess = allowedRoles.some(role => userRoles.includes(role));
+            if (!hasAccess) {
+                showAlert("Access Denied", "You do not have permission to view this page.", "🚫");
+                setTimeout(() => window.location.href = '../dashboard.html', 2000);
             }
         });
     });
-    // --- END OF LIVE AGE CALCULATION ---
+}
 
-    // --- START OF LOGIN FORM LOGIC ---
+// ==========================================
+// 3. LOAD HEADER/FOOTER & FORMS
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    loadHeader();
+    loadFooter();
+    initForms();
+    setupInactivityTimer();
+});
+
+function loadHeader() {
+    const inPages = window.location.pathname.includes('/pages/');
+    fetch(inPages ? '../header.html' : 'header.html', { cache: "no-store" })
+        .then(res => res.text()).then(data => {
+            const ph = document.getElementById('header-placeholder');
+            if (ph) { ph.innerHTML = data; initMobileMenu(); updateAuthUI(); }
+        });
+}
+
+function loadFooter() {
+    const inPages = window.location.pathname.includes('/pages/');
+    fetch(inPages ? '../footer.html' : 'footer.html', { cache: "no-store" })
+        .then(res => res.text()).then(data => {
+            const ph = document.getElementById('footer-placeholder');
+            if (ph) ph.innerHTML = data;
+        });
+}
+
+function initMobileMenu() {
+    const toggle = document.getElementById('menu-toggle');
+    const nav = document.getElementById('nav-links');
+    if (toggle && nav) toggle.addEventListener('click', () => nav.classList.toggle('active'));
+}
+
+function updateAuthUI() {
+    const authButtons = document.getElementById('auth-buttons');
+    if (!authButtons) return;
+    const inPages = window.location.pathname.includes('/pages/');
+    const prefix = inPages ? '../' : '';
+
+    auth.onAuthStateChanged((user) => {
+        if (user && user.emailVerified) {
+            authButtons.innerHTML = `<a href="${prefix}dashboard.html" class="btn btn-outline">Dashboard</a><a href="#" id="logoutLink" class="btn btn-primary">Logout</a>`;
+            document.getElementById('logoutLink').addEventListener('click', (e) => {
+                e.preventDefault(); auth.signOut().then(() => window.location.href = prefix + 'index.html');
+            });
+        } else {
+            authButtons.innerHTML = `<a href="${prefix}login.html" class="btn btn-outline">Login</a><a href="${prefix}choose-register.html" class="btn btn-primary">Register</a>`;
+        }
+    });
+}
+
+// ==========================================
+// 4. FORM LOGIC & EMAIL VERIFICATION
+// ==========================================
+function initForms() {
+    
+    // --- LIVE AGE CALCULATION ---
+    document.querySelectorAll('input[type="date"]').forEach(input => {
+        input.addEventListener('change', function() {
+            const displayDiv = this.nextElementSibling;
+            if (displayDiv && displayDiv.id.includes('ageDisplay')) {
+                displayDiv.textContent = `Age: ${calculateAge(this.value)}`;
+            }
+        });
+    });
+
+    // --- LOGIN FORM ---
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
         loginForm.addEventListener('submit', (e) => {
@@ -197,313 +137,189 @@ function initForms() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             const errorDiv = document.getElementById('loginError');
+            const resendSection = document.getElementById('resendSection');
             const btn = document.getElementById('loginBtn');
             
             btn.textContent = 'Signing in...'; btn.disabled = true;
+            errorDiv.style.display = 'none';
 
             auth.signInWithEmailAndPassword(email, password)
-                .then(() => window.location.href = 'dashboard.html')
+                .then((userCredential) => {
+                    if (!userCredential.user.emailVerified) {
+                        // If not verified, block them
+                        errorDiv.style.display = 'block';
+                        errorDiv.textContent = "Please verify your email. Check your inbox.";
+                        resendSection.style.display = 'block'; // Show resend button
+                        btn.textContent = 'Sign In'; btn.disabled = false;
+                        auth.signOut(); // Log them out immediately
+                    } else {
+                        // If verified, let them in
+                        window.location.href = 'dashboard.html';
+                    }
+                })
                 .catch(err => {
                     errorDiv.style.display = 'block';
                     errorDiv.textContent = err.message;
                     btn.textContent = 'Sign In'; btn.disabled = false;
                 });
         });
-    }
-    // --- END OF LOGIN FORM LOGIC ---
 
-    // --- START OF STAFF REGISTER FORM LOGIC ---
-    // --- STAFF REGISTER FORM LOGIC ---
-const registerForm = document.getElementById('registerForm');
-if (registerForm) {
-    registerForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        
-        const inviteCode = document.getElementById('inviteCode').value.trim();
-        const firstName = document.getElementById('firstname').value;
-        const lastName = document.getElementById('lastname').value;
-        const gender = document.getElementById('gender').value;
-        const religion = document.getElementById('religion').value;
-        const dob = document.getElementById('dob').value;
-        const email = document.getElementById('email').value;
-        const phone = document.getElementById('phone').value;
-        const password = document.getElementById('password').value;
-        const confirm = document.getElementById('confirmPassword').value;
-        
-        const passwordError = document.getElementById('passwordError');
-        const registerError = document.getElementById('registerError');
-        const btn = document.getElementById('registerBtn');
+        // --- RESEND VERIFICATION EMAIL ---
+        document.getElementById('resendBtn')?.addEventListener('click', () => {
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            if(!email || !password) { showAlert("Error", "Please enter your email and password first.", "❌"); return; }
 
-        if (password !== confirm) {
-            passwordError.style.display = 'block';
-            return;
-        }
-        passwordError.style.display = 'none';
-        registerError.style.display = 'none';
-
-        btn.textContent = 'Verifying...'; btn.disabled = true;
-
-        try {
-            // 1. Check the Invite Code against the database
-            const configDoc = await db.collection('settings').doc('config').get();
-            const validCode = configDoc.exists ? configDoc.data().inviteCode : null;
-
-            if (!validCode) {
-                throw new Error("Registration is currently disabled. Please contact Admin.");
-            }
-
-            if (inviteCode !== validCode) {
-                throw new Error("Invalid Invite Code. Please contact HR.");
-            }
-
-            // 2. Create the Account
-            btn.textContent = 'Creating Account...';
-            const cred = await auth.createUserWithEmailAndPassword(email, password);
-            
-            // 3. Generate Staff ID
-            const counterRef = db.collection('settings').doc('counters');
-            const generatedStaffId = await db.runTransaction(async (transaction) => {
-                const doc = await transaction.get(counterRef);
-                let nextId = 1002; 
-                if (doc.exists && doc.data().lastStaffId) {
-                    nextId = doc.data().lastStaffId + 1;
-                }
-                transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
-                return String(nextId); 
-            });
-
-            // 4. Save Profile
-            const calculatedAge = calculateAge(dob);
-            await db.collection('users').doc(cred.user.uid).set({
-                firstName: firstName,
-                lastName: lastName,
-                gender: gender,
-                religion: religion,
-                dob: dob,
-                age: calculatedAge,
-                email: email,
-                phone: phone,
-                staffId: generatedStaffId, 
-                roles: [],
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
-
-            showAlert("Success", "Registration Successful! Your Staff ID has been generated.", "✔️");
-            setTimeout(() => window.location.href = 'dashboard.html', 1500);
-
-        } catch (err) {
-            registerError.style.display = 'block';
-            registerError.textContent = err.message;
-            btn.textContent = 'Create Account'; 
-            btn.disabled = false;
-        }
-    });
-}
-    // --- END OF STAFF REGISTER FORM LOGIC ---
-}
-// --- END OF INITFORMS FUNCTION ---
-
-
-// ==========================================
-// 8. GLOBAL ACTIVITY LOGGER
-// ==========================================
-// --- START OF ACTIVITY LOGGER ---
-function logActivity(user, action, details) {
-    if (!user) return;
-    db.collection('users').doc(user.uid).get().then(doc => {
-        const data = doc.data() || {};
-        const staffName = data.firstName ? `${data.firstName} ${data.lastName}` : 'Staff Member';
-        const staffId = data.staffId || 'N/A';
-        db.collection('auditLogs').add({
-            userId: user.uid, staffName: staffName, staffId: staffId, action: action, details: details,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(err => console.error("Error logging activity:", err));
-    }).catch(err => {
-        db.collection('auditLogs').add({
-            userId: user.uid, staffName: 'Staff Member', staffId: 'N/A', action: action, details: details,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            // Re-authenticate temporarily to send email
+            auth.signInWithEmailAndPassword(email, password).then(cred => {
+                cred.user.sendEmailVerification().then(() => {
+                    showAlert("Success", "Verification email resent! Check your inbox.", "✔️");
+                    auth.signOut();
+                });
+            }).catch(err => showAlert("Error", err.message, "❌"));
         });
-    });
-}
-// --- END OF ACTIVITY LOGGER ---
+    }
 
+    // --- PATIENT REGISTER FORM ---
+    const patientRegisterForm = document.getElementById('patientRegisterForm');
+    if (patientRegisterForm) {
+        patientRegisterForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('registerBtn');
+            const errorDiv = document.getElementById('registerError');
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
 
-// ==========================================
-// 9. FRONT DOOR ROUTE GUARD (Security)
-// ==========================================
-// --- START OF ROUTE GUARD ---
-function enforceAuth(allowedRoles) {
-    auth.onAuthStateChanged((user) => {
-        if (!user) {
-            window.location.href = '../login.html';
-            return;
-        }
-        db.collection('users').doc(user.uid).get().then(doc => {
-            if (!doc.exists) { window.location.href = '../login.html'; return; }
-            const data = doc.data();
-            let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
-            
-            if (userRoles.includes('admin')) return; 
-            
-            const hasAccess = allowedRoles.some(role => userRoles.includes(role));
-            if (!hasAccess) {
-                showAlert("Access Denied", "You do not have permission to view this page.", "🚫");
-                setTimeout(() => window.location.href = '../dashboard.html', 2000);
+            if (password !== confirm) {
+                document.getElementById('passwordError').style.display = 'block';
+                return;
             }
-        }).catch(() => window.location.href = '../login.html');
-    });
-}
-// --- END OF ROUTE GUARD ---
+            document.getElementById('passwordError').style.display = 'none';
+            btn.textContent = 'Creating Account...'; btn.disabled = true;
 
+            const firstName = document.getElementById('firstname').value;
+            const lastName = document.getElementById('lastname').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
 
-// ==========================================
-// 10. AUTO-LOGOUT (SHARED TERMINAL SECURITY)
-// ==========================================
-// --- START OF AUTO-LOGOUT LOGIC ---
-let inactivityTimer;
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // 1. Send Verification Email
+                await cred.user.sendEmailVerification();
 
-function resetInactivityTimer() {
-    clearTimeout(inactivityTimer); 
-    
-    if (auth.currentUser) {
-        inactivityTimer = setTimeout(() => {
-            auth.signOut().then(() => {
-                if (typeof showAlert === 'function') {
-                    showAlert("Session Expired", "You have been logged out due to 10 minutes of inactivity to protect patient data.", "⏰");
+                // 2. Create User Profile in Database
+                await db.collection('users').doc(cred.user.uid).set({
+                    firstName, lastName, email, phone, roles: ['patient'], linkedPatientIds: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                // 3. Sign them out and redirect to login with a success message
+                await auth.signOut();
+                showAlert("Success", "Account created! Please check your email inbox to verify your account before logging in.", "✔️");
+                window.location.href = 'login.html?verified=pending';
+
+            } catch (err) {
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = err.message;
+                btn.textContent = 'Create Account'; btn.disabled = false;
+            }
+        });
+    }
+
+    // --- STAFF REGISTER FORM ---
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const inviteCode = document.getElementById('inviteCode').value.trim();
+            const btn = document.getElementById('registerBtn');
+            const errorDiv = document.getElementById('registerError');
+            const password = document.getElementById('password').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (password !== confirm) {
+                document.getElementById('passwordError').style.display = 'block';
+                return;
+            }
+            document.getElementById('passwordError').style.display = 'none';
+            errorDiv.style.display = 'none';
+            btn.textContent = 'Verifying...'; btn.disabled = true;
+
+            try {
+                // 1. Check Invite Code
+                const configDoc = await db.collection('settings').doc('config').get();
+                if (!configDoc.exists || inviteCode !== configDoc.data().inviteCode) {
+                    throw new Error("Invalid Invite Code. Please contact HR.");
                 }
-                setTimeout(() => {
-                    const isPages = window.location.pathname.includes('/pages/');
-                    window.location.href = isPages ? '../login.html' : 'login.html';
-                }, 2500);
-            }).catch((error) => {
-                console.error("Auto-logout error:", error);
-                window.location.reload();
-            });
-        }, 100 * 60 * 1000); 
+
+                btn.textContent = 'Creating Account...';
+                const email = document.getElementById('email').value;
+                
+                // 2. Create Account
+                const cred = await auth.createUserWithEmailAndPassword(email, password);
+                
+                // 3. Send Verification Email
+                await cred.user.sendEmailVerification();
+
+                // 4. Generate Staff ID & Save
+                const counterRef = db.collection('settings').doc('counters');
+                const newStaffId = await db.runTransaction(async (transaction) => {
+                    const doc = await transaction.get(counterRef);
+                    let nextId = 1002; 
+                    if (doc.exists && doc.data().lastStaffId) nextId = doc.data().lastStaffId + 1;
+                    transaction.set(counterRef, { lastStaffId: nextId }, { merge: true });
+                    return String(nextId); 
+                });
+
+                await db.collection('users').doc(cred.user.uid).set({
+                    firstName: document.getElementById('firstname').value,
+                    lastName: document.getElementById('lastname').value,
+                    gender: document.getElementById('gender').value,
+                    religion: document.getElementById('religion').value,
+                    dob: document.getElementById('dob').value,
+                    age: calculateAge(document.getElementById('dob').value),
+                    email: email,
+                    phone: document.getElementById('phone').value,
+                    staffId: newStaffId, 
+                    roles: [],
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                await auth.signOut();
+                showAlert("Success", "Account created! Please check your email inbox to verify your account before logging in.", "✔️");
+                window.location.href = 'login.html?verified=pending';
+
+            } catch (err) {
+                errorDiv.style.display = 'block';
+                errorDiv.textContent = err.message;
+                btn.textContent = 'Create Account'; btn.disabled = false;
+            }
+        });
     }
 }
 
-['mousemove', 'keydown', 'click', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, resetInactivityTimer);
-});
-
-auth.onAuthStateChanged((user) => {
-    if (user) {
-        resetInactivityTimer(); 
-    } else {
-        clearTimeout(inactivityTimer); 
-    }
-});
-// --- END OF AUTO-LOGOUT LOGIC ---
-
-
-// ==========================================
-// 11. GLOBAL CUSTOM MODAL ENGINE
-// ==========================================
-// --- START OF MODAL HTML INJECTION ---
-document.addEventListener('DOMContentLoaded', () => {
-    const modalHTML = `
-        <div id="globalModalOverlay" class="custom-modal-overlay">
-            <div class="custom-modal-box">
-                <div id="globalModalIcon" class="custom-modal-icon">ℹ️</div>
-                <div id="globalModalTitle" class="custom-modal-title">Message</div>
-                <div id="globalModalMessage" class="custom-modal-message">Details...</div>
-                <input type="text" id="globalModalInput" style="display: none; width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 20px; font-size: 14px;">
-                <div class="custom-modal-buttons" id="globalModalButtons"></div>
-            </div>
-        </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
-});
-// --- END OF MODAL HTML INJECTION ---
-
-// --- START OF SHOW ALERT ---
-window.closeGlobalModal = function() {
-    document.getElementById('globalModalOverlay').classList.remove('active');
-};
-
-window.showAlert = function(title, message, icon = 'ℹ️') {
-    const overlay = document.getElementById('globalModalOverlay');
-    const input = document.getElementById('globalModalInput');
-    input.style.display = 'none'; 
-    
-    document.getElementById('globalModalIcon').textContent = icon;
-    document.getElementById('globalModalTitle').textContent = title;
-    document.getElementById('globalModalMessage').innerHTML = message;
-    
-    const btnContainer = document.getElementById('globalModalButtons');
-    btnContainer.innerHTML = `<button class="btn btn-primary" style="flex:1;" onclick="closeGlobalModal()">OK</button>`;
-    
-    overlay.classList.add('active');
-};
-// --- END OF SHOW ALERT ---
-
-// --- START OF SHOW CONFIRM ---
-window.showConfirm = function(title, message, onConfirm) {
-    const overlay = document.getElementById('globalModalOverlay');
-    const input = document.getElementById('globalModalInput');
-    input.style.display = 'none'; 
-    
-    document.getElementById('globalModalIcon').textContent = '⚠️';
-    document.getElementById('globalModalTitle').textContent = title;
-    document.getElementById('globalModalMessage').innerHTML = message;
-    
-    const btnContainer = document.getElementById('globalModalButtons');
-    btnContainer.innerHTML = `
-        <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeGlobalModal()">Cancel</button>
-        <button class="btn btn-primary" style="flex:1;" id="globalModalConfirmBtn">Confirm</button>
-    `;
-    
-    document.getElementById('globalModalConfirmBtn').onclick = () => {
-        closeGlobalModal();
-        onConfirm();
-    };
-    
-    overlay.classList.add('active');
-};
-// --- END OF SHOW CONFIRM ---
-
-// --- START OF SHOW PROMPT ---
-window.showPrompt = function(title, message, defaultValue, onConfirm) {
-    const overlay = document.getElementById('globalModalOverlay');
-    const input = document.getElementById('globalModalInput');
-    input.style.display = 'block'; 
-    input.value = defaultValue || ''; 
-    
-    document.getElementById('globalModalIcon').textContent = '✏️';
-    document.getElementById('globalModalTitle').textContent = title;
-    document.getElementById('globalModalMessage').innerHTML = message;
-    
-    const btnContainer = document.getElementById('globalModalButtons');
-    btnContainer.innerHTML = `
-        <button class="btn btn-outline" style="flex:1; border-color: #ccc; color: #333;" onclick="closeGlobalModal()">Cancel</button>
-        <button class="btn btn-primary" style="flex:1;" id="globalModalConfirmBtn">Submit</button>
-    `;
-    
-    document.getElementById('globalModalConfirmBtn').onclick = () => {
-        const val = input.value;
-        closeGlobalModal();
-        onConfirm(val);
-    };
-    
-    overlay.classList.add('active');
-    setTimeout(() => input.focus(), 300);
-};
-// --- END OF SHOW PROMPT ---
-
-
-// ==========================================
-// 12. SMART BACK BUTTON LOGIC
-// ==========================================
-// --- START OF SMART BACK BUTTON ---
-function goBack() {
-    // Check if there is a previous page in the browser history
-    if (window.history.length > 1) {
-        window.history.back();
-    } else {
-        // Fallback: If they opened the page directly, send them to the dashboard
-        const isPagesFolder = window.location.pathname.includes('/pages/');
-        window.location.href = isPagesFolder ? '../dashboard.html' : 'dashboard.html';
-    }
+// Check URL for verification success message
+if (window.location.search.includes('verified=pending')) {
+    document.getElementById('verifySuccessMsg').style.display = 'block';
 }
-// --- END OF SMART BACK BUTTON ---
+
+// ==========================================
+// 5. AUTO-LOGOUT (INACTIVITY)
+// ==========================================
+let inactivityTimer;
+function setupInactivityTimer() {
+    const reset = () => {
+        clearTimeout(inactivityTimer);
+        if (auth.currentUser && auth.currentUser.emailVerified) {
+            inactivityTimer = setTimeout(() => {
+                auth.signOut().then(() => {
+                    showAlert("Session Expired", "Logged out due to inactivity.", "⏰");
+                    setTimeout(() => window.location.href = 'login.html', 2000);
+                });
+            }, 15 * 60 * 1000); // 15 minutes
+        }
+    };
+    ['mousemove', 'keydown', 'click', 'scroll'].forEach(ev => document.addEventListener(ev, reset));
+    auth.onAuthStateChanged(user => { if(user) reset(); else clearTimeout(inactivityTimer); });
+}
