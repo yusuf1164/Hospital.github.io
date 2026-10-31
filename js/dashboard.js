@@ -2,7 +2,16 @@ auth.onAuthStateChanged((user) => {
     if (!user) { window.location.href = 'login.html'; return; }
 
     db.collection('users').doc(user.uid).get().then(doc => {
-        if (!doc.exists) return;
+        
+        // --- FIX: If the database document is missing, show an error instead of hanging ---
+        if (!doc.exists) {
+            const nameEl = document.getElementById('userName');
+            const roleEl = document.getElementById('userRole');
+            if (nameEl) nameEl.textContent = "Profile Not Found";
+            if (roleEl) roleEl.textContent = "Please contact HR / Reception";
+            console.error("User document does not exist in Firestore!");
+            return; 
+        }
 
         const data = doc.data();
         let userRoles = data.roles || (data.role ? [data.role] : ['patient']);
@@ -12,6 +21,7 @@ auth.onAuthStateChanged((user) => {
         if (nameEl) nameEl.textContent = data.firstName ? `${data.firstName} ${data.lastName}` : user.email;
         if (roleEl) roleEl.textContent = userRoles.join(', ');
 
+        // --- ADMIN STATS LOGIC ---
         const statsContainer = document.getElementById('adminStatsContainer');
         if (statsContainer && userRoles.includes('admin')) {
             statsContainer.style.display = 'block';
@@ -22,7 +32,7 @@ auth.onAuthStateChanged((user) => {
                 if (el) el.innerText = snap.size;
             }).catch(e => console.log(e));
 
-            // 2. Ongoing Treatment (patients where treatmentStatus == 'Ongoing' OR missing)
+            // 2. Ongoing Treatment
             db.collection('patients').get().then(snap => {
                 let ongoingCount = 0;
                 snap.forEach(doc => {
@@ -31,7 +41,7 @@ auth.onAuthStateChanged((user) => {
                 });
                 const el = document.getElementById('statOngoing');
                 if (el) el.innerText = ongoingCount;
-            });
+            }).catch(e => console.log(e));
 
             // 3. Treated Patients
             db.collection('patients').get().then(snap => {
@@ -41,7 +51,7 @@ auth.onAuthStateChanged((user) => {
                 });
                 const el = document.getElementById('statTreated');
                 if (el) el.innerText = treatedCount;
-            });
+            }).catch(e => console.log(e));
 
             // 4. Active Emergencies
             db.collection('emergencies').where('status', '==', 'Active').get().then(snap => {
@@ -78,6 +88,12 @@ auth.onAuthStateChanged((user) => {
         }
 
         renderModules(userRoles);
+
+    }).catch(err => {
+        // --- FIX: Catch permission errors ---
+        console.error("Firestore Error:", err);
+        const nameEl = document.getElementById('userName');
+        if (nameEl) nameEl.textContent = "Database Permission Error";
     });
 });
 
