@@ -10,28 +10,33 @@
     <header id="header-placeholder"></header>
     <main>
         <div class="form-container">
-            <h2>Sign-in Portal</h2>
-            <p>Access your medical records and appointments.</p>
-
-            <!-- SMART BACK BUTTON -->
-            <button onclick="goBack()" class="btn btn-outline" style="border-color: #1e3a8a; color: #1e3a8a; margin-bottom: 20px; display: inline-block; cursor: pointer;">⬅️ Back</button>
+            <h2>Login</h2>
+            <p>Access your account.</p>
             
+            <!-- SUCCESS MESSAGE FOR VERIFICATION -->
+            <div id="verifySuccessMsg" style="display:none; background: #d1fae5; color: #065f46; padding: 10px; border-radius: 5px; margin-bottom: 15px; font-size: 14px; text-align: center;">
+                Registration successful! Please check your email inbox to verify your account.
+            </div>
+
             <form id="loginForm">
                 <div class="form-group">
                     <label for="email">Email Address</label>
-                    <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                    <input type="email" id="email" required placeholder="you@example.com">
                 </div>
                 <div class="form-group">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="••••••••" required>
-                </div>
-                <div class="form-options">
-                    <label><input type="checkbox"> Remember me</label>
-                    <a href="#">Forgot password?</a>
+                    <input type="password" id="password" required placeholder="••••••••">
                 </div>
                 <button type="submit" class="btn-submit" id="loginBtn">Sign In</button>
                 <div id="loginError" class="error-message" style="text-align:center; margin-top:10px;"></div>
             </form>
+            
+            <!-- RESEND VERIFICATION BUTTON (Hidden by default) -->
+            <div id="resendSection" style="display:none; text-align: center; margin-top: 15px;">
+                <p style="font-size: 13px; color: #666;">Didn't receive the email?</p>
+                <button id="resendBtn" class="btn btn-outline" style="border-color: #f59e0b; color: #f59e0b; margin-top: 5px; width: 100%;">Resend Verification Email</button>
+            </div>
+
             <div class="form-footer">
                 Don't have an account? <a href="choose-register.html">Register here</a>
             </div>
