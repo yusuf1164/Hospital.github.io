@@ -323,3 +323,17 @@ function setupInactivityTimer() {
     ['mousemove', 'keydown', 'click', 'scroll'].forEach(ev => document.addEventListener(ev, reset));
     auth.onAuthStateChanged(user => { if(user) reset(); else clearTimeout(inactivityTimer); });
 }
+
+
+
+
+function goBack() {
+    // Check if the user actually navigated here from another page
+    if (window.history.length > 1 && document.referrer) {
+        window.history.back();
+    } else {
+        // If they opened the link directly, send them to the dashboard
+        const inPages = window.location.pathname.includes('/pages/');
+        window.location.href = inPages ? '../dashboard.html' : 'dashboard.html';
+    }
+}
